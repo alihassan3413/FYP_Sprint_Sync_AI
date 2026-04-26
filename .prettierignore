@@ -1,0 +1,8 @@
+resources/js/components/ui/**
+resources/js/actions/**
+resources/js/routes/**
+resources/js/wayfinder/index.ts
+resources/js/types/auto-imports.d.ts
+resources/js/types/components.d.ts
+resources/js/ziggy.js
+resources/views/mail/*
