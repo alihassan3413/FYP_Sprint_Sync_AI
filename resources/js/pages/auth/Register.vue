@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import InputError from '@/components/InputError.vue';
-import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthBase from '@/layouts/AuthLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
 
 const form = useForm({
@@ -13,13 +10,34 @@ const form = useForm({
     email: '',
     password: '',
     password_confirmation: '',
+    workspace_name: '',
 });
 
 const submit = () => {
     form.post(route('register'), {
-        onFinish: () => form.reset('password', 'password_confirmation'),
+        onFinish: () => form.reset('password', 'password_confirmation', 'workspace_name'),
     });
 };
+
+const hasUserManuallyEditedWorkspaceName = ref(false);
+
+function generateWorkspaceName(name: string): string {
+    return name.toUpperCase() + "'s Workspace";
+}
+
+function handleWorkspaceNameInput() {
+    hasUserManuallyEditedWorkspaceName.value = true;
+}
+
+watch(
+    () => form.name,
+    (newName) => {
+        if (!hasUserManuallyEditedWorkspaceName.value) {
+            form.workspace_name = generateWorkspaceName(newName);
+        }
+    }
+);
+
 </script>
 
 <template>
@@ -66,6 +84,19 @@ const submit = () => {
                         placeholder="Confirm password"
                     />
                     <InputError :message="form.errors.password_confirmation" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="workspace_name">Workspace Name</Label>
+                    <Input
+                        id="workspace_name"
+                        type="text"
+                        tabindex="5"
+                        v-model="form.workspace_name"
+                        @input="handleWorkspaceNameInput"
+                        placeholder="Workspace name"
+                    />
+                    <InputError :message="form.errors.workspace_name" />
                 </div>
 
                 <Button type="submit" class="mt-2 w-full" tabindex="5" :disabled="form.processing">
