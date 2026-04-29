@@ -1,4 +1,4 @@
-# Laravel Vue Inertia Starter Kit
+# SPRINT SYNC AI
 
 A modern Laravel + Vue + Inertia starter kit for building full-stack web applications faster.
 
