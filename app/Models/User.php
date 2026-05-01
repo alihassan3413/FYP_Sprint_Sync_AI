@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 use App\Modules\Workspace\Models\Workspace;
+use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -51,6 +52,24 @@ class User extends Authenticatable
 
     public function workspaces(): BelongsToMany
     {
-        return $this->belongsToMany(Workspace::class, 'workspace_users');
+        return $this->belongsToMany(Workspace::class, 'workspace_users')
+            ->withPivot(['role', 'workspace_role_id'])
+            ->withTimestamps();
+    }
+
+    public function currentWorkspace()
+    {
+        return $this->belongsTo(Workspace::class, 'current_workspace_id');
+    }
+
+    public function activeWorkspaceOrFail()
+    {
+        $workspace = $this->workspaces()->where('workspaces.id', $this->current_workspace_id)->first();
+
+        if (!$workspace) {
+            throw new Exception('No active workspace found for the user.');
+        }
+
+        return $workspace;
     }
 }

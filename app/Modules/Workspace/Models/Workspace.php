@@ -5,6 +5,7 @@ namespace App\Modules\Workspace\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Workspace extends Model
 {
@@ -26,7 +27,17 @@ final class Workspace extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'workspace_users')
-            ->withPivot('role')
+             ->withPivot(['role', 'workspace_role_id'])
             ->withTimestamps();
+    }
+
+    public function roles(): HasMany
+    {
+        return $this->hasMany(WorkspaceRole::class);
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(WorkspaceInvitation::class);
     }
 }

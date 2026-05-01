@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
+            $table->foreignId('current_workspace_id')->nullable()->constrained('workspaces')->nullOnDelete();
             $table->timestamps();
         });
 

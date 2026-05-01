@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,7 +37,7 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'workspace_name' => 'null|string|max:255',
+            'workspace_name' => 'nullable|string|max:255',
         ]);
 
         $user = DB::transaction(function () use ($request, $createWorkspaceForUserAction) {
@@ -47,7 +48,13 @@ class RegisteredUserController extends Controller
             ]);
 
             $workspaceName = $request->input('workspace_name', $user->name . "'s Workspace");
-            $createWorkspaceForUserAction->handle($user, $workspaceName);
+            $workspace = $createWorkspaceForUserAction->handle($user, $workspaceName);
+
+            Log::info('Created workspace for user', ['user_id' => $user->id, 'workspace_id' => $workspace->id]);
+            $user->current_workspace_id = $workspace->id;
+            $user->save();
+
+            return $user;
         });
 
         event(new Registered($user));

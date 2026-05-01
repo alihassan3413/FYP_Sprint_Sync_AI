@@ -2,20 +2,20 @@
     "$schema": "https://shadcn-vue.com/schema.json",
     "style": "default",
     "typescript": true,
-    "tsConfigPath": "./tsconfig.json",
     "tailwind": {
-        "config": "tailwind.config.js",
+        "config": "",
         "css": "resources/css/app.css",
         "baseColor": "neutral",
         "cssVariables": true,
         "prefix": ""
     },
-    "framework": "laravel",
+    "iconLibrary": "lucide",
     "aliases": {
-        "components": "resources/js/Components",
+        "components": "@/components",
+        "composables": "@/composables",
         "utils": "@/lib/utils",
-        "ui": "resources/js/Components/ui",
+        "ui": "@/components/ui",
         "lib": "@/lib",
-        "hooks": "@/hooks"
+        "hooks": "@/composables"
     }
 }

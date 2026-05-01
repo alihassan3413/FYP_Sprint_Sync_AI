@@ -4,6 +4,7 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../../resources/**/*.{vue,ts,js}';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -167,5 +168,18 @@
         font-feature-settings:
             'rlig' 1,
             'calt' 1;
+    }
+}
+
+/*
+  ---break---
+*/
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
     }
 }
