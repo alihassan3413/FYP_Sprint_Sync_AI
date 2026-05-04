@@ -10,6 +10,12 @@ Route::middleware(['auth', 'verified'])
     ->name('workspace.')
     ->group(function () {
 
+        Route::post('/', [WorkspaceController::class, 'store'])
+        ->name('store');
+
+        Route::post('/{workspace}/switch', [WorkspaceController::class, 'switch'])
+            ->name('switch');
+
         Route::get('/invitations/create', function () {
             return Inertia::render('workspace/invitations/Create');
         })->name('invitations.create');
@@ -17,8 +23,6 @@ Route::middleware(['auth', 'verified'])
         Route::post('/invitations', [WorkspaceInvitationController::class, 'store'])
         ->name('invitations.store');
 
-        Route::post('/{workspace}/switch', [WorkspaceController::class, 'switch'])
-            ->name('switch');
     });
 
 
