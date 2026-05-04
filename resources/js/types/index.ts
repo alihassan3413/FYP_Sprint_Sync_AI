@@ -17,32 +17,23 @@ export interface NavItem {
 }
 
 export interface WorkspaceSummary {
-  id: number
-  name: string
-  role: string
-  is_current?: boolean
+    id: number;
+    name: string;
+    slug: string;
+    role: string;
+    is_current?: boolean;
+}
+
+export interface CurrentWorkspace {
+    id: number;
+    name: string;
+    slug: string;
+    role: string;
 }
 
 export interface WorkspaceContext {
-  current: {
-    id: number
-    name: string
-    role: string
-  } | null
-  available: WorkspaceSummary[]
-}
-
-export interface SharedData {
-    name: string;
-    auth: Auth;
-    workspace?: WorkspaceContext;
-    ziggy: {
-        location: string;
-        url: string;
-        port: null | number;
-        defaults: Record<string, unknown>;
-        routes: Record<string, string>;
-    };
+    current: CurrentWorkspace | null;
+    available: WorkspaceSummary[];
 }
 
 export interface User {

@@ -23,19 +23,22 @@ function initialsOf(name: string): string {
 }
 
 function switchWorkspace(workspaceItem: WorkspaceSummary) {
-  if (workspaceItem.is_current || switchingId.value !== null) return;
+    if (workspaceItem.is_current || switchingId.value !== null) return;
 
-  switchingId.value = workspaceItem.id;
-  router.post(
-    `/workspace/${workspaceItem.id}/switch`,
-    {},
-    {
-      preserveScroll: true,
-      onFinish: () => {
-        switchingId.value = null;
-      },
-    }
-  );
+    switchingId.value = workspaceItem.id;
+
+    router.post(
+        route('workspace.switch', {
+            workspace: workspaceItem.slug,
+        }),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                switchingId.value = null;
+            },
+        },
+    );
 }
 
 function openCreateWorkspaceModal() {

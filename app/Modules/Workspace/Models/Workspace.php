@@ -19,6 +19,11 @@ final class Workspace extends Model
         ];
     }
 
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
     public function owner()
     {
         return $this->belongsTo(User::class, 'owner_id');

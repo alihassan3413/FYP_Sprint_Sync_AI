@@ -12,21 +12,29 @@ import AppLogo from './AppLogo.vue';
 const page = usePage<SharedData>();
 const currentWorkspace = computed(() => page.props.workspace?.current ?? null);
 
-console.log(currentWorkspace.value?.name);
 
+const mainNavItems = computed<NavItem[]>(() => {
+    if (!currentWorkspace.value) {
+        return [];
+    }
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Teams',
-        href: '/teams',
-        icon: Users2,
-    },
-];
+    return [
+        {
+            title: 'Dashboard',
+            href: route('dashboard', {
+                workspace: currentWorkspace.value.slug,
+            }),
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Teams',
+            href: route('workspace.teams.index', {
+                workspace: currentWorkspace.value.slug,
+            }),
+            icon: Users2,
+        },
+    ];
+});
 
 const footerNavItems: NavItem[] = [
     {

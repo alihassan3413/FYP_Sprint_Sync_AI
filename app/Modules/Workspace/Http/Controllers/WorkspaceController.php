@@ -16,7 +16,6 @@ class WorkspaceController
 {
     public function __construct(private WorkspaceService $service) {}
 
-
     public function store(StoreWorkspaceRequest $request, CreateWorkspaceAction $action): RedirectResponse
     {
         $workspace = $action->handle($request->toDTO(), $request->user());
@@ -40,6 +39,10 @@ class WorkspaceController
 
         $this->service->switchTo($user, $workspace);
 
-        return back()->with('success', "Switched to {$workspace->name}.");
+        return redirect()
+            ->route('dashboard', [
+                'workspace' => $workspace->slug,
+            ])
+            ->with('success', "Switched to {$workspace->name}.");
     }
 }

@@ -26,7 +26,7 @@ final class WorkspaceService
         }
 
         return $user->workspaces()
-            ->select('workspaces.id', 'workspaces.name')
+            ->select('workspaces.id', 'workspaces.name', 'workspaces.slug')
             ->orderBy('workspaces.name')
             ->get();
     }
@@ -64,6 +64,7 @@ final class WorkspaceService
                 'id' => $current->id,
                 'name' => $current->name,
                 'role' => $current->pivot->role,
+                'slug' => $current->slug,
             ] : null,
 
             'available' => $workspaces
@@ -72,6 +73,7 @@ final class WorkspaceService
                     'name' => $workspace->name,
                     'role' => $workspace->pivot->role,
                     'is_current' => $workspace->id === $user->current_workspace_id,
+                    'slug' => $workspace->slug,
                 ])
                 ->values()
                 ->all(),
