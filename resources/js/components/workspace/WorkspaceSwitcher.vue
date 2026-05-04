@@ -51,7 +51,7 @@ function openCreateWorkspaceModal() {
     <DropdownMenuTrigger as-child>
       <SidebarMenuButton
         size="lg"
-        class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+        class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
       >
         <div
           class="flex aspect-square size-8 items-center justify-center text-sm font-extrabold text-black shrink-0 rounded-sm bg-primary"
