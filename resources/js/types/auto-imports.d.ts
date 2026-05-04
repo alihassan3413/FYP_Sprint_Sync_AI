@@ -17,11 +17,13 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const effectScope: typeof import('vue').effectScope
+  const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const getInitials: typeof import('../composables/useInitials').getInitials
   const h: typeof import('vue').h
+  const handleError: typeof import('../lib/errors/handleError').handleError
   const initializeTheme: typeof import('../composables/useAppearance').initializeTheme
   const inject: typeof import('vue').inject
   const isProxy: typeof import('vue').isProxy
@@ -45,6 +47,7 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const parseError: typeof import('../lib/errors/handleError').parseError
   const provide: typeof import('vue').provide
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
@@ -69,11 +72,14 @@ declare global {
   const useCssVars: typeof import('vue').useCssVars
   const useDark: typeof import('@vueuse/core').useDark
   const useDebounceFn: typeof import('@vueuse/core').useDebounceFn
+  const useFlashToasts: typeof import('../composables/useFlashToasts').useFlashToasts
   const useForm: typeof import('@inertiajs/vue3').useForm
+  const useFormErrors: typeof import('../composables/useFormErrors').useFormErrors
   const useId: typeof import('vue').useId
   const useInitials: typeof import('../composables/useInitials').useInitials
   const useLocalStorage: typeof import('@vueuse/core').useLocalStorage
   const useModel: typeof import('vue').useModel
+  const useNotificationStore: typeof import('../stores/notification.store').useNotificationStore
   const usePage: typeof import('@inertiajs/vue3').usePage
   const useRemember: typeof import('@inertiajs/vue3').useRemember
   const useSlots: typeof import('vue').useSlots
@@ -107,11 +113,13 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
     readonly getInitials: UnwrapRef<typeof import('../composables/useInitials')['getInitials']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly handleError: UnwrapRef<typeof import('../lib/errors/handleError')['handleError']>
     readonly initializeTheme: UnwrapRef<typeof import('../composables/useAppearance')['initializeTheme']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
@@ -135,6 +143,7 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
@@ -159,11 +168,14 @@ declare module 'vue' {
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
     readonly useDark: UnwrapRef<typeof import('@vueuse/core')['useDark']>
     readonly useDebounceFn: UnwrapRef<typeof import('@vueuse/core')['useDebounceFn']>
+    readonly useFlashToasts: UnwrapRef<typeof import('../composables/useFlashToasts')['useFlashToasts']>
     readonly useForm: UnwrapRef<typeof import('@inertiajs/vue3')['useForm']>
+    readonly useFormErrors: UnwrapRef<typeof import('../composables/useFormErrors')['useFormErrors']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useInitials: UnwrapRef<typeof import('../composables/useInitials')['useInitials']>
     readonly useLocalStorage: UnwrapRef<typeof import('@vueuse/core')['useLocalStorage']>
     readonly useModel: UnwrapRef<typeof import('vue')['useModel']>
+    readonly useNotificationStore: UnwrapRef<typeof import('../stores/notification.store')['useNotificationStore']>
     readonly usePage: UnwrapRef<typeof import('@inertiajs/vue3')['usePage']>
     readonly useRemember: UnwrapRef<typeof import('@inertiajs/vue3')['useRemember']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>

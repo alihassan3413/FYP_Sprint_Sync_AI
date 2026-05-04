@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Workspace\Models\Workspace;
+use App\Modules\Workspace\Services\WorkspaceService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -36,14 +38,22 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         return array_merge(parent::share($request), [
+
             ...parent::share($request),
-            'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
+
             'auth' => [
                 'user' => $request->user(),
+            ],
+
+            'workspace' => fn () => app(WorkspaceService::class)->inertiaFor($request->user()),
+
+            'flash' => fn () => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+                'info'    => $request->session()->get('info'),
+                'warning' => $request->session()->get('warning'),
             ],
         ]);
     }

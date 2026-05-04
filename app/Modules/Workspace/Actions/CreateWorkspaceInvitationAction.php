@@ -21,18 +21,22 @@ final class CreateWorkspaceInvitationAction
             ],
             [
                 'invited_by' => $invitedBy->id,
-                'token' => Str::random(64),
+                'token' => Str::random(32),
                 'role' => $data->role->value,
                 'accepted_at' => null,
                 'expires_at' => now()->addDays(7),
             ]
         );
 
+        $invitationUrl = route('workspace.invitations.accept', [
+            'token' => $invitation->token,
+        ]);
+
         Mail::to($invitation->email)->send(new MemberInvitationMail(
             workspaceName: $workspace->name,
             invitedByName: $invitedBy->name,
             role: $data->role->value,
-            invitationUrl: $invitation->token,
+            invitationUrl: $invitationUrl,
             expiresAt: $invitation->expires_at->format('F j, Y'),
         ));
 

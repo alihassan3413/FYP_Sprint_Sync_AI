@@ -13,15 +13,18 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppContent: typeof import('./../components/AppContent.vue')['default']
     AppearanceTabs: typeof import('./../components/AppearanceTabs.vue')['default']
+    AppFormInput: typeof import('./../components/ui/AppFormInput.vue')['default']
     AppHeader: typeof import('./../components/AppHeader.vue')['default']
     AppHeaderLayout: typeof import('./../layouts/app/AppHeaderLayout.vue')['default']
     AppLayout: typeof import('./../layouts/AppLayout.vue')['default']
     AppLogo: typeof import('./../components/AppLogo.vue')['default']
     AppLogoIcon: typeof import('./../components/AppLogoIcon.vue')['default']
+    AppModal: typeof import('./../components/ui/AppModal.vue')['default']
     AppShell: typeof import('./../components/AppShell.vue')['default']
     AppSidebar: typeof import('./../components/AppSidebar.vue')['default']
     AppSidebarHeader: typeof import('./../components/AppSidebarHeader.vue')['default']
     AppSidebarLayout: typeof import('./../layouts/app/AppSidebarLayout.vue')['default']
+    AppToaster: typeof import('./../components/ui/AppToaster.vue')['default']
     AuthCardLayout: typeof import('./../layouts/auth/AuthCardLayout.vue')['default']
     AuthLayout: typeof import('./../layouts/AuthLayout.vue')['default']
     AuthSimpleLayout: typeof import('./../layouts/auth/AuthSimpleLayout.vue')['default']
@@ -47,6 +50,7 @@ declare module 'vue' {
     Collapsible: typeof import('./../components/ui/collapsible/Collapsible.vue')['default']
     CollapsibleContent: typeof import('./../components/ui/collapsible/CollapsibleContent.vue')['default']
     CollapsibleTrigger: typeof import('./../components/ui/collapsible/CollapsibleTrigger.vue')['default']
+    CreateWorkspaceModal: typeof import('./../components/workspace/popups/CreateWorkspaceModal.vue')['default']
     DeleteUser: typeof import('./../components/DeleteUser.vue')['default']
     Dialog: typeof import('./../components/ui/dialog/Dialog.vue')['default']
     DialogClose: typeof import('./../components/ui/dialog/DialogClose.vue')['default']
@@ -131,5 +135,6 @@ declare module 'vue' {
     TooltipTrigger: typeof import('./../components/ui/tooltip/TooltipTrigger.vue')['default']
     UserInfo: typeof import('./../components/UserInfo.vue')['default']
     UserMenuContent: typeof import('./../components/UserMenuContent.vue')['default']
+    WorkspaceSwitcher: typeof import('./../components/workspace/WorkspaceSwitcher.vue')['default']
   }
 }

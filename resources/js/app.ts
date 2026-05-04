@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import { initializeTheme } from './composables/useAppearance';
+ import { createPinia } from 'pinia'
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -29,6 +30,7 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
+            .use(createPinia())
             .mount(el);
     },
     progress: {

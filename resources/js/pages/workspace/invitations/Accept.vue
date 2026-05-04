@@ -25,7 +25,7 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.post(route('workspace.invitations.accept', props.token), {
+    form.post(route('workspace.invitations.accept.store', props.token), {
         onFinish: () => form.reset('password', 'password_confirmation'),
     });
 };
