@@ -7,7 +7,7 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::prefix('{workspace}')
+Route::prefix('{workspace:slug}')
     ->scopeBindings()
     ->middleware(['auth', 'verified'])->get('dashboard', function () {
     return Inertia::render('Dashboard');

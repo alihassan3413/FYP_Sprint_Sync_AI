@@ -63,7 +63,7 @@ final class WorkspaceInvitationController extends Controller
         $acceptWorkspaceInvitationAction->handle($token, $user);
 
         return redirect()
-            ->route('dashboard')
+            ->route('dashboard', ['workspace' => $invitation->workspace->slug])
             ->with('success', 'Invitation accepted successfully.');
     }
 
@@ -86,6 +86,34 @@ final class WorkspaceInvitationController extends Controller
                 ->with('error', 'This invitation has expired.');
         }
 
+        $authUser = Auth::user();
+
+        if ($authUser) {
+            if ($authUser->email !== $invitation->email) {
+                return redirect()
+                    ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                    ->with('error', "This invitation was sent to {$invitation->email}. Please login with that email to accept it.");
+            }
+
+            app(AcceptWorkspaceInvitationAction::class)->handle($token, $authUser);
+
+            return redirect()
+                ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                ->with('success', 'Invitation accepted successfully.');
+        }
+
+        $existingUser = User::query()
+            ->where('email', $invitation->email)
+            ->exists();
+
+        if ($existingUser) {
+            session(['pending_invitation_token' => $token]);
+
+            return redirect()
+                ->route('login')
+                ->with('status', 'Please login to accept your workspace invitation.');
+        }
+
         return inertia('workspace/invitations/Accept', [
             'token' => $token,
             'invitation' => [
@@ -96,5 +124,5 @@ final class WorkspaceInvitationController extends Controller
                 ],
             ],
         ]);
-}
+    }
 }

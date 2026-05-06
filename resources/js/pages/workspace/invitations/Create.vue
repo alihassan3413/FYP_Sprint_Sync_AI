@@ -1,95 +1,130 @@
 <script setup lang="ts">
-import InputError from '@/components/InputError.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { CreditCard, Key, LoaderCircle, Mail, Send, User } from 'lucide-vue-next';
+
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+
+const props = defineProps<{
+  seats?: { used: number; total: number };
+}>();
+
+const { workspaceRoute } = useCurrentWorkspace();
 
 const form = useForm({
-    email: '',
-    role: 'member',
+  email: '',
+  role: 'member',
 });
 
 const submit = () => {
-    form.post(route('workspace.invitations.store'), {
-        onSuccess: () => form.reset(),
-    });
+    console.log(form);
+
+  form.post(workspaceRoute('workspace.invitations.store'), {
+    onSuccess: () => form.reset(),
+  });
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Teams',
-        href: '/teams',
-    },
-    {
-        title: 'Invite Member',
-        href: '/teams/invitations/create',
-    },
+  { title: 'Team', href: workspaceRoute('workspace.teams.index') },
+  { title: 'Invite member', href: workspaceRoute('workspace.invitations.create') },
+];
+
+const roleOptions = [
+  {
+    value: 'member',
+    label: 'Member',
+    description: 'Can create and complete tasks, comment, and view sprints.',
+    icon: User,
+    badge: 'Default',
+  },
+  {
+    value: 'admin',
+    label: 'Admin',
+    description: 'Everything members can do, plus manage projects, sprints, and integrations.',
+    icon: Key,
+  },
 ];
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <Head title="Invite Member" />
+  <Head title="Invite member" />
 
-        <div class="mx-auto flex w-full max-w-xl flex-col gap-6">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight">Invite Team Member</h1>
-                <p class="text-sm text-muted-foreground">
-                    Send an invitation to join your current workspace.
-                </p>
-            </div>
+  <AppLayout :breadcrumbs="breadcrumbs">
+    <div class="mx-auto flex w-full max-w-xl flex-col gap-6 p-4 md:p-6 lg:p-8">
 
-            <form @submit.prevent="submit" class="flex flex-col gap-6 rounded-xl border bg-card p-6 shadow-sm">
-                <div class="grid gap-6">
-                    <div class="grid gap-2">
-                        <Label for="email">Email address</Label>
+      <AppPageHeader
+        eyebrow="Workspace · Team"
+        title="Invite a teammate"
+        description="They'll get an email to join your workspace on SprintSync."
+      />
 
-                        <Input
-                            id="email"
-                            type="email"
-                            required
-                            autofocus
-                            tabindex="1"
-                            autocomplete="email"
-                            v-model="form.email"
-                            placeholder="rajab@example.com"
-                        />
+      <form
+        @submit.prevent="submit"
+        class="flex flex-col rounded-xl border bg-card shadow-sm"
+      >
+        <div class="flex flex-col gap-5 p-5 sm:p-6">
 
-                        <InputError :message="form.errors.email" />
-                    </div>
+          <AppFormInput
+            v-model="form.email"
+            id="email"
+            label="Email address"
+            type="email"
+            required
+            autofocus
+            autocomplete="email"
+            placeholder="rajab@example.com"
+            hint="They'll receive a one-click invite — no password required from you."
+            :icon="Mail"
+          />
 
-                    <div class="grid gap-2">
-                        <Label for="role">Role</Label>
+          <div class="grid gap-2">
+            <Label class="text-[13px] font-medium">Role</Label>
 
-                        <select
-                            id="role"
-                            v-model="form.role"
-                            tabindex="2"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                        </select>
+            <AppRadioCard
+              v-model="form.role"
+              :options="roleOptions"
+              accent="blue"
+            />
 
-                        <InputError :message="form.errors.role" />
-                    </div>
-
-                    <Button type="submit" class="mt-2 w-full" tabindex="3" :disabled="form.processing">
-                        <LoaderCircle v-if="form.processing" class="h-4 w-4 animate-spin" />
-                        Send invitation
-                    </Button>
-                </div>
-
-                <div class="text-center text-sm text-muted-foreground">
-                    <Link :href="route('teams.index')" class="underline underline-offset-4">
-                        Back to team members
-                    </Link>
-                </div>
-            </form>
+            <InputError :message="form.errors.role" />
+          </div>
         </div>
-    </AppLayout>
+
+        <div
+          class="flex flex-col-reverse items-stretch gap-3 border-t bg-muted/20 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+        >
+          <div
+            v-if="seats"
+            class="flex items-center gap-1.5 text-[11.5px] text-muted-foreground"
+          >
+            <CreditCard class="size-3.5" />
+            <span class="tabular-nums">
+              {{ seats.used }} of {{ seats.total }} seats used
+            </span>
+          </div>
+          <div v-else />
+
+          <div class="flex items-center justify-end gap-2">
+            <Button as-child variant="ghost" size="sm" type="button" tabindex="3">
+              <Link :href="workspaceRoute('workspace.teams.index')">
+                Cancel
+              </Link>
+            </Button>
+
+            <Button
+              type="submit"
+              size="sm"
+              tabindex="2"
+              :disabled="form.processing"
+              class="gap-1.5"
+            >
+              <LoaderCircle v-if="form.processing" class="size-3.5 animate-spin" />
+              <Send v-else class="size-3.5" />
+              Send invitation
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </AppLayout>
 </template>

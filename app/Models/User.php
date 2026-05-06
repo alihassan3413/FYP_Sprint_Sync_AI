@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
+use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
 use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,6 +26,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'current_workspace_id',
     ];
 
     /**
@@ -64,10 +66,12 @@ class User extends Authenticatable
 
     public function activeWorkspaceOrFail()
     {
-        $workspace = $this->workspaces()->where('workspaces.id', $this->current_workspace_id)->first();
+        $workspace = $this->workspaces()
+            ->whereKey($this->current_workspace_id)
+            ->first();
 
         if (!$workspace) {
-            throw new Exception('No active workspace found for the user.');
+            throw WorkspaceException::noActiveWorkspace();
         }
 
         return $workspace;

@@ -26,6 +26,7 @@ final class ErrorCode
     public const WORKSPACE_INVITATION_INVALID = 'WORKSPACE.INVITATION.INVALID';
     public const WORKSPACE_SLUG_ALREADY_EXISTS = 'WORKSPACE.SLUG.ALREADY.EXISTS';
     public const WORKSPACE_CREATION_FAILED = 'WORKSPACE.CREATION.FAILED';
+    public const WORKSPACE_NO_ACTIVE = 'WORKSPACE.NO.ACTIVE';
 
     private function __construct()
     {

@@ -80,4 +80,13 @@ class WorkspaceException extends AppException
             message: 'Workspace not found.',
         );
     }
+
+    public static function noActiveWorkspace(): self
+    {
+        return new self(
+            code:    ErrorCode::WORKSPACE_NO_ACTIVE,
+            status:  400,
+            message: 'No active workspace. Please select a workspace to continue.',
+        );
+    }
 }

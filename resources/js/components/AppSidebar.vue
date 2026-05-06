@@ -4,33 +4,21 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/vue3';
-import type { SharedData } from '@/types';
 import { BookOpen, Folder, LayoutGrid, Users2 } from 'lucide-vue-next';
-import AppLogo from './AppLogo.vue';
 
-const page = usePage<SharedData>();
-const currentWorkspace = computed(() => page.props.workspace?.current ?? null);
-
+const { workspaceRoute } = useCurrentWorkspace();
 
 const mainNavItems = computed<NavItem[]>(() => {
-    if (!currentWorkspace.value) {
-        return [];
-    }
 
     return [
         {
             title: 'Dashboard',
-            href: route('dashboard', {
-                workspace: currentWorkspace.value.slug,
-            }),
+            href: workspaceRoute('dashboard'),
             icon: LayoutGrid,
         },
         {
             title: 'Teams',
-            href: route('workspace.teams.index', {
-                workspace: currentWorkspace.value.slug,
-            }),
+            href: workspaceRoute('workspace.teams.index'),
             icon: Users2,
         },
     ];

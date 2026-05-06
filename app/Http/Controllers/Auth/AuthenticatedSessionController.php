@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Modules\Workspace\Actions\AcceptWorkspaceInvitationAction;
+use App\Modules\Workspace\Models\WorkspaceInvitation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,13 +29,59 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
-    {
+    public function store(
+        LoginRequest $request,
+        AcceptWorkspaceInvitationAction $acceptWorkspaceInvitationAction,
+    ): RedirectResponse {
         $request->authenticate();
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+
+        $pendingInvitationToken = $request->session()->pull('pending_invitation_token');
+
+        if ($pendingInvitationToken) {
+            $invitation = WorkspaceInvitation::query()
+                ->where('token', $pendingInvitationToken)
+                ->first();
+
+            if (! $invitation) {
+                return redirect()
+                    ->route('dashboard', ['workspace' => $user->activeWorkspaceOrFail()->slug])
+                    ->with('error', 'Invitation not found.');
+            }
+
+            if ($invitation->accepted_at) {
+                return redirect()
+                    ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                    ->with('error', 'This invitation has already been accepted.');
+            }
+
+            if ($invitation->expires_at->isPast()) {
+                return redirect()
+                    ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                    ->with('error', 'This invitation has expired.');
+            }
+
+            if ($user->email !== $invitation->email) {
+                return redirect()
+                    ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                    ->with('error', "This invitation was sent to {$invitation->email}. Please login with that email to accept it.");
+            }
+
+            $acceptWorkspaceInvitationAction->handle($pendingInvitationToken, $user);
+
+            return redirect()
+                ->route('dashboard', ['workspace' => $invitation->workspace->slug])
+                ->with('success', 'Invitation accepted successfully.');
+        }
+
+        $workspace = $user->activeWorkspaceOrFail();
+
+        return redirect()->intended(
+            route('dashboard', ['workspace' => $workspace->slug], false)
+        );
     }
 
     /**

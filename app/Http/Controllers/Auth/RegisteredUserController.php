@@ -50,7 +50,6 @@ class RegisteredUserController extends Controller
             $workspaceName = $request->input('workspace_name', $user->name . "'s Workspace");
             $workspace = $createWorkspaceForUserAction->handle($user, $workspaceName);
 
-            Log::info('Created workspace for user', ['user_id' => $user->id, 'workspace_id' => $workspace->id]);
             $user->current_workspace_id = $workspace->id;
             $user->save();
 

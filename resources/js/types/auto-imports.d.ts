@@ -70,6 +70,7 @@ declare global {
   const useClipboard: typeof import('@vueuse/core').useClipboard
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
+  const useCurrentWorkspace: typeof import('../composables/useCurrentWorkspace').useCurrentWorkspace
   const useDark: typeof import('@vueuse/core').useDark
   const useDebounceFn: typeof import('@vueuse/core').useDebounceFn
   const useFlashToasts: typeof import('../composables/useFlashToasts').useFlashToasts
@@ -166,6 +167,7 @@ declare module 'vue' {
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
+    readonly useCurrentWorkspace: UnwrapRef<typeof import('../composables/useCurrentWorkspace')['useCurrentWorkspace']>
     readonly useDark: UnwrapRef<typeof import('@vueuse/core')['useDark']>
     readonly useDebounceFn: UnwrapRef<typeof import('@vueuse/core')['useDebounceFn']>
     readonly useFlashToasts: UnwrapRef<typeof import('../composables/useFlashToasts')['useFlashToasts']>
