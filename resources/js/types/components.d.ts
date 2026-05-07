@@ -12,6 +12,9 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActivityTimeLine: typeof import('./../components/dashboard/ActivityTimeLine.vue')['default']
+    AIAssistant: typeof import('./../components/ai/AIAssistant.vue')['default']
+    AIIconBadge: typeof import('./../components/ai/AIIconBadge.vue')['default']
+    AISuggestionChip: typeof import('./../components/ai/AISuggestionChip.vue')['default']
     AppAiInsight: typeof import('./../components/ui/AppAiInsight.vue')['default']
     AppAvatar: typeof import('./../components/ui/AppAvatar.vue')['default']
     AppAvatarStack: typeof import('./../components/ui/AppAvatarStack.vue')['default']

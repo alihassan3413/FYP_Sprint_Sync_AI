@@ -78,6 +78,8 @@ const currentUserId = computed(
   () => allMembers.value.find((m) => m.is_self)?.id ?? null,
 );
 
+useDockContext('teams');
+
 const columns: Column<Member>[] = [
   { key: 'name', label: 'Member', sortable: true,
     accessor: (m) => m.name?.toLowerCase() ?? m.email.toLowerCase() },

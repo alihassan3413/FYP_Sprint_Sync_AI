@@ -25,6 +25,7 @@ declare global {
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const getInitials: typeof import('../composables/useInitials').getInitials
+  const getSuggestions: typeof import('../lib/ai-suggestions').getSuggestions
   const greeting: typeof import('../lib/activity').greeting
   const h: typeof import('vue').h
   const handleError: typeof import('../lib/errors/handleError').handleError
@@ -70,6 +71,7 @@ declare global {
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
   const updateTheme: typeof import('../composables/useAppearance').updateTheme
+  const useAiAssistant: typeof import('../composables/useAiAssitant').useAiAssistant
   const useAppearance: typeof import('../composables/useAppearance').useAppearance
   const useAttrs: typeof import('vue').useAttrs
   const useClipboard: typeof import('@vueuse/core').useClipboard
@@ -78,6 +80,7 @@ declare global {
   const useCurrentWorkspace: typeof import('../composables/useCurrentWorkspace').useCurrentWorkspace
   const useDark: typeof import('@vueuse/core').useDark
   const useDebounceFn: typeof import('@vueuse/core').useDebounceFn
+  const useDockContext: typeof import('../composables/useAiAssitant').useDockContext
   const useFlashToasts: typeof import('../composables/useFlashToasts').useFlashToasts
   const useForm: typeof import('@inertiajs/vue3').useForm
   const useFormErrors: typeof import('../composables/useFormErrors').useFormErrors
@@ -104,6 +107,9 @@ declare global {
   // @ts-ignore
   export type { ActivityKind, ActivityEntry } from '../lib/activity'
   import('../lib/activity')
+  // @ts-ignore
+  export type { AIContext } from '../lib/ai-suggestions'
+  import('../lib/ai-suggestions')
   // @ts-ignore
   export type { MemberStatus, MemberRole, Member } from '../lib/members'
   import('../lib/members')
@@ -133,6 +139,7 @@ declare module 'vue' {
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
     readonly getInitials: UnwrapRef<typeof import('../composables/useInitials')['getInitials']>
+    readonly getSuggestions: UnwrapRef<typeof import('../lib/ai-suggestions')['getSuggestions']>
     readonly greeting: UnwrapRef<typeof import('../lib/activity')['greeting']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly handleError: UnwrapRef<typeof import('../lib/errors/handleError')['handleError']>
@@ -178,6 +185,7 @@ declare module 'vue' {
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateTheme: UnwrapRef<typeof import('../composables/useAppearance')['updateTheme']>
+    readonly useAiAssistant: UnwrapRef<typeof import('../composables/useAiAssitant')['useAiAssistant']>
     readonly useAppearance: UnwrapRef<typeof import('../composables/useAppearance')['useAppearance']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
@@ -186,6 +194,7 @@ declare module 'vue' {
     readonly useCurrentWorkspace: UnwrapRef<typeof import('../composables/useCurrentWorkspace')['useCurrentWorkspace']>
     readonly useDark: UnwrapRef<typeof import('@vueuse/core')['useDark']>
     readonly useDebounceFn: UnwrapRef<typeof import('@vueuse/core')['useDebounceFn']>
+    readonly useDockContext: UnwrapRef<typeof import('../composables/useAiAssitant')['useDockContext']>
     readonly useFlashToasts: UnwrapRef<typeof import('../composables/useFlashToasts')['useFlashToasts']>
     readonly useForm: UnwrapRef<typeof import('@inertiajs/vue3')['useForm']>
     readonly useFormErrors: UnwrapRef<typeof import('../composables/useFormErrors')['useFormErrors']>

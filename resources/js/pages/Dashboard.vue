@@ -50,6 +50,8 @@ const firstName = computed(() => props.user.name.split(' ')[0]);
 
 const workspaceAge = computed(() => daysSince(props.workspaceMeta.created_at));
 
+useDockContext('dashboard');
+
 const onboardingSteps = computed<ChecklistStep[]>(() => [
   {
     key: 'workspace',

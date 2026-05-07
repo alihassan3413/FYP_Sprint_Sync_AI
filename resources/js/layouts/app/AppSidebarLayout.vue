@@ -6,20 +6,32 @@ import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
-    breadcrumbs?: BreadcrumbItemType[];
+  breadcrumbs?: BreadcrumbItemType[];
 }
 
 withDefaults(defineProps<Props>(), {
-    breadcrumbs: () => [],
+  breadcrumbs: () => [],
 });
+
+const dock = useAiAssistant();
+
+function onAISubmit(prompt: string) {
+  console.log('[AI dock] submit:', prompt);
+}
 </script>
 
 <template>
-    <AppShell variant="sidebar">
-        <AppSidebar />
-        <AppContent variant="sidebar">
-            <AppSidebarHeader :breadcrumbs="breadcrumbs" />
-            <slot />
-        </AppContent>
-    </AppShell>
+  <AppShell variant="sidebar">
+    <AppSidebar />
+    <AppContent variant="sidebar">
+      <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+      <slot />
+    </AppContent>
+  </AppShell>
+
+  <AIAssistant
+    :suggestions="dock.suggestions.value"
+    :hidden="dock.isHidden.value"
+    @submit="onAISubmit"
+  />
 </template>
