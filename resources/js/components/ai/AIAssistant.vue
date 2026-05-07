@@ -120,7 +120,6 @@ function onKeydown(e: KeyboardEvent) {
         class="flex items-center px-2 py-1.75 justify-between rounded-4xl bg-[rgba(34,34,34,0.15)] text-[12.5px] text-white/70"
         @click="focusInput"
       >
-        <!-- Gradient sparkle icon -->
         <div
           class="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#365AFF]"
         >
