@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActivityTimeLine: typeof import('./../components/dashboard/ActivityTimeLine.vue')['default']
     AppAiInsight: typeof import('./../components/ui/AppAiInsight.vue')['default']
     AppAvatar: typeof import('./../components/ui/AppAvatar.vue')['default']
     AppAvatarStack: typeof import('./../components/ui/AppAvatarStack.vue')['default']
@@ -67,6 +68,7 @@ declare module 'vue' {
     Collapsible: typeof import('./../components/ui/collapsible/Collapsible.vue')['default']
     CollapsibleContent: typeof import('./../components/ui/collapsible/CollapsibleContent.vue')['default']
     CollapsibleTrigger: typeof import('./../components/ui/collapsible/CollapsibleTrigger.vue')['default']
+    ComingNextCard: typeof import('./../components/dashboard/ComingNextCard.vue')['default']
     CreateWorkspaceModal: typeof import('./../components/workspace/popups/CreateWorkspaceModal.vue')['default']
     DeleteUser: typeof import('./../components/DeleteUser.vue')['default']
     Dialog: typeof import('./../components/ui/dialog/Dialog.vue')['default']
@@ -113,6 +115,8 @@ declare module 'vue' {
     NavigationMenuViewport: typeof import('./../components/ui/navigation-menu/NavigationMenuViewport.vue')['default']
     NavMain: typeof import('./../components/NavMain.vue')['default']
     NavUser: typeof import('./../components/NavUser.vue')['default']
+    OnBoardingCheckList: typeof import('./../components/dashboard/OnBoardingCheckList.vue')['default']
+    OnlineNowCard: typeof import('./../components/dashboard/OnlineNowCard.vue')['default']
     PlaceholderPattern: typeof import('./../components/PlaceholderPattern.vue')['default']
     SeatUsageCard: typeof import('./../components/team/SeatUsageCard.vue')['default']
     Separator: typeof import('./../components/ui/separator/Separator.vue')['default']

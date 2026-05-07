@@ -6,8 +6,12 @@ import { Check, ChevronsUpDown, Plus, Settings } from "lucide-vue-next";
 const page = usePage<SharedData>();
 const { state } = useSidebar();
 
-const workspace = computed(() => page.props.workspace ?? null);
+const workspace = computed(() => page.props.workspace ?? null)
+console.log(workspace.value);
+
 const current = computed(() => workspace.value?.current ?? null);
+console.log(current.value);
+
 const available = computed<WorkspaceSummary[]>(() => workspace.value?.available ?? []);
 const isCollapsed = computed(() => state.value === "collapsed");
 const isCreateWorkspaceOpen = ref(false);

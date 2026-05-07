@@ -13,7 +13,7 @@ Route::middleware(['auth', 'verified'])
         Route::post('/', [WorkspaceController::class, 'store'])
         ->name('store');
 
-        Route::post('/{workspace}/switch', [WorkspaceController::class, 'switch'])
+        Route::post('/{workspace:slug}/switch', [WorkspaceController::class, 'switch'])
             ->name('switch');
 
         Route::get('/invitations/create', function () {
