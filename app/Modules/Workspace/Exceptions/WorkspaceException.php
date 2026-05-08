@@ -30,18 +30,18 @@ class WorkspaceException extends AppException
     public static function invitationExpired(?DateTimeInterface $expiredAt = null): self
     {
         return new self(
-            code:    ErrorCode::WORKSPACE_INVITATION_EXPIRED,
-            status:  410, // Gone — the resource existed but is no longer available
+            code: ErrorCode::WORKSPACE_INVITATION_EXPIRED,
+            status: 410, // Gone — the resource existed but is no longer available
             message: 'This invitation has expired. Please request a new one.',
-            meta:    $expiredAt ? ['expired_at' => $expiredAt->format('c')] : [],
+            meta: $expiredAt ? ['expired_at' => $expiredAt->format('c')] : [],
         );
     }
 
     public static function invitationInvalid(string $reason = 'This invitation link is no longer valid.'): self
     {
         return new self(
-            code:    ErrorCode::WORKSPACE_INVITATION_INVALID,
-            status:  404,
+            code: ErrorCode::WORKSPACE_INVITATION_INVALID,
+            status: 404,
             message: $reason,
         );
     }
@@ -49,10 +49,10 @@ class WorkspaceException extends AppException
     public static function alreadyMember(string $workspaceName): self
     {
         return new self(
-            code:    ErrorCode::WORKSPACE_ALREADY_MEMBER,
-            status:  409, // Conflict — current state prevents the action
+            code: ErrorCode::WORKSPACE_ALREADY_MEMBER,
+            status: 409, // Conflict — current state prevents the action
             message: "You're already a member of {$workspaceName}.",
-            meta:    ['workspace_name' => $workspaceName],
+            meta: ['workspace_name' => $workspaceName],
         );
     }
 
@@ -65,18 +65,18 @@ class WorkspaceException extends AppException
         }
 
         return new self(
-            code:    ErrorCode::WORKSPACE_LIMIT_REACHED,
-            status:  403,
+            code: ErrorCode::WORKSPACE_LIMIT_REACHED,
+            status: 403,
             message: "You've reached your limit of {$limit} workspaces.",
-            meta:    $meta,
+            meta: $meta,
         );
     }
 
     public static function notFound(): self
     {
         return new self(
-            code:    ErrorCode::WORKSPACE_NOT_FOUND,
-            status:  404,
+            code: ErrorCode::WORKSPACE_NOT_FOUND,
+            status: 404,
             message: 'Workspace not found.',
         );
     }
@@ -84,8 +84,8 @@ class WorkspaceException extends AppException
     public static function noActiveWorkspace(): self
     {
         return new self(
-            code:    ErrorCode::WORKSPACE_NO_ACTIVE,
-            status:  400,
+            code: ErrorCode::WORKSPACE_NO_ACTIVE,
+            status: 400,
             message: 'No active workspace. Please select a workspace to continue.',
         );
     }

@@ -2,7 +2,6 @@
 
 namespace App\Modules\Workspace\Data;
 
-use App\UserRole;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Spatie\TypeScriptTransformer\Attributes\TypeScriptType;

@@ -17,7 +17,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Throwable;
 
-
 class ErrorResponseBuilder
 {
     public function __construct(private TraceId $traceId) {}
@@ -41,67 +40,65 @@ class ErrorResponseBuilder
         return null;
     }
 
-
     private function normalize(Throwable $e): ErrorPayload
     {
         $traceId = $this->traceId->get();
 
         if ($e instanceof AppException) {
             return new ErrorPayload(
-                code:    $e->getErrorCode(),
+                code: $e->getErrorCode(),
                 message: $e->getMessage(),
-                status:  $e->getStatusCode(),
-                meta:    $e->getMeta(),
+                status: $e->getStatusCode(),
+                meta: $e->getMeta(),
                 traceId: $traceId,
             );
         }
 
         return match (true) {
             $e instanceof AuthenticationException => new ErrorPayload(
-                code:    ErrorCode::AUTH_UNAUTHENTICATED,
+                code: ErrorCode::AUTH_UNAUTHENTICATED,
                 message: 'Please sign in to continue.',
-                status:  401,
+                status: 401,
                 traceId: $traceId,
             ),
 
             $e instanceof AuthorizationException => new ErrorPayload(
-                code:    ErrorCode::AUTH_FORBIDDEN,
+                code: ErrorCode::AUTH_FORBIDDEN,
                 message: 'You are not allowed to do that.',
-                status:  403,
+                status: 403,
                 traceId: $traceId,
             ),
 
             $e instanceof ModelNotFoundException,
             $e instanceof NotFoundHttpException => new ErrorPayload(
-                code:    ErrorCode::NOT_FOUND,
+                code: ErrorCode::NOT_FOUND,
                 message: 'The requested resource was not found.',
-                status:  404,
+                status: 404,
                 traceId: $traceId,
             ),
 
             $e instanceof TooManyRequestsHttpException => new ErrorPayload(
-                code:    ErrorCode::RATE_LIMITED,
+                code: ErrorCode::RATE_LIMITED,
                 message: 'Too many requests. Please slow down.',
-                status:  429,
+                status: 429,
                 traceId: $traceId,
             ),
 
             $e instanceof HttpExceptionInterface => new ErrorPayload(
-                code:    ErrorCode::BAD_REQUEST,
+                code: ErrorCode::BAD_REQUEST,
                 message: $e->getMessage() ?: 'An error occurred.',
-                status:  $e->getStatusCode(),
+                status: $e->getStatusCode(),
                 traceId: $traceId,
             ),
 
             default => new ErrorPayload(
-                code:    ErrorCode::INTERNAL_ERROR,
+                code: ErrorCode::INTERNAL_ERROR,
                 message: 'Something went wrong on our end. Please try again.',
-                status:  500,
+                status: 500,
                 traceId: $traceId,
             ),
         };
     }
-
 
     private function renderJson(ErrorPayload $payload): JsonResponse
     {
@@ -113,9 +110,9 @@ class ErrorResponseBuilder
         return back()
             ->withInput()
             ->with('error', [
-                'code'    => $payload->code,
+                'code' => $payload->code,
                 'message' => $payload->message,
-                'meta'    => array_merge($payload->meta, ['trace_id' => $payload->traceId]),
+                'meta' => array_merge($payload->meta, ['trace_id' => $payload->traceId]),
             ]);
     }
 

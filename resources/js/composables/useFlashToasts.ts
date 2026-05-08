@@ -1,8 +1,8 @@
-import { router, usePage } from '@inertiajs/vue3'
-import { watch } from 'vue'
-import { useNotificationStore } from '@/stores/notification.store'
-import { handleError } from '@/lib/errors/handleError'
-import type { FlashError } from '@/types/errors'
+import { handleError } from '@/lib/errors/handleError';
+import { useNotificationStore } from '@/stores/notification.store';
+import type { FlashError } from '@/types/errors';
+import { router, usePage } from '@inertiajs/vue3';
+import { watch } from 'vue';
 
 /**
  * Bridges Inertia flash messages to the toast system.
@@ -19,47 +19,47 @@ import type { FlashError } from '@/types/errors'
  * Inertia requests) and routes them through handleError too.
  */
 export function useFlashToasts(): void {
-  const page = usePage<{
-    flash?: {
-      success?: string | null
-      error?: FlashError | string | null
-      info?: string | null
-      warning?: string | null
-    }
-  }>()
+    const page = usePage<{
+        flash?: {
+            success?: string | null;
+            error?: FlashError | string | null;
+            info?: string | null;
+            warning?: string | null;
+        };
+    }>();
 
-  const notify = useNotificationStore()
+    const notify = useNotificationStore();
 
-  // Watch flash messages on every page change.
-  // immediate:true catches the very first page load too.
-  watch(
-    () => page.props.flash,
-    (flash) => {
-      if (!flash) return
+    // Watch flash messages on every page change.
+    // immediate:true catches the very first page load too.
+    watch(
+        () => page.props.flash,
+        (flash) => {
+            if (!flash) return;
 
-      if (flash.success) {
-        notify.success(flash.success)
-      }
+            if (flash.success) {
+                notify.success(flash.success);
+            }
 
-      if (flash.info) {
-        notify.info(flash.info)
-      }
+            if (flash.info) {
+                notify.info(flash.info);
+            }
 
-      if (flash.warning) {
-        notify.warning(flash.warning)
-      }
+            if (flash.warning) {
+                notify.warning(flash.warning);
+            }
 
-      if (flash.error) {
-        // Errors flow through handleError so code-based handlers fire
-        // (session expired → redirect, limit reached → action toast, etc.)
-        handleError(flash.error)
-      }
-    },
-    { deep: true, immediate: true }
-  )
+            if (flash.error) {
+                // Errors flow through handleError so code-based handlers fire
+                // (session expired → redirect, limit reached → action toast, etc.)
+                handleError(flash.error);
+            }
+        },
+        { deep: true, immediate: true },
+    );
 
-  // Catch Inertia-level errors (network failures, server crashes during navigation)
-  router.on('exception', (event) => {
-    handleError(event.detail.exception)
-  })
+    // Catch Inertia-level errors (network failures, server crashes during navigation)
+    router.on('exception', (event) => {
+        handleError(event.detail.exception);
+    });
 }

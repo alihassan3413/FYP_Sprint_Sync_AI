@@ -9,10 +9,7 @@ export function useCurrentWorkspace() {
         return page.props.workspace?.current ?? null;
     });
 
-    function workspaceRoute(
-        name: string,
-        params: Record<string, unknown> = {},
-    ): string {
+    function workspaceRoute(name: string, params: Record<string, unknown> = {}): string {
         if (!currentWorkspace.value) {
             return route('login');
         }

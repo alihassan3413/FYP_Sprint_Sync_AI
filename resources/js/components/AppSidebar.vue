@@ -9,7 +9,6 @@ import { BookOpen, Folder, LayoutGrid, Users2 } from 'lucide-vue-next';
 const { workspaceRoute } = useCurrentWorkspace();
 
 const mainNavItems = computed<NavItem[]>(() => {
-
     return [
         {
             title: 'Dashboard',
@@ -44,7 +43,7 @@ const footerNavItems: NavItem[] = [
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                       <WorkspaceSwitcher />
+                        <WorkspaceSwitcher />
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>

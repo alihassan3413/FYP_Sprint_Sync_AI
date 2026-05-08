@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import AppToaster from '@/components/ui/AppToaster.vue';
-import { useFlashToasts } from '@/composables/useFlashToasts'
+import { useFlashToasts } from '@/composables/useFlashToasts';
+import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
@@ -12,13 +12,13 @@ withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
 });
 
-useFlashToasts()
+useFlashToasts();
 </script>
 
 <template>
-        <AppLayout :breadcrumbs="breadcrumbs">
-            <slot />
-        </AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <slot />
+    </AppLayout>
 
-        <AppToaster />
+    <AppToaster />
 </template>

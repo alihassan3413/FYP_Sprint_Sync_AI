@@ -10,7 +10,7 @@ final class AcceptWorkspaceInvitationAction
 {
     public function handle(string $token, User $user): WorkspaceInvitation
     {
-       $invitation = WorkspaceInvitation::query()->where('token', $token)->firstOrFail();
+        $invitation = WorkspaceInvitation::query()->where('token', $token)->firstOrFail();
 
         if ($invitation->accepted_at) {
             throw ValidationException::withMessages([
@@ -18,7 +18,7 @@ final class AcceptWorkspaceInvitationAction
             ]);
         }
 
-         if ($invitation->expires_at->isPast()) {
+        if ($invitation->expires_at->isPast()) {
             throw ValidationException::withMessages([
                 'invitation' => 'This invitation has expired.',
             ]);

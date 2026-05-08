@@ -25,9 +25,8 @@ final class CreateWorkspaceForUserAction
         });
     }
 
-
     private function generateSlug(string $name): string
     {
-        return Str::slug($name) . '-' . Str::random(6);
+        return Str::slug($name).'-'.Str::random(6);
     }
 }

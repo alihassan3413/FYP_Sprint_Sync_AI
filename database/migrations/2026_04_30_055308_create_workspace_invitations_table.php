@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['workspace_id' , 'email']);
+            $table->unique(['workspace_id', 'email']);
 
             $table->index('email');
             $table->index('expires_at');

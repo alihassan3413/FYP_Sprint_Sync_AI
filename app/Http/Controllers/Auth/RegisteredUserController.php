@@ -11,8 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +29,7 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function store(Request $request, CreateWorkspaceForUserAction $createWorkspaceForUserAction): RedirectResponse
     {
@@ -47,7 +47,7 @@ class RegisteredUserController extends Controller
                 'password' => Hash::make($request->password),
             ]);
 
-            $workspaceName = $request->input('workspace_name', $user->name . "'s Workspace");
+            $workspaceName = $request->input('workspace_name', $user->name."'s Workspace");
             $workspace = $createWorkspaceForUserAction->handle($user, $workspaceName);
 
             $user->current_workspace_id = $workspace->id;
@@ -60,6 +60,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return to_route('dashboard');
+        return to_route('dashboard', ['workspace' => $user->activeWorkspaceOrFail()->slug]);
     }
 }

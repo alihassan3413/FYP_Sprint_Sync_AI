@@ -18,13 +18,13 @@ final class CreateWorkspaceAction
     public function handle(WorkspaceData $data, User $owner): Workspace
     {
 
-        return DB::transaction(function() use ($data, $owner) {
+        return DB::transaction(function () use ($data, $owner) {
             $workspace = Workspace::create([
                 'name' => $data->name,
                 'slug' => $data->slug,
                 'settings' => $data->settings,
                 'is_active' => $data->is_active,
-                'owner_id' =>  $owner->id,
+                'owner_id' => $owner->id,
             ]);
 
             $workspace->users()->attach($owner->id, ['role' => UserRole::OWNER->value]);

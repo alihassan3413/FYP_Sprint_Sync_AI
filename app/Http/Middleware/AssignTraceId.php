@@ -38,7 +38,7 @@ class AssignTraceId
         // production debugging feasible.
         Log::shareContext([
             'trace_id' => $id,
-            'user_id'  => optional($request->user())->getKey(),
+            'user_id' => optional($request->user())->getKey(),
         ]);
 
         /** @var Response $response */
