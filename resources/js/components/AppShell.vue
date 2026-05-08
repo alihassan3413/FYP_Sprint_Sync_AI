@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 
 interface Props {
     variant?: 'header' | 'sidebar';
@@ -8,11 +8,11 @@ interface Props {
 
 defineProps<Props>();
 
-const isOpen = ref(true);
-
-onMounted(() => {
-    isOpen.value = localStorage.getItem('sidebar') !== 'false';
-});
+const isOpen = ref(
+    typeof window === 'undefined'
+        ? true
+        : localStorage.getItem('sidebar') !== 'false'
+);
 
 const handleSidebarChange = (open: boolean) => {
     isOpen.value = open;
