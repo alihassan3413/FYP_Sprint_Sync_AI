@@ -15,7 +15,7 @@ final class Workspace extends Model
     {
         return [
             'settings' => 'array',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
         ];
     }
 
@@ -32,7 +32,7 @@ final class Workspace extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'workspace_users')
-             ->withPivot(['role', 'workspace_role_id'])
+            ->withPivot(['role', 'workspace_role_id'])
             ->withTimestamps();
     }
 

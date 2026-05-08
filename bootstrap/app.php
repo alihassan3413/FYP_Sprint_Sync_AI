@@ -4,10 +4,12 @@ use App\Exceptions\AppException;
 use App\Http\Middleware\AssignTraceId;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Support\Errors\ErrorResponseBuilder;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Validation\ValidationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -36,8 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->dontReport([
-            \Illuminate\Validation\ValidationException::class,
-            \Illuminate\Auth\AuthenticationException::class,
+            ValidationException::class,
+            AuthenticationException::class,
         ]);
 
     })->create();

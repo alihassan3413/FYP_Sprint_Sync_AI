@@ -2,9 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Services\WorkspaceService;
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -49,8 +47,8 @@ class HandleInertiaRequests extends Middleware
 
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
-                'error'   => $request->session()->get('error'),
-                'info'    => $request->session()->get('info'),
+                'error' => $request->session()->get('error'),
+                'info' => $request->session()->get('info'),
                 'warning' => $request->session()->get('warning'),
             ],
         ]);

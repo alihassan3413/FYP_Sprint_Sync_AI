@@ -4,7 +4,7 @@ use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::prefix('{workspace}')
+Route::prefix('{workspace:slug}')
     ->scopeBindings()
     ->middleware(['auth', 'verified'])
     ->name('workspace.')

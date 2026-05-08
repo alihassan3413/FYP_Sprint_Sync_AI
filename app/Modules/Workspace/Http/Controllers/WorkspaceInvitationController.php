@@ -16,11 +16,11 @@ use Inertia\Response;
 
 final class WorkspaceInvitationController extends Controller
 {
-    public function store (
+    public function store(
         StoreWorkspaceInvitationRequest $request,
         CreateWorkspaceInvitationAction $createWorkspaceInvitationAction,
     ) {
-        $workspace = $request->user()->activeWorkspaceOrFail();
+        $workspace = $request->route('workspace');
 
         $createWorkspaceInvitationAction->handle($workspace, $request->user(), $request->toDTO());
 

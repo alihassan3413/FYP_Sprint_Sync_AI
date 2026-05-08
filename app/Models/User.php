@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
-use Exception;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -14,7 +14,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -70,7 +70,7 @@ class User extends Authenticatable
             ->whereKey($this->current_workspace_id)
             ->first();
 
-        if (!$workspace) {
+        if (! $workspace) {
             throw WorkspaceException::noActiveWorkspace();
         }
 

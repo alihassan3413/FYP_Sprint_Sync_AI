@@ -8,7 +8,6 @@ use App\Support\Errors\ErrorCode;
 use Exception;
 use Throwable;
 
-
 class AppException extends Exception
 {
     protected string $errorCode;
@@ -28,9 +27,9 @@ class AppException extends Exception
         ?Throwable $previous = null,
     ) {
         parent::__construct($message, 0, $previous);
-        $this->errorCode    = $code;
-        $this->statusCode   = $status;
-        $this->meta         = $meta;
+        $this->errorCode = $code;
+        $this->statusCode = $status;
+        $this->meta = $meta;
         $this->shouldReport = $shouldReport;
     }
 
@@ -43,7 +42,6 @@ class AppException extends Exception
     {
         return $this->statusCode;
     }
-
 
     public function getMeta(): array
     {

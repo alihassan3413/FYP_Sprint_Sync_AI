@@ -3,8 +3,9 @@
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])
-    ->prefix('projects')
-    ->name('projects.')
+    ->prefix('{workspace:slug}/projects')
+    ->scopeBindings()
+    ->name('workspace.projects.')
     ->group(function () {
         // Example:
         // Route::get('/', [ProjectsController::class, 'index'])->name('index');

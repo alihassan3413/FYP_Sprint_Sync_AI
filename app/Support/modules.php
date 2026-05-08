@@ -12,7 +12,7 @@ if (! function_exists('load_module_routes')) {
         }
 
         foreach (File::directories($modulesPath) as $moduleDirectory) {
-            $routesFile = $moduleDirectory . DIRECTORY_SEPARATOR . 'routes.php';
+            $routesFile = $moduleDirectory.DIRECTORY_SEPARATOR.'routes.php';
 
             if (File::exists($routesFile)) {
                 require $routesFile;
