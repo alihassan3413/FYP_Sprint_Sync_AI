@@ -13,11 +13,6 @@ withDefaults(defineProps<Props>(), {
   breadcrumbs: () => [],
 });
 
-const dock = useAiAssistant();
-
-function onAISubmit(prompt: string) {
-  console.log('[AI dock] submit:', prompt);
-}
 </script>
 
 <template>
@@ -28,10 +23,4 @@ function onAISubmit(prompt: string) {
       <slot />
     </AppContent>
   </AppShell>
-
-  <AIAssistant
-    :suggestions="dock.suggestions.value"
-    :hidden="dock.isHidden.value"
-    @submit="onAISubmit"
-  />
 </template>
