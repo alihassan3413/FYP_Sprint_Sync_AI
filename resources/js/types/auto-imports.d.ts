@@ -105,6 +105,9 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
+  export type { AssistantState, AssistantMessage } from '../composables/useAiAssitant'
+  import('../composables/useAiAssitant')
+  // @ts-ignore
   export type { ActivityKind, ActivityEntry } from '../lib/activity'
   import('../lib/activity')
   // @ts-ignore
