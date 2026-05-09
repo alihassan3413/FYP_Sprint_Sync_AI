@@ -10,27 +10,24 @@ defineProps<{
 </script>
 
 <template>
-    <div class="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+    <div class="flex min-h-svh flex-col items-center justify-center bg-muted/40 p-6 md:p-10">
         <div class="flex w-full max-w-md flex-col gap-6">
-            <Link :href="route('home')" class="flex items-center gap-2 self-center font-medium">
-                <div class="flex h-9 w-9 items-center justify-center">
-                    <AppLogoIcon class="size-9 fill-current text-black dark:text-white" />
+            <Link :href="route('home')" class="flex items-center justify-center gap-2.5 self-center">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
+                    <AppLogoIcon class="size-5 fill-current" />
                 </div>
+                <span class="text-sm font-semibold tracking-tight">Sprint Sync</span>
             </Link>
 
-            <div class="flex flex-col gap-6">
-                <Card class="rounded-xl">
-                    <CardHeader class="px-10 pt-8 pb-0 text-center">
-                        <CardTitle class="text-xl">{{ title }}</CardTitle>
-                        <CardDescription>
-                            {{ description }}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="px-10 py-8">
-                        <slot />
-                    </CardContent>
-                </Card>
-            </div>
+            <Card class="rounded-xl shadow-sm">
+                <CardHeader class="px-8 pt-8 pb-0 text-center">
+                    <CardTitle class="text-xl font-semibold">{{ title }}</CardTitle>
+                    <CardDescription class="mt-1 text-sm">{{ description }}</CardDescription>
+                </CardHeader>
+                <CardContent class="px-8 pb-8 pt-6">
+                    <slot />
+                </CardContent>
+            </Card>
         </div>
     </div>
 </template>
