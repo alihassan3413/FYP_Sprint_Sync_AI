@@ -18,7 +18,7 @@ const { openDock, messages } = useAiAssistant();
         :exit="{ opacity: 0, transition: { duration: 0.15 } }"
         :while-hover="{ scale: 1.06 }"
         :while-tap="{ scale: 0.94 }"
-        aria-label="Open AI assistant (⌘K)"
+        aria-label="Open AI assistant"
         class="group fixed right-6 bottom-6 z-50 grid size-14 place-items-center rounded-full bg-[#365AFF] shadow-[0_8px_24px_rgba(54,90,255,0.45),inset_0_1px_0_rgba(255,255,255,0.3)] outline-none hover:shadow-[0_12px_32px_rgba(54,90,255,0.6),inset_0_1px_0_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#365AFF] max-sm:right-4 max-sm:bottom-4"
         @click="openDock"
     >
@@ -31,11 +31,5 @@ const { openDock, messages } = useAiAssistant();
         >
             <Sparkles class="size-5 text-white" :stroke-width="2.2" />
         </motion.span>
-
-        <span
-            class="pointer-events-none absolute -top-9 right-0 rounded-md bg-black/85 px-2 py-1 text-[10px] font-medium tracking-wide text-white opacity-0 backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100"
-        >
-            ⌘K
-        </span>
     </motion.button>
 </template>

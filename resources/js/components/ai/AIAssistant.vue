@@ -9,11 +9,15 @@ const props = withDefaults(defineProps<Props>(), {
     placeholder: 'Ask your personal AI assistant',
 });
 
+const page = usePage();
+
 const { state, suggestions, isHidden } = useAiAssistant();
+
+const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 </script>
 
 <template>
-    <Teleport to="body">
+    <Teleport to="body" v-if="isAuthenticated">
         <AnimatePresence mode="sync">
             <template v-if="!isHidden">
                 <AssistantFab v-if="state === 'collapsed'" key="fab" />

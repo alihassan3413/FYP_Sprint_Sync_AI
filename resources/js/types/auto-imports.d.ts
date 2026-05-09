@@ -73,6 +73,7 @@ declare global {
   const updateTheme: typeof import('../composables/useAppearance').updateTheme
   const useAiAssistant: typeof import('../composables/useAiAssitant').useAiAssistant
   const useAppearance: typeof import('../composables/useAppearance').useAppearance
+  const useAssistantPageContext: typeof import('../composables/useAiAssitant').useAssistantPageContext
   const useAttrs: typeof import('vue').useAttrs
   const useClipboard: typeof import('@vueuse/core').useClipboard
   const useCssModule: typeof import('vue').useCssModule
@@ -105,7 +106,7 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { AssistantState, AssistantMessage } from '../composables/useAiAssitant'
+  export type { AssistantState, PendingTool, AssistantMessage } from '../composables/useAiAssitant'
   import('../composables/useAiAssitant')
   // @ts-ignore
   export type { ActivityKind, ActivityEntry } from '../lib/activity'
@@ -190,6 +191,7 @@ declare module 'vue' {
     readonly updateTheme: UnwrapRef<typeof import('../composables/useAppearance')['updateTheme']>
     readonly useAiAssistant: UnwrapRef<typeof import('../composables/useAiAssitant')['useAiAssistant']>
     readonly useAppearance: UnwrapRef<typeof import('../composables/useAppearance')['useAppearance']>
+    readonly useAssistantPageContext: UnwrapRef<typeof import('../composables/useAiAssitant')['useAssistantPageContext']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>

@@ -35,7 +35,6 @@ class MakeModuleCommand extends Command
 
         foreach ($directories as $directory) {
             File::makeDirectory($directory, 0755, true);
-            File::put("{$directory}/.gitkeep", '');
         }
 
         $this->createRoutesFile($name, $modulePath);
