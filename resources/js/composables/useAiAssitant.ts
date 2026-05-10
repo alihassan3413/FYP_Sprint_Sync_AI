@@ -22,6 +22,7 @@ export interface AssistantMessage {
     content: string;
     timestamp: number;
     streaming?: boolean;
+    isLoading?: boolean;
     pendingTool?: PendingTool;
     toolStatus?: 'executed' | 'failed' | 'rejected';
 }
@@ -87,7 +88,7 @@ function addUserMessage(content: string): AssistantMessage {
     return msg;
 }
 
-function addAssistantMessage(content = '', streaming = true): AssistantMessage {
+function addAssistantMessage(content = '', streaming = true, isLoading = false): AssistantMessage {
     const msg: AssistantMessage = {
         id: crypto.randomUUID(),
         serverId: null,
@@ -95,6 +96,7 @@ function addAssistantMessage(content = '', streaming = true): AssistantMessage {
         content,
         timestamp: Date.now(),
         streaming,
+        isLoading,
     };
     messages.value.push(msg);
     return msg;
@@ -135,6 +137,19 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
         // Add more as you build tools.
         default:
             return name.replace(/_/g, ' ');
+    }
+}
+
+function getToolIntro(name: string): string {
+    switch (name) {
+        case 'invite_user':
+            return 'I can send this invitation. Please confirm before I continue.';
+
+        case 'create_workspace':
+            return 'I can create this workspace for you. Please confirm first.';
+
+        default:
+            return 'I’m ready to perform this action. Please confirm.';
     }
 }
 
@@ -211,6 +226,12 @@ async function consumeSseStream(
             }
 
             case 'text':
+                const msg = messages.value.find((m) => m.id === assistantMsg.id);
+
+                if (msg) {
+                    msg.isLoading = false;
+                }
+
                 appendToMessage(assistantMsg.id, event.delta as string);
                 break;
 
@@ -219,6 +240,13 @@ async function consumeSseStream(
                 if (msg) {
                     const toolName = event.name as string;
                     const args = (event.args as Record<string, unknown>) ?? {};
+
+                    msg.isLoading = false;
+
+
+                    if (!msg.content.trim()) {
+                        msg.content = getToolIntro(toolName);
+                    }
                     msg.pendingTool = {
                         messageId: event.message_id as number,
                         toolCallId: event.tool_call_id as string,
@@ -304,7 +332,7 @@ async function submit(prompt: string) {
     state.value = 'expanded';
 
     isStreaming.value = true;
-    const assistantMsg = addAssistantMessage('', true);
+    const assistantMsg = addAssistantMessage('', true, true);
 
     try {
         const response = await fetch('/api/assistant/chat', {
@@ -331,6 +359,16 @@ async function submit(prompt: string) {
             '\n\n⚠️ Connection error. Please check your network and try again.',
         );
     } finally {
+        const msg = messages.value.find((m) => m.id === assistantMsg.id);
+
+        if (msg) {
+            msg.isLoading = false;
+
+            if (!msg.content.trim() && !msg.pendingTool) {
+                msg.content = 'I could not generate a response. Please try again.';
+            }
+        }
+
         finishMessage(assistantMsg.id);
         isStreaming.value = false;
     }
@@ -345,13 +383,20 @@ async function confirmTool(
     const sourceMsg = messages.value.find(
         (m) => m.pendingTool?.messageId === messageId,
     );
+
     if (sourceMsg) {
         sourceMsg.toolStatus = action === 'confirm' ? 'executed' : 'rejected';
         sourceMsg.pendingTool = undefined;
+        sourceMsg.isLoading = false;
+    }
+
+    if (action === 'reject') {
+        addAssistantMessage('Okay, I canceled that action.', false, false);
+        return;
     }
 
     isStreaming.value = true;
-    const assistantMsg = addAssistantMessage('', true);
+    const assistantMsg = addAssistantMessage('', true, true);
 
     try {
         const response = await fetch('/api/assistant/confirm', {
@@ -377,6 +422,12 @@ async function confirmTool(
             '\n\n⚠️ Connection error during action. Please try again.',
         );
     } finally {
+        const msg = messages.value.find((m) => m.id === assistantMsg.id);
+
+        if (msg) {
+            msg.isLoading = false;
+        }
+
         finishMessage(assistantMsg.id);
         isStreaming.value = false;
     }

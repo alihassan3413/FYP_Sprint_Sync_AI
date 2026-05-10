@@ -7,11 +7,16 @@ namespace App\Modules\Assistant\Actions;
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
 
-
 class BuildContextPayload
 {
     /**
-     * @param array{page?: string, route?: string} $pageContext  optional UI context
+     * @param  array{
+     *     page?: string,
+     *     route?: string,
+     *     workspace_id?: int|null,
+     *     workspace_slug?: string|null,
+     *     workspace_name?: string|null
+     * }  $pageContext optional UI context
      * @return array{system: string, additional_messages: array}
      */
     public function handle(User $user, ?Workspace $workspace, array $pageContext = []): array
@@ -29,25 +34,26 @@ class BuildContextPayload
         $parts = [];
 
         $parts[] = <<<'TXT'
-        You are SprintSync's in-app assistant. You help users manage their
-        workspaces, projects, sprints, tasks, and team. You can take actions
-        on the user's behalf using the provided tools.
-        TXT;
+You are SprintSync's in-app assistant. You help users manage their
+workspaces, projects, sprints, tasks, and team. You can take actions
+on the user's behalf using the provided tools.
+TXT;
 
         $parts[] = <<<'TXT'
-        Rules:
-        - Be concise. Aim for 1-3 sentences unless the user asks for detail.
-        - When a user asks for an action you can perform with a tool, call
-          the tool. Do not narrate what you are about to do — just do it.
-        - If a tool requires confirmation, the system handles that — you
-          don't need to ask "are you sure?" before calling.
-        - If you don't have enough information to call a tool, ask ONE
-          clarifying question. Don't ask multiple questions at once.
-        - If you cannot help with something, say so directly. Don't
-          pretend or invent capabilities.
-        - Never invent IDs, names, or data. If you don't know, look it up
-          with a tool or ask the user.
-        TXT;
+Rules:
+- Be concise. Aim for 1-3 sentences unless the user asks for detail.
+- When a user asks for an action you can perform with a tool, call the tool. Do not narrate what you are about to do — just do it.
+- If a tool requires confirmation, the system handles that — you don't need to ask "are you sure?" before calling.
+- If you don't have enough information to call a tool, ask ONE clarifying question. Don't ask multiple questions at once.
+- If you cannot help with something, say so directly. Don't pretend or invent capabilities.
+- Never invent IDs, names, counts, members, projects, tasks, or workspace data. If you don't know, look it up with a tool or ask the user.
+- When the user asks about the current workspace, workspace details, member count, admins, members list, pending invitations, or their role in the workspace, use the get_workspace_info tool.
+- For simple workspace count or summary questions, call get_workspace_info without members/invitations unless needed.
+- If the user asks who the members are, list members, show admins, or show team members, call get_workspace_info with include_members=true.
+- If the user asks about pending invitations, invites, or invited users, call get_workspace_info with include_invitations=true.
+- get_workspace_info is read-only, so do not ask for confirmation before using it.
+- If the user cancels or rejects a tool confirmation, acknowledge the cancellation once and do not call the same tool again unless the user clearly asks to try again.
+TXT;
 
         $parts[] = sprintf(
             "Current user: %s (%s). User ID: %d.",
@@ -57,10 +63,16 @@ class BuildContextPayload
         );
 
         if ($workspace) {
+            $membership = $workspace->users()
+                ->whereKey($user->id)
+                ->first();
+
             $parts[] = sprintf(
-                "Current workspace: '%s' (ID: %d). Workspace was created %s.",
+                "Current workspace: '%s' (ID: %d, slug: %s). Current user's workspace role: %s. Workspace was created %s.",
                 $workspace->name,
                 $workspace->id,
+                $workspace->slug,
+                $membership?->pivot?->role ?? 'unknown',
                 $workspace->created_at?->diffForHumans() ?? 'recently',
             );
         } else {
@@ -69,6 +81,19 @@ class BuildContextPayload
 
         if (! empty($pageContext['page'])) {
             $parts[] = "The user is currently viewing: {$pageContext['page']}.";
+        }
+
+        if (! empty($pageContext['route'])) {
+            $parts[] = "Current route: {$pageContext['route']}.";
+        }
+
+        if (! empty($pageContext['workspace_name']) || ! empty($pageContext['workspace_slug'])) {
+            $parts[] = sprintf(
+                "UI selected workspace from page context: name=%s, slug=%s, id=%s.",
+                $pageContext['workspace_name'] ?? 'unknown',
+                $pageContext['workspace_slug'] ?? 'unknown',
+                $pageContext['workspace_id'] ?? 'unknown',
+            );
         }
 
         $parts[] = sprintf(

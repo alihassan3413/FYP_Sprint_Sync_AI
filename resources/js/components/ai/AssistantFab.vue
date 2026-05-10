@@ -19,10 +19,10 @@ const { openDock, messages } = useAiAssistant();
         :while-hover="{ scale: 1.06 }"
         :while-tap="{ scale: 0.94 }"
         aria-label="Open AI assistant"
-        class="group fixed right-6 bottom-6 z-50 grid size-14 place-items-center rounded-full bg-[#365AFF] shadow-[0_8px_24px_rgba(54,90,255,0.45),inset_0_1px_0_rgba(255,255,255,0.3)] outline-none hover:shadow-[0_12px_32px_rgba(54,90,255,0.6),inset_0_1px_0_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#365AFF] max-sm:right-4 max-sm:bottom-4"
+        class="group fixed right-6 bottom-6 z-50 grid size-14 place-items-center rounded-full bg-custom-blue shadow-[0_8px_24px_rgba(54,90,255,0.45),inset_0_1px_0_rgba(255,255,255,0.3)] outline-none hover:shadow-[0_12px_32px_rgba(54,90,255,0.6),inset_0_1px_0_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-custom-blue max-sm:right-4 max-sm:bottom-4"
         @click="openDock"
     >
-        <span v-if="messages.length > 0" aria-hidden="true" class="absolute inset-0 animate-ping rounded-full bg-[#365AFF] opacity-25" />
+        <span v-if="messages.length > 0" aria-hidden="true" class="absolute inset-0 animate-ping rounded-full bg-custom-blue opacity-25" />
 
         <motion.span
             layout-id="assistant-icon"

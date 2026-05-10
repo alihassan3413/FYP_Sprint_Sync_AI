@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Modules\Assistant\Contracts\AiProvider;
 use App\Modules\Assistant\Providers\OpenAiProvider;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
+use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -43,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
         $registry = $this->app->make(ToolRegistry::class);
         $registry->register($this->app->make(CreateWorkspaceTool::class));
         $registry->register($this->app->make(InvitationTool::class));
+        $registry->register($this->app->make(GetWorkspaceInfoTool::class));
         // Add more tools here as you build them.
     }
 
