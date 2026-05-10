@@ -106,13 +106,14 @@ class OpenAiProvider implements AiProvider
         $buffer = '';
 
         while (! $stream->eof()) {
-            $chunk = $stream->read(8192);
+            $chunk = $stream->read(256);
             if ($chunk === '') {
                 continue;
             }
 
             $buffer .= $chunk;
 
+            $buffer = str_replace("\r\n", "\n", $buffer);
             // SSE events are separated by double newlines.
             while (($pos = strpos($buffer, "\n\n")) !== false) {
                 $event = substr($buffer, 0, $pos);

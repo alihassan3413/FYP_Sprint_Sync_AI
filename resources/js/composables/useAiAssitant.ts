@@ -1,6 +1,8 @@
 import { router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { getSuggestions, type AIContext } from '@/lib/ai-suggestions';
+import { usePage } from '@inertiajs/vue3';
+import type { SharedData } from '@/types';
 
 export type AssistantState = 'collapsed' | 'dock' | 'expanded';
 
@@ -24,6 +26,14 @@ export interface AssistantMessage {
     toolStatus?: 'executed' | 'failed' | 'rejected';
 }
 
+type PageContext = {
+    page?: string;
+    route?: string;
+    workspace_id?: number | null;
+    workspace_slug?: string | null;
+    workspace_name?: string | null;
+};
+
 // ---- Module-level singleton state ----
 const state = ref<AssistantState>('collapsed');
 const suggestions = ref<string[]>([]);
@@ -32,7 +42,13 @@ const isStreaming = ref(false);
 const messages = ref<AssistantMessage[]>([]);
 const inputValue = ref('');
 const conversationId = ref<number | null>(null);
-const pageContext = ref<{ page?: string; route?: string }>({});
+const pageContext = ref<{
+    page?: string;
+    route?: string;
+    workspace_id?: number | null;
+    workspace_slug?: string | null;
+    workspace_name?: string | null;
+}>({});
 
 // ---- State transitions ----
 function collapse() { state.value = 'collapsed'; }
@@ -44,7 +60,7 @@ function setSuggestions(items: string[]) { suggestions.value = items; }
 function clearSuggestions() { suggestions.value = []; }
 
 // ---- Page context ----
-function setPageContext(ctx: { page?: string; route?: string }) {
+function setPageContext(ctx: PageContext) {
     pageContext.value = ctx;
 }
 
@@ -114,8 +130,8 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
     switch (name) {
         case 'create_workspace':
             return `Create workspace "${args.name ?? 'untitled'}"`;
-        case 'invite_teammate':
-            return `Invite ${args.email ?? 'someone'}`;
+        case 'invite_user':
+            return `Invite ${args.email ?? 'someone'}${args.role && args.role !== 'member' ? ` as ${args.role}` : ''}`;
         // Add more as you build tools.
         default:
             return name.replace(/_/g, ' ');
@@ -290,8 +306,6 @@ async function submit(prompt: string) {
     isStreaming.value = true;
     const assistantMsg = addAssistantMessage('', true);
 
-    console.debug('[submit] sending with conversation_id:', conversationId.value);
-
     try {
         const response = await fetch('/api/assistant/chat', {
             method: 'POST',
@@ -397,7 +411,17 @@ export function useDockContext(context: AIContext) {
     dock.setSuggestions(getSuggestions(context));
 }
 
-export function useAssistantPageContext(ctx: { page?: string; route?: string }) {
+
+export function useAssistantPageContext(ctx: PageContext) {
     const dock = useAiAssistant();
-    dock.setPageContext(ctx);
+    const page = usePage<SharedData>();
+
+    const currentWorkspace = page.props.workspace?.current ?? null;
+
+    dock.setPageContext({
+        ...ctx,
+        workspace_id: currentWorkspace?.id ?? null,
+        workspace_slug: currentWorkspace?.slug ?? null,
+        workspace_name: currentWorkspace?.name ?? null,
+    });
 }

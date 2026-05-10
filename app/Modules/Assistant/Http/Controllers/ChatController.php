@@ -73,16 +73,28 @@ class ChatController
 
     private function resolveConversation($user, array $validated): Conversation
     {
+        $workspaceId = $validated['workspace_id']
+            ?? data_get($validated, 'page_context.workspace_id')
+            ?? $user->current_workspace_id
+            ?? $user->currentWorkspace?->id
+            ?? null;
+
         if (! empty($validated['conversation_id'])) {
             $conversation = Conversation::where('user_id', $user->id)
                 ->findOrFail($validated['conversation_id']);
+
+            if (! $conversation->workspace_id && $workspaceId) {
+                $conversation->update([
+                    'workspace_id' => $workspaceId,
+                ]);
+            }
 
             return $conversation;
         }
 
         return Conversation::create([
             'user_id' => $user->id,
-            'workspace_id' => $validated['workspace_id'] ?? null,
+            'workspace_id' => $workspaceId,
         ]);
     }
 

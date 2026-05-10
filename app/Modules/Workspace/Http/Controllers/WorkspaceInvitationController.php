@@ -8,6 +8,7 @@ use App\Modules\Workspace\Actions\AcceptWorkspaceInvitationAction;
 use App\Modules\Workspace\Actions\CreateWorkspaceInvitationAction;
 use App\Modules\Workspace\Http\Requests\AcceptWorkspaceInvitationRequest;
 use App\Modules\Workspace\Http\Requests\StoreWorkspaceInvitationRequest;
+use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,9 @@ final class WorkspaceInvitationController extends Controller
         StoreWorkspaceInvitationRequest $request,
         CreateWorkspaceInvitationAction $createWorkspaceInvitationAction,
     ) {
-        $workspace = $request->route('workspace');
+        $workspace = Workspace::query()
+            ->where('slug', $request->route('workspace'))
+            ->firstOrFail();
 
         $createWorkspaceInvitationAction->handle($workspace, $request->user(), $request->toDTO());
 

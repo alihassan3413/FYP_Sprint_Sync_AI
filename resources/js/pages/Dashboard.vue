@@ -33,9 +33,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-/* ----------------------------------------------------------------------------
- * Derived data — never trust the backend to compute display-only things
- * ------------------------------------------------------------------------- */
+
 const onlineMembers = computed(() => props.members.filter((m) => m.status === 'active'));
 
 const teamMembers = computed(() => props.members.filter((m) => m.status !== 'pending'));
