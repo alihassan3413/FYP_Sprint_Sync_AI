@@ -112,12 +112,25 @@ function finishMessage(id: string) {
     if (msg) msg.streaming = false;
 }
 
-// ---- CSRF helper ----
+function getCookie(name: string): string | null {
+    const value = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith(`${name}=`));
+
+    if (!value) {
+        return null;
+    }
+
+    return decodeURIComponent(value.split('=')[1] ?? '');
+}
+
 function getCsrfToken(): string {
     return (
+        getCookie('XSRF-TOKEN') ||
         document
             .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-            ?.getAttribute('content') ?? ''
+            ?.getAttribute('content') ||
+        ''
     );
 }
 
@@ -388,7 +401,7 @@ async function submit(prompt: string) {
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'text/event-stream',
-                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-XSRF-TOKEN': getCsrfToken(),
                 'X-Requested-With': 'XMLHttpRequest',
             },
             body: JSON.stringify({
@@ -452,7 +465,7 @@ async function confirmTool(
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'text/event-stream',
-                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-XSRF-TOKEN': getCsrfToken(),
                 'X-Requested-With': 'XMLHttpRequest',
             },
             body: JSON.stringify({

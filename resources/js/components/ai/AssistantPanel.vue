@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ChevronDown, Plus, RotateCcw, Sparkles, X } from "lucide-vue-next";
 import { motion } from "motion-v";
-import MarkdownIt from 'markdown-it';
-import DOMPurify from 'dompurify';
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 
 interface Props {
   suggestions?: string[];
@@ -116,36 +116,55 @@ watch(
     ]"
   >
     <!-- Top control row -->
-    <div class="flex items-center justify-between px-2 pt-0.5">
-      <button
-        v-if="hasMessages"
-        type="button"
-        class="grid size-6 place-items-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/90"
-        aria-label="New conversation"
-        title="New conversation"
-        @click="clearConversation"
-      >
-        <RotateCcw class="size-3" :stroke-width="2.2" />
-      </button>
-      <span v-else />
-
-      <div class="flex items-center gap-1">
+    <div class="flex items-center justify-between px-3 pt-2">
+      <!-- macOS-style controls -->
+      <div class="flex items-center gap-1.5">
+        <!-- Close -->
         <button
           type="button"
-          class="grid size-6 place-items-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/90"
-          aria-label="Minimize to dock"
-          @click="openDock"
-        >
-          <ChevronDown class="size-3.5" :stroke-width="2.2" />
-        </button>
-        <button
-          type="button"
-          class="grid size-6 place-items-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/90"
+          class="group grid size-3.5 place-items-center rounded-full bg-[#ff5f57] shadow-sm ring-1 ring-black/10 transition hover:scale-110"
           aria-label="Close assistant"
+          title="Close"
           @click="collapse"
         >
-          <X class="size-3.5" :stroke-width="2.2" />
+          <X
+            class="size-2 opacity-0 transition group-hover:opacity-70"
+            :stroke-width="3"
+          />
         </button>
+
+        <!-- Minimize -->
+        <button
+          type="button"
+          class="group grid size-3.5 place-items-center rounded-full bg-[#ffbd2e] shadow-sm ring-1 ring-black/10 transition hover:scale-110"
+          aria-label="Minimize to dock"
+          title="Minimize"
+          @click="openDock"
+        >
+          <span
+            class="h-0.5 w-1.5 rounded-full bg-black/55 opacity-0 transition group-hover:opacity-70"
+          />
+        </button>
+
+        <!-- New conversation -->
+        <button
+          v-if="hasMessages"
+          type="button"
+          class="group grid size-3.5 place-items-center rounded-full bg-[#28c840] shadow-sm ring-1 ring-black/10 transition hover:scale-110"
+          aria-label="New conversation"
+          title="New conversation"
+          @click="clearConversation"
+        >
+          <RotateCcw
+            class="size-2 opacity-0 transition group-hover:opacity-70"
+            :stroke-width="3"
+          />
+        </button>
+
+        <span
+          v-else
+          class="block size-3.5 rounded-full bg-white/12 ring-1 ring-white/10"
+        />
       </div>
     </div>
 
@@ -205,12 +224,12 @@ watch(
               <!-- Normal streamed text -->
               <template v-else>
                 <motion.div
-                    v-if="msg.content"
-                    :initial="{ opacity: 0, y: 3 }"
-                    :animate="{ opacity: 1, y: 0 }"
-                    :transition="{ duration: 0.16 }"
-                    class="assistant-markdown"
-                    v-html="renderMarkdown(msg.content)"
+                  v-if="msg.content"
+                  :initial="{ opacity: 0, y: 3 }"
+                  :animate="{ opacity: 1, y: 0 }"
+                  :transition="{ duration: 0.16 }"
+                  class="assistant-markdown"
+                  v-html="renderMarkdown(msg.content)"
                 />
 
                 <span
@@ -369,7 +388,6 @@ watch(
   }
 }
 
-
 .assistant-markdown {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -426,5 +444,4 @@ watch(
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-
 </style>
