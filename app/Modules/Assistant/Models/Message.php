@@ -55,6 +55,7 @@ class Message extends Model
     public const STATUS_REJECTED = 'rejected';
     public const STATUS_EXECUTED = 'executed';
     public const STATUS_FAILED = 'failed';
+    public const STATUS_SUPERSEDED = 'superseded';
 
     public function conversation(): BelongsTo
     {

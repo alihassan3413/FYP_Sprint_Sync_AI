@@ -17,11 +17,16 @@ class BuildContextPayload
      *     workspace_slug?: string|null,
      *     workspace_name?: string|null
      * }  $pageContext optional UI context
+     * @param  array<int, array{name: string, args: array}>  $supersededActions tools the user was amending or canceling
      * @return array{system: string, additional_messages: array}
      */
-    public function handle(User $user, ?Workspace $workspace, array $pageContext = []): array
-    {
-        $systemPrompt = $this->buildSystemPrompt($user, $workspace, $pageContext);
+    public function handle(
+        User $user,
+        ?Workspace $workspace,
+        array $pageContext = [],
+        array $supersededActions = [],
+    ): array {
+        $systemPrompt = $this->buildSystemPrompt($user, $workspace, $pageContext, $supersededActions);
 
         return [
             'system' => $systemPrompt,
@@ -29,8 +34,15 @@ class BuildContextPayload
         ];
     }
 
-    private function buildSystemPrompt(User $user, ?Workspace $workspace, array $pageContext): string
-    {
+    /**
+     * @param  array<int, array{name: string, args: array}>  $supersededActions
+     */
+    private function buildSystemPrompt(
+        User $user,
+        ?Workspace $workspace,
+        array $pageContext,
+        array $supersededActions = [],
+    ): string {
         $parts = [];
 
         $parts[] = <<<'TXT'
@@ -101,6 +113,19 @@ TXT;
             now()->toIso8601String(),
             now()->format('l, F j, Y'),
         );
+
+        if (! empty($supersededActions)) {
+            $lines = ['Pending action context:'];
+            foreach ($supersededActions as $action) {
+                $argsJson = json_encode($action['args'] ?? [], JSON_UNESCAPED_SLASHES);
+                $lines[] = sprintf('- %s with args %s', $action['name'], $argsJson);
+            }
+            $lines[] = 'The user just sent a new message while the action(s) above were awaiting confirmation. Their message is most likely (a) amending the args, (b) canceling, or (c) unrelated.';
+            $lines[] = 'If amending: re-emit the SAME tool with the args merged from above (keep prior fields, override only what the user changed). Do not narrate.';
+            $lines[] = 'If canceling: respond with one short sentence acknowledging the cancellation. Do not call the tool again.';
+            $lines[] = 'If unrelated: handle the new request normally.';
+            $parts[] = implode("\n", $lines);
+        }
 
         return implode("\n\n", $parts);
     }

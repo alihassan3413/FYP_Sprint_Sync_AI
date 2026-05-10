@@ -208,6 +208,12 @@ async function consumeSseStream(
         return;
     }
 
+    // Tracks pending tools that were superseded this turn so a later
+    // tool_pending event with replaces_message_id can update the original
+    // bubble in place instead of pushing a duplicate card.
+    // key = old server-side message_id, value = host frontend message id
+    const supersededHosts = new Map<number, string>();
+
     for await (const event of parseSSE(response)) {
         const type = event.type as string;
 
@@ -225,35 +231,69 @@ async function consumeSseStream(
                 break;
             }
 
-            case 'text':
+            case 'text': {
                 const msg = messages.value.find((m) => m.id === assistantMsg.id);
-
                 if (msg) {
                     msg.isLoading = false;
                 }
-
                 appendToMessage(assistantMsg.id, event.delta as string);
                 break;
+            }
+
+            case 'tool_superseded': {
+                const oldMessageId = event.message_id as number;
+                const host = messages.value.find(
+                    (m) => m.pendingTool?.messageId === oldMessageId,
+                );
+                if (host) {
+                    supersededHosts.set(oldMessageId, host.id);
+                    host.pendingTool = undefined;
+                }
+                break;
+            }
 
             case 'tool_pending': {
-                const msg = messages.value.find((m) => m.id === assistantMsg.id);
-                if (msg) {
-                    const toolName = event.name as string;
-                    const args = (event.args as Record<string, unknown>) ?? {};
+                const toolName = event.name as string;
+                const args = (event.args as Record<string, unknown>) ?? {};
+                const replacesId = event.replaces_message_id as number | undefined;
 
-                    msg.isLoading = false;
+                const newPending: PendingTool = {
+                    messageId: event.message_id as number,
+                    toolCallId: event.tool_call_id as string,
+                    name: toolName,
+                    args,
+                    summary: summarizeTool(toolName, args),
+                };
 
+                const hostId =
+                    replacesId !== undefined ? supersededHosts.get(replacesId) : undefined;
+                const host = hostId
+                    ? messages.value.find((m) => m.id === hostId)
+                    : undefined;
 
-                    if (!msg.content.trim()) {
-                        msg.content = getToolIntro(toolName);
+                if (host) {
+                    // In-place update of the existing card.
+                    host.pendingTool = newPending;
+                    host.toolStatus = undefined;
+                    supersededHosts.delete(replacesId!);
+
+                    const current = messages.value.find((m) => m.id === assistantMsg.id);
+                    if (current) {
+                        current.isLoading = false;
+                        if (!current.content.trim()) {
+                            current.content =
+                                'Updated the pending action. Please confirm when ready.';
+                        }
                     }
-                    msg.pendingTool = {
-                        messageId: event.message_id as number,
-                        toolCallId: event.tool_call_id as string,
-                        name: toolName,
-                        args,
-                        summary: summarizeTool(toolName, args),
-                    };
+                } else {
+                    const msg = messages.value.find((m) => m.id === assistantMsg.id);
+                    if (msg) {
+                        msg.isLoading = false;
+                        if (!msg.content.trim()) {
+                            msg.content = getToolIntro(toolName);
+                        }
+                        msg.pendingTool = newPending;
+                    }
                 }
                 break;
             }
@@ -306,12 +346,19 @@ async function consumeSseStream(
                 finishMessage(assistantMsg.id);
                 break;
 
-            case 'error':
-                appendToMessage(
-                    assistantMsg.id,
-                    `\n\n⚠️ ${event.message as string}`,
-                );
+            case 'error': {
+                const msg = messages.value.find((m) => m.id === assistantMsg.id);
+                const friendly = (event.message as string) ?? 'Something went wrong.';
+                if (msg) {
+                    msg.isLoading = false;
+                    if (!msg.content.trim()) {
+                        msg.content = `⚠️ ${friendly}`;
+                    } else {
+                        msg.content += `\n\n⚠️ ${friendly}`;
+                    }
+                }
                 break;
+            }
 
             case 'done':
             case 'stream_end':

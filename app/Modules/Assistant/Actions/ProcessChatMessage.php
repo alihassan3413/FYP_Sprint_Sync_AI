@@ -24,7 +24,7 @@ class ProcessChatMessage
     ) {}
 
     /**
-     * @param array{page?: string, route?: string} $pageContext
+     * @param  array{page?: string, route?: string}  $pageContext
      * @return Generator<int, array{type: string, ...}>
      */
     public function handle(
@@ -46,19 +46,70 @@ class ProcessChatMessage
             'id' => $userMsg->id,
         ];
 
+        // If the user sent a new message while one or more tools were
+        // awaiting confirmation, treat those as superseded: the user is
+        // either amending args, canceling, or moving on. Resolving them
+        // now keeps the conversation history valid for the LLM (an
+        // unresolved tool message has no content and OpenAI 400s on it).
+        $supersededIdsByName = [];
         try {
-            yield from $this->runLlmRound($user, $conversation, $pageContext, $model);
+            yield from $this->supersedePendingTools($conversation, $supersededIdsByName);
         } catch (Throwable $e) {
-            Log::error('Assistant orchestration failed', [
-                'conversation_id' => $conversation->id,
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            report($e);
+            yield $this->errorEvent($e);
+            return;
+        }
+
+        try {
+            yield from $this->runLlmRound(
+                user: $user,
+                conversation: $conversation,
+                pageContext: $pageContext,
+                model: $model,
+                supersededIdsByName: $supersededIdsByName,
+            );
+        } catch (Throwable $e) {
+            report($e);
+            yield $this->errorEvent($e);
+        }
+    }
+
+    /**
+     * Find any pending tool messages and resolve them with a synthetic
+     * tool result so the conversation history can be replayed safely to
+     * the LLM. Returns a map of tool name => most recent superseded
+     * message id, used later to tag re-emitted tool_pending events.
+     *
+     * @param  array<string, int>  $supersededIdsByName  passed by reference; populated here
+     */
+    private function supersedePendingTools(Conversation $conversation, array &$supersededIdsByName): Generator
+    {
+        $pending = $conversation->messages()
+            ->where('role', 'tool')
+            ->where('tool_status', Message::STATUS_PENDING)
+            ->get();
+
+        foreach ($pending as $msg) {
+            $name = $msg->metadata['name'] ?? null;
+            $args = $msg->metadata['args'] ?? [];
+
+            $msg->update([
+                'tool_status' => Message::STATUS_SUPERSEDED,
+                'content' => json_encode([
+                    'superseded' => true,
+                    'reason' => 'User sent a new message while this action was awaiting confirmation. Treat their latest message as an amendment, cancellation, or unrelated turn — and act accordingly.',
+                ]),
             ]);
 
+            if ($name !== null) {
+                $supersededIdsByName[$name] = $msg->id;
+            }
+
             yield [
-                'type' => 'error',
-                'message' => 'Something went wrong. Please try again.',
+                'type' => 'tool_superseded',
+                'message_id' => $msg->id,
+                'name' => $name,
+                'args' => $args,
             ];
         }
     }
@@ -67,6 +118,8 @@ class ProcessChatMessage
      * One round-trip with the LLM. After tool execution, we recursively
      * call this again to let the LLM compose a final reply using tool
      * results. Capped at 5 rounds to prevent infinite loops.
+     *
+     * @param  array<string, int>  $supersededIdsByName  tool name => message id of a tool just superseded
      */
     private function runLlmRound(
         User $user,
@@ -74,6 +127,7 @@ class ProcessChatMessage
         array $pageContext,
         string $model,
         int $depth = 0,
+        array $supersededIdsByName = [],
     ): Generator {
         if ($depth >= 5) {
             yield ['type' => 'error', 'message' => 'Conversation got too complex. Please start a new one.'];
@@ -84,8 +138,15 @@ class ProcessChatMessage
             ? Workspace::find($conversation->workspace_id)
             : null;
 
+        // Pass any superseded actions into the system prompt so the LLM
+        // knows the user may be amending or canceling them. Only relevant
+        // on the first round; deeper rounds are tool-result follow-ups.
+        $supersededActions = $depth === 0
+            ? $this->buildSupersededActions($conversation, $supersededIdsByName)
+            : [];
+
         // Build the messages array sent to the LLM.
-        $context = $this->contextBuilder->handle($user, $workspace, $pageContext);
+        $context = $this->contextBuilder->handle($user, $workspace, $pageContext, $supersededActions);
         $messages = [['role' => 'system', 'content' => $context['system']]];
 
         // Last 30 messages — enough context, bounded token cost.
@@ -159,7 +220,7 @@ class ProcessChatMessage
 
         // Tools called → handle each one.
         foreach ($toolCalls as $toolCall) {
-            yield from $this->handleToolCall($user, $conversation, $toolCall);
+            yield from $this->handleToolCall($user, $conversation, $toolCall, $supersededIdsByName);
         }
 
         // Check whether any tools are pending confirmation. If so, STOP.
@@ -176,11 +237,55 @@ class ProcessChatMessage
 
         // All tools auto-executed → recurse so the LLM can use results
         // to compose its final reply.
-        yield from $this->runLlmRound($user, $conversation, $pageContext, $model, $depth + 1);
+        yield from $this->runLlmRound(
+            user: $user,
+            conversation: $conversation,
+            pageContext: $pageContext,
+            model: $model,
+            depth: $depth + 1,
+            supersededIdsByName: [],
+        );
     }
 
-    private function handleToolCall(User $user, Conversation $conversation, array $toolCall): Generator
+    /**
+     * @param  array<string, int>  $supersededIdsByName
+     * @return array<int, array{name: string, args: array}>
+     */
+    private function buildSupersededActions(Conversation $conversation, array $supersededIdsByName): array
     {
+        if (empty($supersededIdsByName)) {
+            return [];
+        }
+
+        $messages = $conversation->messages()
+            ->whereIn('id', array_values($supersededIdsByName))
+            ->get()
+            ->keyBy('id');
+
+        $actions = [];
+        foreach ($supersededIdsByName as $name => $id) {
+            $msg = $messages->get($id);
+            if (! $msg) {
+                continue;
+            }
+            $actions[] = [
+                'name' => $name,
+                'args' => $msg->metadata['args'] ?? [],
+            ];
+        }
+
+        return $actions;
+    }
+
+    /**
+     * @param  array<string, int>  $supersededIdsByName
+     */
+    private function handleToolCall(
+        User $user,
+        Conversation $conversation,
+        array $toolCall,
+        array $supersededIdsByName = [],
+    ): Generator {
         $name = $toolCall['function']['name'];
         $args = json_decode($toolCall['function']['arguments'], true) ?? [];
         $tool = $this->registry->get($name);
@@ -211,7 +316,7 @@ class ProcessChatMessage
                 'metadata' => ['name' => $name, 'args' => $args],
             ]);
 
-            yield [
+            $event = [
                 'type' => 'tool_pending',
                 'message_id' => $pendingMsg->id,
                 'tool_call_id' => $toolCall['id'],
@@ -219,6 +324,15 @@ class ProcessChatMessage
                 'args' => $args,
                 'description' => $tool->description(),
             ];
+
+            // If this re-emits a tool the user was just amending, tell the
+            // UI to update the existing card in place rather than render
+            // a duplicate.
+            if (isset($supersededIdsByName[$name])) {
+                $event['replaces_message_id'] = $supersededIdsByName[$name];
+            }
+
+            yield $event;
             return;
         }
 
@@ -250,5 +364,21 @@ class ProcessChatMessage
             'content' => json_encode($result),
             'metadata' => ['name' => $name],
         ]);
+    }
+
+    /**
+     * Friendly error event. Real exception is reported via report() so
+     * Sentry/logs catch it; the UI sees a short, calm bubble. Locally
+     * we surface the raw message so dev iteration is fast.
+     */
+    private function errorEvent(Throwable $e): array
+    {
+        $message = 'Something went wrong while generating a response. Please try again.';
+
+        if (app()->environment('local')) {
+            $message .= ' ['.$e->getMessage().']';
+        }
+
+        return ['type' => 'error', 'message' => $message];
     }
 }
