@@ -3,6 +3,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { useCurrentWorkspace } from '@/composables/useCurrentWorkspace';
 import type { SharedData, WorkspaceSummary } from '@/types';
 import { Check, ChevronsUpDown, Plus, Settings } from 'lucide-vue-next';
+import { Link } from '@inertiajs/vue3';
 
 const page = usePage<SharedData>();
 const { state } = useSidebar();
@@ -115,7 +116,7 @@ function openCreateWorkspaceModal() {
             </DropdownMenuItem>
 
             <DropdownMenuItem as-child class="cursor-pointer gap-2">
-                <Link :href="workspaceRoute('workspace.invitations.create')">
+                <Link :href="workspaceRoute('workspace.settings')">
                     <Settings class="size-4" />
                     <span>Workspace settings</span>
                 </Link>

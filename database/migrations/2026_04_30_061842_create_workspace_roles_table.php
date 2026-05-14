@@ -19,6 +19,8 @@ return new class extends Migration
 
             $table->foreignId('workspace_id')->constrained('workspaces')->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['workspace_id', 'slug']);
         });
     }
 

@@ -2,6 +2,7 @@
 
 use App\Modules\Workspace\Http\Controllers\WorkspaceController;
 use App\Modules\Workspace\Http\Controllers\WorkspaceInvitationController;
+use App\Modules\Workspace\Http\Controllers\WorkspaceRoleController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -29,6 +30,9 @@ Route::middleware(['auth', 'verified'])
 
         Route::post('/invitations', [WorkspaceInvitationController::class, 'store'])
             ->name('invitations.store');
+
+        Route::get('/settings', [WorkspaceRoleController::class, 'index'])->name('settings');
+        Route::post('/roles', [WorkspaceRoleController::class, 'store'])->name('roles.store');
     });
 
 // Guest-accessible invitation routes (no auth required)

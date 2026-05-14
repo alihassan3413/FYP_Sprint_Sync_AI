@@ -23,12 +23,6 @@ class WorkspaceController
         return back()->with('success', "Workspace \"{$workspace->name}\" created.");
     }
 
-    /**
-     * Switch the authenticated user's current workspace.
-     *
-     * The service throws a 403 if the user doesn't belong — but we want
-     * a domain exception with a code, so we check first.
-     */
     public function switch(Request $request, Workspace $workspace): RedirectResponse
     {
         $user = $request->user();
@@ -45,4 +39,6 @@ class WorkspaceController
             ])
             ->with('success', "Switched to {$workspace->name}.");
     }
+
+    
 }
