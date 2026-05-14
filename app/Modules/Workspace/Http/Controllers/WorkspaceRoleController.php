@@ -13,7 +13,7 @@ use Inertia\Inertia;
 final class WorkspaceRoleController
 {
     public function index() {
-        return Inertia::render('workspace/settings/index');
+        return Inertia::render('workspace/settings/RoleManagement');
     }
 
     public function store(

@@ -31,7 +31,10 @@ Route::middleware(['auth', 'verified'])
         Route::post('/invitations', [WorkspaceInvitationController::class, 'store'])
             ->name('invitations.store');
 
-        Route::get('/settings', [WorkspaceRoleController::class, 'index'])->name('settings');
+        Route::get('/settings', [WorkspaceController::class, 'index'])->name('settings');
+
+
+        Route::get('/roles', [WorkspaceRoleController::class, 'index'])->name('roles.index');
         Route::post('/roles', [WorkspaceRoleController::class, 'store'])->name('roles.store');
     });
 

@@ -11,10 +11,15 @@ use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Services\WorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class WorkspaceController
 {
     public function __construct(private WorkspaceService $service) {}
+
+    public function index() {
+        return Inertia::render('workspace/settings/index');
+    }
 
     public function store(StoreWorkspaceRequest $request, CreateWorkspaceAction $action): RedirectResponse
     {
@@ -40,5 +45,5 @@ class WorkspaceController
             ->with('success', "Switched to {$workspace->name}.");
     }
 
-    
+
 }
