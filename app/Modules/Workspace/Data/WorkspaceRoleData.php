@@ -22,7 +22,6 @@ class WorkspaceRoleData extends Data
         #[TypeScriptType('Record<string, boolean> | null')]
         public ?array $permissions,
 
-        public int $workspace_id,
     ) {}
 
     public static function fromModel(WorkspaceRole $role): self
@@ -32,7 +31,6 @@ class WorkspaceRoleData extends Data
             name: $role->name,
             slug: $role->slug,
             permissions: $role->permissions,
-            workspace_id: $role->workspace_id,
         );
     }
 }

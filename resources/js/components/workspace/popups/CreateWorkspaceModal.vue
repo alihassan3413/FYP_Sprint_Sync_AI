@@ -27,15 +27,6 @@ const autoSlug = computed(() =>
         .slice(0, 32),
 );
 
-watch(
-    () => form.name,
-    () => {
-        if (!slugTouched.value) {
-            form.slug = autoSlug.value;
-        }
-    },
-);
-
 const canSubmit = computed(() => {
     return form.name.trim().length >= 3 && form.slug.trim().length >= 3 && !form.processing;
 });
@@ -50,11 +41,6 @@ function submit() {
             emit('created');
             reset();
             emit('update:open', false);
-        },
-
-        onFinish: () => {
-            // no need to manually set processing false
-            // Inertia does that automatically
         },
     });
 }
@@ -74,6 +60,15 @@ function handleClose(value: boolean) {
 
     emit('update:open', value);
 }
+
+watch(
+    () => form.name,
+    () => {
+        if (!slugTouched.value) {
+            form.slug = autoSlug.value;
+        }
+    },
+);
 </script>
 
 <template>

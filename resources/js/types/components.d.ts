@@ -76,6 +76,7 @@ declare module 'vue' {
     CollapsibleTrigger: typeof import('./../components/ui/collapsible/CollapsibleTrigger.vue')['default']
     ComingNextCard: typeof import('./../components/dashboard/ComingNextCard.vue')['default']
     CreateWorkspaceModal: typeof import('./../components/workspace/popups/CreateWorkspaceModal.vue')['default']
+    CreateWorkspaceRoleModal: typeof import('./../components/workspace/popups/CreateWorkspaceRoleModal.vue')['default']
     DeleteUser: typeof import('./../components/DeleteUser.vue')['default']
     Dialog: typeof import('./../components/ui/dialog/Dialog.vue')['default']
     DialogClose: typeof import('./../components/ui/dialog/DialogClose.vue')['default']
