@@ -14,6 +14,7 @@ const form = useForm({
 });
 
 const slugTouched = ref(false);
+
 const { workspaceRoute } = useCurrentWorkspace();
 
 const autoSlug = computed(() =>
