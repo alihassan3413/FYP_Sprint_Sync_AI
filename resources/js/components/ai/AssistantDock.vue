@@ -122,7 +122,7 @@ defineExpose({ focusInput });
             <motion.div
                 layout-id="assistant-icon"
                 :transition="{ type: 'spring', stiffness: 400, damping: 30 }"
-                class="flex size-11 shrink-0 items-center justify-center rounded-full bg-custom-blue"
+                class="bg-custom-blue flex size-11 shrink-0 items-center justify-center rounded-full"
             >
                 <Sparkles class="size-4 text-white" :stroke-width="2" />
             </motion.div>

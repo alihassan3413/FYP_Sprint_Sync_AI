@@ -2,8 +2,8 @@
 import { useSidebar } from '@/components/ui/sidebar';
 import { useCurrentWorkspace } from '@/composables/useCurrentWorkspace';
 import type { SharedData, WorkspaceSummary } from '@/types';
-import { Check, ChevronsUpDown, Plus, Settings } from 'lucide-vue-next';
 import { Link } from '@inertiajs/vue3';
+import { Check, ChevronsUpDown, Plus, Settings } from 'lucide-vue-next';
 
 const page = usePage<SharedData>();
 const { state } = useSidebar();

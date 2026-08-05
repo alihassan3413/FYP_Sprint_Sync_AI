@@ -12,15 +12,11 @@ defineProps<{
         <div class="lg:grid lg:grid-cols-[1.1fr_1fr]">
             <aside class="relative hidden overflow-hidden border-r-[1.5px] border-black lg:block">
                 <div
-                    class="pointer-events-none absolute right-10 top-10 h-16 w-16 opacity-50"
-                    style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 8px 8px;"
+                    class="pointer-events-none absolute top-10 right-10 h-16 w-16 opacity-50"
+                    style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 8px 8px"
                 />
-                <div
-                    class="pointer-events-none absolute -bottom-32 -left-24 h-px w-[520px] rotate-[26deg] bg-black/15"
-                />
-                <span
-                    class="pointer-events-none absolute right-[18%] top-[44%] h-3 w-3 rounded-full border-[1.5px] border-black"
-                />
+                <div class="pointer-events-none absolute -bottom-32 -left-24 h-px w-[520px] rotate-[26deg] bg-black/15" />
+                <span class="pointer-events-none absolute top-[44%] right-[18%] h-3 w-3 rounded-full border-[1.5px] border-black" />
 
                 <div class="relative flex h-full min-h-svh flex-col px-12 py-11 xl:px-16 xl:py-14">
                     <Link :href="route('home')" class="flex w-fit items-center gap-2.5">
@@ -31,12 +27,10 @@ defineProps<{
                     </Link>
 
                     <div class="mt-12 max-w-[460px] xl:mt-16">
-                        <h2 class="text-[52px] font-black leading-[0.95] tracking-[-0.035em] xl:text-[60px]">
+                        <h2 class="text-[52px] leading-[0.95] font-black tracking-[-0.035em] xl:text-[60px]">
                             Plan sprints<br />faster with
                             <span class="relative inline-block whitespace-nowrap">
-                                <span
-                                    class="absolute inset-x-[-6px] bottom-[6px] h-[18px] -skew-x-6 bg-[#D4FF4A]"
-                                />
+                                <span class="absolute inset-x-[-6px] bottom-[6px] h-[18px] -skew-x-6 bg-[#D4FF4A]" />
                                 <span class="relative">AI.</span>
                             </span>
                         </h2>
@@ -49,22 +43,16 @@ defineProps<{
                         <div class="flex gap-3">
                             <div class="w-[150px]">
                                 <div class="mb-3 flex items-center justify-between">
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                                        Todo
-                                    </span>
+                                    <span class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase"> Todo </span>
                                     <span class="text-[10px] font-medium text-zinc-400">3</span>
                                 </div>
                                 <div class="space-y-2.5">
                                     <div class="border-[1.5px] border-black bg-white p-3">
-                                        <p class="text-[11px] font-semibold leading-snug">
-                                            Mobile push notifications
-                                        </p>
+                                        <p class="text-[11px] leading-snug font-semibold">Mobile push notifications</p>
                                         <div class="mt-2.5 flex items-center justify-between">
                                             <span class="flex items-center gap-1.5">
                                                 <span class="h-1.5 w-1.5 bg-zinc-400" />
-                                                <span class="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                                    Backlog
-                                                </span>
+                                                <span class="text-[9px] font-semibold tracking-[0.14em] text-zinc-500 uppercase"> Backlog </span>
                                             </span>
                                             <span
                                                 class="flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[8px] font-bold"
@@ -73,18 +61,12 @@ defineProps<{
                                             </span>
                                         </div>
                                     </div>
-                                    <div
-                                        class="-rotate-[1.5deg] border-[1.5px] border-black bg-white p-3 shadow-[3px_3px_0_#000]"
-                                    >
-                                        <p class="text-[11px] font-semibold leading-snug">
-                                            Refactor auth middleware
-                                        </p>
+                                    <div class="-rotate-[1.5deg] border-[1.5px] border-black bg-white p-3 shadow-[3px_3px_0_#000]">
+                                        <p class="text-[11px] leading-snug font-semibold">Refactor auth middleware</p>
                                         <div class="mt-2.5 flex items-center justify-between">
                                             <span class="flex items-center gap-1.5">
                                                 <span class="h-1.5 w-1.5 bg-black" />
-                                                <span class="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                                    Tech
-                                                </span>
+                                                <span class="text-[9px] font-semibold tracking-[0.14em] text-zinc-500 uppercase"> Tech </span>
                                             </span>
                                             <span
                                                 class="flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[8px] font-bold"
@@ -98,22 +80,16 @@ defineProps<{
 
                             <div class="w-[150px]">
                                 <div class="mb-3 flex items-center justify-between">
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                                        In review
-                                    </span>
+                                    <span class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase"> In review </span>
                                     <span class="text-[10px] font-medium text-zinc-400">1</span>
                                 </div>
                                 <div class="space-y-2.5">
                                     <div class="border-[1.5px] border-black bg-white p-3">
-                                        <p class="text-[11px] font-semibold leading-snug">
-                                            Sprint AI suggestions v2
-                                        </p>
+                                        <p class="text-[11px] leading-snug font-semibold">Sprint AI suggestions v2</p>
                                         <div class="mt-2.5 flex items-center justify-between">
                                             <span class="flex items-center gap-1.5">
                                                 <span class="h-1.5 w-1.5 rounded-full border-[1.5px] border-black" />
-                                                <span class="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                                    QA
-                                                </span>
+                                                <span class="text-[9px] font-semibold tracking-[0.14em] text-zinc-500 uppercase"> QA </span>
                                             </span>
                                             <span
                                                 class="flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[8px] font-bold"
@@ -127,22 +103,16 @@ defineProps<{
 
                             <div class="w-[150px]">
                                 <div class="mb-3 flex items-center justify-between">
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                                        Done
-                                    </span>
+                                    <span class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase"> Done </span>
                                     <span class="text-[10px] font-medium text-zinc-400">2</span>
                                 </div>
                                 <div class="space-y-2.5">
                                     <div class="border-[1.5px] border-black bg-white p-3 shadow-[3px_3px_0_#000]">
-                                        <p class="text-[11px] font-semibold leading-snug">
-                                            API rate limiting
-                                        </p>
+                                        <p class="text-[11px] leading-snug font-semibold">API rate limiting</p>
                                         <div class="mt-2.5 flex items-center justify-between">
                                             <span class="flex items-center gap-1.5">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-black" />
-                                                <span class="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                                    Shipped
-                                                </span>
+                                                <span class="text-[9px] font-semibold tracking-[0.14em] text-zinc-500 uppercase"> Shipped </span>
                                             </span>
                                             <span
                                                 class="flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[8px] font-bold"
@@ -152,13 +122,9 @@ defineProps<{
                                         </div>
                                     </div>
                                     <div class="border-[1.5px] border-black bg-white p-3">
-                                        <p class="text-[11px] font-semibold leading-snug">
-                                            Onboarding redesign
-                                        </p>
+                                        <p class="text-[11px] leading-snug font-semibold">Onboarding redesign</p>
                                         <div class="mt-2.5 flex items-center justify-between">
-                                            <span class="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                                S
-                                            </span>
+                                            <span class="text-[9px] font-semibold tracking-[0.14em] text-zinc-500 uppercase"> S </span>
                                             <span
                                                 class="flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[8px] font-bold"
                                             >
@@ -171,29 +137,21 @@ defineProps<{
                         </div>
 
                         <div
-                            class="absolute right-[-10px] top-[122px] w-[228px] -rotate-[2.5deg] border-[1.5px] border-black bg-white p-3.5 shadow-[5px_5px_0_#000]"
+                            class="absolute top-[122px] right-[-10px] w-[228px] -rotate-[2.5deg] border-[1.5px] border-black bg-white p-3.5 shadow-[5px_5px_0_#000]"
                         >
                             <div class="mb-1.5 flex items-center gap-2">
-                                <span
-                                    class="flex h-5 w-5 items-center justify-center border-[1.5px] border-black bg-[#D4FF4A]"
-                                >
+                                <span class="flex h-5 w-5 items-center justify-center border-[1.5px] border-black bg-[#D4FF4A]">
                                     <Sparkles class="h-3 w-3" :stroke-width="2.5" />
                                 </span>
-                                <span class="text-[9px] font-bold uppercase tracking-[0.18em]">
-                                    AI suggestion
-                                </span>
+                                <span class="text-[9px] font-bold tracking-[0.18em] uppercase"> AI suggestion </span>
                             </div>
-                            <p class="text-[12px] font-medium leading-snug">
-                                Move 2 tasks to next sprint to balance team capacity.
-                            </p>
+                            <p class="text-[12px] leading-snug font-medium">Move 2 tasks to next sprint to balance team capacity.</p>
                         </div>
                     </div>
 
                     <div class="mt-10 flex items-end justify-between gap-6">
                         <div>
-                            <p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                                Team
-                            </p>
+                            <p class="mb-2.5 text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">Team</p>
                             <div class="flex -space-x-2">
                                 <span
                                     class="relative z-40 flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-black bg-white text-[10px] font-bold ring-[2.5px] ring-[#D4FF4A]"
@@ -219,9 +177,7 @@ defineProps<{
                         </div>
 
                         <div class="text-right">
-                            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                                Sprint 14 · 78% complete
-                            </p>
+                            <p class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">Sprint 14 · 78% complete</p>
                             <div class="mt-2.5 flex items-end justify-end gap-[3px]">
                                 <span class="block h-2 w-1.5 bg-black/40" />
                                 <span class="block h-3 w-1.5 bg-black/55" />
@@ -246,7 +202,7 @@ defineProps<{
                 <div class="w-full max-w-sm">
                     <div class="border-[1.5px] border-black bg-white p-6 shadow-[3px_3px_0_#000]">
                         <div class="mb-5">
-                            <h1 class="text-[22px] font-black leading-tight tracking-tight">
+                            <h1 class="text-[22px] leading-tight font-black tracking-tight">
                                 {{ title }}
                             </h1>
                             <p v-if="description" class="mt-1.5 text-sm text-zinc-500">

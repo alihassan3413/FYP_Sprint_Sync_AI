@@ -5,47 +5,35 @@ declare(strict_types=1);
 namespace App\Modules\Assistant\Actions;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
-
-class ExecuteToolCall
+final class ExecuteToolCall
 {
-
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
     public function handle(AssistantTool $tool, array $args, User $user): array
     {
-        $start = microtime(true);
+        $startedAt = microtime(true);
+
+        if (! $tool->authorize($user)) {
+            return [
+                'success' => false,
+                'error_code' => 'unauthorized',
+                'error' => 'You do not have permission to perform this action.',
+            ];
+        }
 
         try {
-            if (! $tool->authorize($user)) {
-                return [
-                    'success' => false,
-                    'error_code' => 'unauthorized',
-                    'error' => 'You do not have permission to perform this action.',
-                ];
-            }
-
             $result = $tool->execute($args, $user);
-
-            $elapsed = (int) ((microtime(true) - $start) * 1000);
-
-            Log::info('Tool executed', [
-                'tool' => $tool->name(),
-                'user_id' => $user->id,
-                'elapsed_ms' => $elapsed,
-                'success' => $result['success'] ?? true,
-            ]);
-
-            return $result;
         } catch (Throwable $e) {
-
-            Log::error('Tool execution failed', [
+            Log::error('Assistant tool execution failed', [
                 'tool' => $tool->name(),
                 'user_id' => $user->id,
-                'args' => $args,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return [
@@ -54,5 +42,14 @@ class ExecuteToolCall
                 'error' => 'The action failed due to a system error. Please try again.',
             ];
         }
+
+        Log::info('Assistant tool executed', [
+            'tool' => $tool->name(),
+            'user_id' => $user->id,
+            'elapsed_ms' => (int) ((microtime(true) - $startedAt) * 1000),
+            'success' => $result['success'] ?? true,
+        ]);
+
+        return $result;
     }
 }

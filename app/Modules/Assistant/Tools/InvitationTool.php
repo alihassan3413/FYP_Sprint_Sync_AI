@@ -8,12 +8,11 @@ use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
 use App\Modules\Workspace\Actions\CreateWorkspaceInvitationAction;
 use App\Modules\Workspace\Data\WorkspaceInvitationData;
+use App\UserRole;
 
-class InvitationTool implements AssistantTool
+final class InvitationTool implements AssistantTool
 {
-    public function __construct(
-        private readonly CreateWorkspaceInvitationAction $createInvitation,
-    ) {}
+    public function __construct(private readonly CreateWorkspaceInvitationAction $createInvitation) {}
 
     public function name(): string
     {
@@ -22,9 +21,14 @@ class InvitationTool implements AssistantTool
 
     public function description(): string
     {
-        return 'Invites a user to the current workspace. Ask for the email address if missing. The default role is "member". If the user says admin, use role "admin". Before confirmation, show both email and role.';
+        return 'Invites a person to the current workspace by email. Ask for the email address if it is missing. '
+            .'The default role is "member"; use "admin" only when the user asks for it. '
+            .'Show both the email and the role before confirmation.';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function parameters(): array
     {
         return [
@@ -32,13 +36,13 @@ class InvitationTool implements AssistantTool
             'properties' => [
                 'email' => [
                     'type' => 'string',
-                    'description' => 'The email address of the person to invite.',
                     'format' => 'email',
+                    'description' => 'The email address of the person to invite.',
                 ],
                 'role' => [
                     'type' => 'string',
-                    'description' => 'The role to assign to the invitee (optional, defaults to "member").',
-                    'enum' => ['member', 'admin'],
+                    'enum' => UserRole::invitationRoles(),
+                    'description' => 'The role to assign to the invitee. Defaults to "member".',
                 ],
             ],
             'required' => ['email'],
@@ -53,47 +57,51 @@ class InvitationTool implements AssistantTool
 
     public function authorize(User $user): bool
     {
-        return $user !== null;
-    }
-
-    public function execute(array $args, User $user): array
-    {
-        $email = $args['email'] ?? null;
-        $role = $args['role'] ?? 'member';
-
-        if (! $email) {
-            return [
-                'error' => true,
-                'message' => 'Please provide the email address of the person you want to invite.',
-            ];
-        }
-
-        if (! in_array($role, ['member', 'admin'], true)) {
-            $role = 'member';
-        }
-
         $workspace = $user->currentWorkspace;
 
-        if (! $workspace) {
+        return $workspace !== null && $user->can('invite', $workspace);
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    public function execute(array $args, User $user): array
+    {
+        $workspace = $user->currentWorkspace;
+
+        if ($workspace === null || ! $user->can('invite', $workspace)) {
             return [
-                'error' => true,
-                'message' => 'No active workspace found. Please select a workspace first.',
+                'success' => false,
+                'error_code' => 'unauthorized',
+                'error' => 'You do not have permission to invite people to this workspace.',
             ];
         }
 
-        $data = WorkspaceInvitationData::from([
-            'email' => $email,
-            'role' => $role,
-        ]);
+        $email = (string) $args['email'];
 
-        $invitation = $this->createInvitation->handle($workspace, $user, $data);
+        if ($workspace->users()->where('users.email', $email)->exists()) {
+            return [
+                'success' => false,
+                'error_code' => 'already_member',
+                'error' => "{$email} is already a member of {$workspace->name}.",
+            ];
+        }
+
+        $invitation = $this->createInvitation->handle($workspace, $user, WorkspaceInvitationData::from([
+            'email' => $email,
+            'role' => $args['role'] ?? UserRole::MEMBER->value,
+        ]));
 
         return [
-            'invitation_id' => $invitation->id,
-            'email' => $invitation->email,
-            'role' => $invitation->role,
-            'expires_at' => $invitation->expires_at->toDateTimeString(),
-            'message' => "Invitation sent to {$invitation->email} with role {$invitation->role}.",
+            'success' => true,
+            'invitation' => [
+                'id' => $invitation->id,
+                'email' => $invitation->email,
+                'role' => $invitation->role->value,
+                'expires_at' => $invitation->expires_at->toDateTimeString(),
+            ],
+            'message' => "Invitation sent to {$invitation->email} as {$invitation->role->label()}.",
         ];
     }
 }

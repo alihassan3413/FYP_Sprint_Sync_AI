@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rules\Password;
 
 final class AcceptWorkspaceInvitationRequest extends FormRequest
 {
@@ -12,19 +14,18 @@ final class AcceptWorkspaceInvitationRequest extends FormRequest
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
-        /**
-         * If user is already logged in, they don't need to submit name/password.
-         * If guest user, Accept.vue must submit name/password.
-         */
-        if ($this->user()) {
+        if ($this->user() !== null) {
             return [];
         }
 
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'name' => ['required', 'string', 'min:2', 'max:255'],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
 }

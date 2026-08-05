@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
 import {
     Brush,
     ChevronDown,
@@ -19,6 +18,7 @@ import {
     User,
     Users,
 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,8 +106,24 @@ const allPermissionKeys = permissionGroups.flatMap((g) => g.permissions.map((p) 
 
 const systemRoles = [
     { slug: 'owner', name: 'Owner', desc: 'Full access. Cannot be removed.', icon: Crown, iconColor: '#534AB7', iconBg: '#EEEDFE', memberCount: 1 },
-    { slug: 'admin', name: 'Admin', desc: 'Manage members, billing & settings.', icon: ShieldCheck, iconColor: '#3B6D11', iconBg: '#EAF3DE', memberCount: 3 },
-    { slug: 'member', name: 'Member', desc: 'Default role for workspace members.', icon: User, iconColor: '#185FA5', iconBg: '#E6F1FB', memberCount: 12 },
+    {
+        slug: 'admin',
+        name: 'Admin',
+        desc: 'Manage members, billing & settings.',
+        icon: ShieldCheck,
+        iconColor: '#3B6D11',
+        iconBg: '#EAF3DE',
+        memberCount: 3,
+    },
+    {
+        slug: 'member',
+        name: 'Member',
+        desc: 'Default role for workspace members.',
+        icon: User,
+        iconColor: '#185FA5',
+        iconBg: '#E6F1FB',
+        memberCount: 12,
+    },
     { slug: 'viewer', name: 'Viewer', desc: 'Read-only access to projects.', icon: Eye, iconColor: '#854F0B', iconBg: '#FAEEDA', memberCount: 5 },
 ];
 
@@ -128,18 +144,34 @@ const customIconColorMap: Record<string, string> = {
 
 const customRoles = ref<WorkspaceRoleData[]>(
     props.roles ?? [
-        { id: 1, name: 'Developer', slug: 'developer', workspace_id: 1, member_count: 4, permissions: { 'projects.view': true, 'projects.create': true, 'integrations.view': true, 'integrations.manage': true, 'integrations.deploy': true, 'members.invite': true } },
-        { id: 2, name: 'Designer', slug: 'designer', workspace_id: 1, member_count: 2, permissions: { 'projects.view': true, 'projects.create': true } },
+        {
+            id: 1,
+            name: 'Developer',
+            slug: 'developer',
+            workspace_id: 1,
+            member_count: 4,
+            permissions: {
+                'projects.view': true,
+                'projects.create': true,
+                'integrations.view': true,
+                'integrations.manage': true,
+                'integrations.deploy': true,
+                'members.invite': true,
+            },
+        },
+        {
+            id: 2,
+            name: 'Designer',
+            slug: 'designer',
+            workspace_id: 1,
+            member_count: 2,
+            permissions: { 'projects.view': true, 'projects.create': true },
+        },
     ],
 );
 
 const selectedRoleId = ref<number | null>(customRoles.value[0]?.id ?? null);
 const collapsedGroups = ref<Record<string, boolean>>({});
-const showCreateModal = ref(false);
-
-// Create form
-const newRoleName = ref('');
-const newRoleSlug = ref('');
 
 // Edit form (mirrors selected role)
 const editName = ref('');
@@ -163,15 +195,14 @@ function selectRole(role: WorkspaceRoleData) {
 }
 
 function toSlug(v: string) {
-    return v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    return v
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
 }
 
 function onEditNameInput(v: string) {
     editSlug.value = toSlug(v);
-}
-
-function onNewNameInput(v: string) {
-    newRoleSlug.value = toSlug(v);
 }
 
 function toggleGroup(key: string) {
@@ -203,25 +234,6 @@ function deleteRole() {
     router.delete(workspaceRoute('workspace.roles.destroy', selectedRole.value.id), { preserveScroll: true });
 }
 
-function createRole() {
-    router.post(
-        workspaceRoute('workspace.roles.store'),
-        {
-            name: newRoleName.value,
-            slug: newRoleSlug.value,
-            permissions: {},
-        },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                showCreateModal.value = false;
-                newRoleName.value = '';
-                newRoleSlug.value = '';
-            },
-        },
-    );
-}
-
 function openCreateWorkspaceRoleModal() {
     isCreateWorkspaceRoleModalOpen.value = true;
 }
@@ -236,7 +248,11 @@ if (customRoles.value.length) selectRole(customRoles.value[0]);
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
             <!-- Page Header -->
-            <AppPageHeader eyebrow="Workspace" title="Role Management" description="Create custom roles and fine-tune what each member can do in your workspace.">
+            <AppPageHeader
+                eyebrow="Workspace"
+                title="Role Management"
+                description="Create custom roles and fine-tune what each member can do in your workspace."
+            >
                 <template #actions>
                     <Button size="sm" class="gap-1.5" @click="openCreateWorkspaceRoleModal">
                         <Plus class="size-3.5" />
@@ -303,11 +319,13 @@ if (customRoles.value.length) selectRole(customRoles.value[0]);
                                 />
                             </div>
                             <p class="text-sm font-medium">{{ role.name }}</p>
-                            <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed line-clamp-2">
+                            <p class="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-relaxed">
                                 {{ Object.values(role.permissions ?? {}).filter(Boolean).length }} permissions enabled
                             </p>
                             <div class="mt-3 flex items-center justify-between">
-                                <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-emerald-800 uppercase dark:bg-emerald-950 dark:text-emerald-300">
+                                <span
+                                    class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-emerald-800 uppercase dark:bg-emerald-950 dark:text-emerald-300"
+                                >
                                     Custom
                                 </span>
                                 <span class="text-muted-foreground flex items-center gap-1 text-[11px]">
@@ -346,11 +364,7 @@ if (customRoles.value.length) selectRole(customRoles.value[0]);
                                 <label class="text-muted-foreground mb-1.5 block text-xs font-medium">Identifier</label>
                                 <div class="border-input bg-muted flex overflow-hidden rounded-lg border text-sm">
                                     <span class="text-muted-foreground border-input border-r px-3 py-2 text-xs">workspace.</span>
-                                    <input
-                                        v-model="editSlug"
-                                        type="text"
-                                        class="bg-transparent flex-1 px-3 py-2 text-sm outline-none"
-                                    />
+                                    <input v-model="editSlug" type="text" class="flex-1 bg-transparent px-3 py-2 text-sm outline-none" />
                                 </div>
                             </div>
                         </div>
@@ -364,34 +378,21 @@ if (customRoles.value.length) selectRole(customRoles.value[0]);
                                     {{ enabledCount }} / {{ totalCount }}
                                 </span>
                             </div>
-                            <button
-                                class="text-muted-foreground hover:text-foreground text-xs transition-colors"
-                                @click="toggleAll"
-                            >
+                            <button class="text-muted-foreground hover:text-foreground text-xs transition-colors" @click="toggleAll">
                                 Toggle all
                             </button>
                         </div>
 
                         <!-- Permission groups -->
                         <div>
-                            <div
-                                v-for="group in permissionGroups"
-                                :key="group.key"
-                                class="border-b last:border-b-0"
-                            >
+                            <div v-for="group in permissionGroups" :key="group.key" class="border-b last:border-b-0">
                                 <!-- Group header -->
-                                <button
-                                    class="bg-muted/50 flex w-full items-center justify-between px-4 py-2.5"
-                                    @click="toggleGroup(group.key)"
-                                >
+                                <button class="bg-muted/50 flex w-full items-center justify-between px-4 py-2.5" @click="toggleGroup(group.key)">
                                     <div class="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-[.04em] uppercase">
                                         <component :is="group.icon" class="size-3.5" />
                                         {{ group.label }}
                                     </div>
-                                    <component
-                                        :is="collapsedGroups[group.key] ? ChevronDown : ChevronUp"
-                                        class="text-muted-foreground size-3.5"
-                                    />
+                                    <component :is="collapsedGroups[group.key] ? ChevronDown : ChevronUp" class="text-muted-foreground size-3.5" />
                                 </button>
 
                                 <!-- Permission rows -->
@@ -407,11 +408,7 @@ if (customRoles.value.length) selectRole(customRoles.value[0]);
                                         </div>
                                         <!-- Toggle switch -->
                                         <label class="relative inline-flex cursor-pointer items-center">
-                                            <input
-                                                v-model="editPermissions[perm.key]"
-                                                type="checkbox"
-                                                class="peer sr-only"
-                                            />
+                                            <input v-model="editPermissions[perm.key]" type="checkbox" class="peer sr-only" />
                                             <div
                                                 class="peer-checked:bg-primary bg-border relative h-5 w-9 rounded-full transition-colors after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4"
                                             />

@@ -4,104 +4,82 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
 use App\Modules\Assistant\Actions\ProcessChatMessage;
 use App\Modules\Assistant\Http\Requests\ChatMessageRequest;
 use App\Modules\Assistant\Models\Conversation;
+use App\Modules\Assistant\Support\EventStream;
+use App\Modules\Assistant\Support\UsageGuard;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-
-class ChatController
+final class ChatController
 {
     public function __invoke(
         ChatMessageRequest $request,
         ProcessChatMessage $processor,
+        UsageGuard $usageGuard,
     ): StreamedResponse {
         $user = $request->user();
-        $validated = $request->validated();
+        $usageGuard->ensureWithinDailyBudget($user);
 
+        $conversation = $this->resolveConversation($user, $request);
+        $model = $request->input('model') ?? config('assistant.default_model');
+        $message = $request->string('message')->toString();
+        $pageContext = $request->array('page_context');
 
-        $conversation = $this->resolveConversation($user, $validated);
+        return EventStream::respond(function (EventStream $stream) use (
+            $processor,
+            $user,
+            $conversation,
+            $message,
+            $pageContext,
+            $model,
+        ) {
+            $stream->emit(['type' => 'connected', 'conversation_id' => $conversation->id]);
 
-        $model = $validated['model'] ?? config('assistant.default_model');
+            $events = $processor->handle(
+                user: $user,
+                conversation: $conversation,
+                userMessage: $message,
+                pageContext: $pageContext,
+                model: $model,
+            );
 
-        return new StreamedResponse(
-            function () use ($processor, $user, $conversation, $validated, $model) {
-                // Disable PHP's output buffering so each event flushes.
-                while (ob_get_level() > 0) {
-                    ob_end_flush();
+            foreach ($events as $event) {
+                if ($stream->aborted()) {
+                    return;
                 }
 
-                // Tell PHP the connection should NOT abort if the client
-                // closes early — we want to finish writing to the DB.
-                ignore_user_abort(true);
-
-                // Long-running response: lift the time limit defensively.
-                set_time_limit(0);
-
-                // Send an initial event so the client knows the stream is
-                // alive even before LLM responds.
-                $this->emit(['type' => 'connected', 'conversation_id' => $conversation->id]);
-
-                foreach ($processor->handle(
-                    user: $user,
-                    conversation: $conversation,
-                    userMessage: $validated['message'],
-                    pageContext: $validated['page_context'] ?? [],
-                    model: $model,
-                ) as $event) {
-                    if (connection_aborted()) {
-                        return;
-                    }
-
-                    $this->emit($event);
-                }
-
-                $this->emit(['type' => 'stream_end']);
-            },
-            200,
-            [
-                'Content-Type' => 'text/event-stream',
-                'Cache-Control' => 'no-cache, no-transform',
-                'Connection' => 'keep-alive',
-                // Critical for nginx — disables proxy buffering.
-                'X-Accel-Buffering' => 'no',
-            ],
-        );
-    }
-
-    private function resolveConversation($user, array $validated): Conversation
-    {
-        $workspaceId = $validated['workspace_id']
-            ?? data_get($validated, 'page_context.workspace_id')
-            ?? $user->current_workspace_id
-            ?? $user->currentWorkspace?->id
-            ?? null;
-
-        if (! empty($validated['conversation_id'])) {
-            $conversation = Conversation::where('user_id', $user->id)
-                ->findOrFail($validated['conversation_id']);
-
-            if (! $conversation->workspace_id && $workspaceId) {
-                $conversation->update([
-                    'workspace_id' => $workspaceId,
-                ]);
+                $stream->emit($event);
             }
 
-            return $conversation;
-        }
-
-        return Conversation::create([
-            'user_id' => $user->id,
-            'workspace_id' => $workspaceId,
-        ]);
+            $stream->emit(['type' => 'stream_end']);
+        });
     }
 
-    private function emit(array $event): void
+    private function resolveConversation(User $user, ChatMessageRequest $request): Conversation
     {
-        echo 'data: ' . json_encode($event) . "\n\n";
-        @ob_flush();
-        flush();
+        $workspaceId = $request->input('workspace_id')
+            ?? $request->input('page_context.workspace_id')
+            ?? $user->current_workspace_id;
+
+        $conversationId = $request->input('conversation_id');
+
+        if ($conversationId === null) {
+            return Conversation::create([
+                'user_id' => $user->id,
+                'workspace_id' => $workspaceId,
+            ]);
+        }
+
+        $conversation = Conversation::query()
+            ->where('user_id', $user->id)
+            ->findOrFail($conversationId);
+
+        if ($conversation->workspace_id === null && $workspaceId !== null) {
+            $conversation->update(['workspace_id' => $workspaceId]);
+        }
+
+        return $conversation;
     }
 }

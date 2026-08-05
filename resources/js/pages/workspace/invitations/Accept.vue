@@ -3,16 +3,20 @@ import AuthBase from '@/layouts/AuthLayout.vue';
 import { useForm } from '@inertiajs/vue3';
 import { ArrowRight, LoaderCircle, Mail, ShieldCheck, User, Users } from 'lucide-vue-next';
 
-const props = defineProps<{
-    token: string;
-    invitation: {
-        email: string;
-        role: string;
-        workspace: {
-            name: string;
+const props = withDefaults(
+    defineProps<{
+        token: string;
+        requiresRegistration?: boolean;
+        invitation: {
+            email: string;
+            role: string;
+            workspace: {
+                name: string;
+            };
         };
-    };
-}>();
+    }>(),
+    { requiresRegistration: true },
+);
 
 const form = useForm({
     name: '',
@@ -68,7 +72,7 @@ const submit = () => {
             </div>
 
             <div class="grid gap-5">
-                <div class="grid gap-2">
+                <div v-if="requiresRegistration" class="grid gap-2">
                     <Label for="name">Full name</Label>
 
                     <div class="relative">
@@ -90,7 +94,7 @@ const submit = () => {
                     <InputError :message="form.errors.name" />
                 </div>
 
-                <div class="grid gap-2">
+                <div v-if="requiresRegistration" class="grid gap-2">
                     <Label for="password">Password</Label>
 
                     <AppPasswordInput
@@ -106,7 +110,7 @@ const submit = () => {
                     <InputError :message="form.errors.password" />
                 </div>
 
-                <div class="grid gap-2">
+                <div v-if="requiresRegistration" class="grid gap-2">
                     <Label for="password_confirmation">Confirm password</Label>
 
                     <AppPasswordInput

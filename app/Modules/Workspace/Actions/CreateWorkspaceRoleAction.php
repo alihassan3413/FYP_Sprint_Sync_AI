@@ -7,37 +7,38 @@ namespace App\Modules\Workspace\Actions;
 use App\Modules\Workspace\Data\WorkspaceRoleData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceRole;
+use App\UserRole;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class CreateWorkspaceRoleAction
 {
-    public function handle(Workspace $workspace, WorkspaceRoleData $data): WorkspaceRoleData
+    public function handle(Workspace $workspace, WorkspaceRoleData $data): WorkspaceRole
     {
-        $slug = $data->slug ?: Str::slug($data->name);
+        $slug = $data->slug !== '' && $data->slug !== null
+            ? Str::slug($data->slug)
+            : Str::slug($data->name);
 
-        $this->ensureSlugIsUnique($workspace, $slug);
+        $this->ensureSlugIsAvailable($workspace, $slug);
 
-        $role = WorkspaceRole::create([
-            'workspace_id' => $workspace->id,
+        return $workspace->roles()->create([
             'name' => $data->name,
             'slug' => $slug,
             'permissions' => $data->permissions ?? [],
         ]);
-
-        return WorkspaceRoleData::fromModel($role);
     }
 
-    private function ensureSlugIsUnique(Workspace $workspace, string $slug): void
+    private function ensureSlugIsAvailable(Workspace $workspace, string $slug): void
     {
-        $exists = WorkspaceRole::query()
-            ->where('workspace_id', $workspace->id)
-            ->where('slug', $slug)
-            ->exists();
-
-        if ($exists) {
+        if (in_array($slug, UserRole::values(), true)) {
             throw ValidationException::withMessages([
-                'slug' => 'A role with this name already exists in this workspace.',
+                'name' => 'That name is reserved for a built-in role.',
+            ]);
+        }
+
+        if ($workspace->roles()->where('slug', $slug)->exists()) {
+            throw ValidationException::withMessages([
+                'name' => 'A role with this name already exists in this workspace.',
             ]);
         }
     }

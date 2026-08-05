@@ -17,7 +17,7 @@ class BuildContextPayload
      *     workspace_slug?: string|null,
      *     workspace_name?: string|null
      * }  $pageContext optional UI context
-     * @param  array<int, array{name: string, args: array}>  $supersededActions tools the user was amending or canceling
+     * @param  array<int, array{name: string, args: array}>  $supersededActions  tools the user was amending or canceling
      * @return array{system: string, additional_messages: array}
      */
     public function handle(
@@ -68,7 +68,7 @@ Rules:
 TXT;
 
         $parts[] = sprintf(
-            "Current user: %s (%s). User ID: %d.",
+            'Current user: %s (%s). User ID: %d.',
             $user->name,
             $user->email,
             $user->id,
@@ -88,7 +88,7 @@ TXT;
                 $workspace->created_at?->diffForHumans() ?? 'recently',
             );
         } else {
-            $parts[] = "The user has no active workspace selected.";
+            $parts[] = 'The user has no active workspace selected.';
         }
 
         if (! empty($pageContext['page'])) {
@@ -101,7 +101,7 @@ TXT;
 
         if (! empty($pageContext['workspace_name']) || ! empty($pageContext['workspace_slug'])) {
             $parts[] = sprintf(
-                "UI selected workspace from page context: name=%s, slug=%s, id=%s.",
+                'UI selected workspace from page context: name=%s, slug=%s, id=%s.',
                 $pageContext['workspace_name'] ?? 'unknown',
                 $pageContext['workspace_slug'] ?? 'unknown',
                 $pageContext['workspace_id'] ?? 'unknown',
@@ -109,7 +109,7 @@ TXT;
         }
 
         $parts[] = sprintf(
-            "Current date/time: %s. Today is %s.",
+            'Current date/time: %s. Today is %s.',
             now()->toIso8601String(),
             now()->format('l, F j, Y'),
         );

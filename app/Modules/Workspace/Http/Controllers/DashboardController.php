@@ -1,14 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
+use App\Modules\Workspace\Models\WorkspaceInvitation;
+use App\UserRole;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class DashboardController extends Controller
+final class DashboardController
 {
     public function __invoke(Workspace $workspace): Response
     {
@@ -19,102 +23,122 @@ class DashboardController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
             ],
-            // NOTE: The global Inertia middleware shares `workspace` with the
-            // shape { current, available }. We MUST NOT use the same key here
-            // — page props override shared props, and the sidebar/switcher
-            // read `workspace.current` from the shared prop.
-            //
-            // So this page-level prop carries dashboard-specific metadata
-            // under a different key.
             'workspaceMeta' => [
                 'name' => $workspace->name,
                 'created_at' => $workspace->created_at->toIso8601String(),
-                'plan' => $workspace->plan?->name ?? 'Pro',
             ],
-            'members' => $this->members($workspace, $user->id),
-            'pendingInvitesCount' => $this->pendingInvitesCount($workspace),
+            'members' => $this->members($workspace, $user),
+            'pendingInvitesCount' => $workspace->pendingInvitations()->count(),
             'activity' => $this->activity($workspace, $user),
             'onboarding' => $this->onboarding($workspace),
         ]);
     }
 
     /**
-     * Workspace members.
+     * @return Collection<int, array<string, mixed>>
      */
-    private function members(Workspace $workspace, int $currentUserId): Collection
+    private function members(Workspace $workspace, User $user): Collection
     {
-        return $workspace->users()
+        $accepted = $workspace->users()
             ->select('users.id', 'users.name', 'users.email')
             ->get()
-            ->map(fn ($u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'email' => $u->email,
-                'role' => $u->pivot->role ?? 'member',
-                'status' => $u->id === $currentUserId ? 'active' : 'offline',
-                'last_active_at' => $u->id === $currentUserId
-                    ? now()->toIso8601String()
-                    : null,
+            ->map(fn (User $member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->pivot->role,
+                'status' => 'active',
+                'last_active_at' => $member->id === $user->id ? now()->toIso8601String() : null,
                 'avatar_url' => null,
-                'is_self' => $u->id === $currentUserId,
-            ])
-            ->values();
+                'is_self' => $member->id === $user->id,
+            ]);
+
+        $invited = $workspace->pendingInvitations()
+            ->get()
+            ->map(fn (WorkspaceInvitation $invitation) => [
+                'id' => "invitation-{$invitation->id}",
+                'name' => $invitation->email,
+                'email' => $invitation->email,
+                'role' => $invitation->role->value,
+                'status' => 'pending',
+                'last_active_at' => null,
+                'avatar_url' => null,
+                'is_self' => false,
+            ]);
+
+        return $accepted->concat($invited)->values();
     }
 
-    private function pendingInvitesCount(Workspace $workspace): int
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function activity(Workspace $workspace, User $user): Collection
     {
-        return 0;
-    }
+        $limit = (int) config('workspace.dashboard_activity_limit');
 
-    private function activity(Workspace $workspace, $user): Collection
-    {
-        $entries = collect();
-
-        $entries->push([
+        $created = collect([[
             'id' => 'workspace-created',
             'kind' => 'workspace.created',
             'occurred_at' => $workspace->created_at->toIso8601String(),
             'actor' => null,
             'actor_is_self' => false,
             'context' => ['workspace_name' => $workspace->name],
-        ]);
+        ]]);
 
-        $workspace->users()
+        $joined = $workspace->users()
             ->select('users.id', 'users.name', 'users.email')
-            ->orderByPivot('created_at')
-            ->limit(7)
+            ->wherePivot('role', '!=', UserRole::OWNER->value)
+            ->orderByPivot('created_at', 'desc')
+            ->limit($limit)
             ->get()
-            ->each(function ($u) use ($entries, $user, $workspace) {
-                if (isset($workspace->owner_id) && $u->id === $workspace->owner_id) {
-                    return;
-                }
+            ->map(fn (User $member) => [
+                'id' => "member-joined-{$member->id}",
+                'kind' => 'member.joined',
+                'occurred_at' => ($member->pivot->created_at ?? $workspace->created_at)->toIso8601String(),
+                'actor' => [
+                    'name' => $member->name,
+                    'email' => $member->email,
+                    'avatar_url' => null,
+                ],
+                'actor_is_self' => $member->id === $user->id,
+                'context' => [],
+            ]);
 
-                $entries->push([
-                    'id' => "member-joined-{$u->id}",
-                    'kind' => 'member.joined',
-                    'occurred_at' => optional($u->pivot->created_at)->toIso8601String()
-                                       ?? $workspace->created_at->toIso8601String(),
-                    'actor' => [
-                        'name' => $u->name,
-                        'email' => $u->email,
-                        'avatar_url' => null,
-                    ],
-                    'actor_is_self' => $u->id === $user->id,
-                    'context' => [],
-                ]);
-            });
+        $invited = $workspace->pendingInvitations()
+            ->with('invitedBy:id,name,email')
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->map(fn (WorkspaceInvitation $invitation) => [
+                'id' => "invitation-sent-{$invitation->id}",
+                'kind' => 'member.invited',
+                'occurred_at' => $invitation->created_at->toIso8601String(),
+                'actor' => $invitation->invitedBy === null ? null : [
+                    'name' => $invitation->invitedBy->name,
+                    'email' => $invitation->invitedBy->email,
+                    'avatar_url' => null,
+                ],
+                'actor_is_self' => $invitation->invited_by === $user->id,
+                'context' => ['invited_email' => $invitation->email],
+            ]);
 
-        return $entries->sortByDesc('occurred_at')->values();
+        return $created
+            ->concat($joined)
+            ->concat($invited)
+            ->sortByDesc('occurred_at')
+            ->take($limit)
+            ->values();
     }
 
+    /**
+     * @return array<string, bool>
+     */
     private function onboarding(Workspace $workspace): array
     {
-        $memberCount = $workspace->users()->count();
-
         return [
             'workspace_created' => true,
-            'first_member_invited' => $memberCount > 1,
-            'role_assigned' => $memberCount > 1,
+            'first_member_invited' => $workspace->invitations()->exists(),
+            'role_assigned' => $workspace->roles()->exists() || $workspace->users()->count() > 1,
             'first_project_created' => false,
             'first_sprint_run' => false,
         ];

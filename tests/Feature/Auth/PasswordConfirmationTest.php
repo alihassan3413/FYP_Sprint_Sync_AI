@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,6 +23,8 @@ class PasswordConfirmationTest extends TestCase
     public function test_password_can_be_confirmed()
     {
         $user = User::factory()->create();
+        $workspace = Workspace::factory()->ownedBy($user)->create();
+        $user->forceFill(['current_workspace_id' => $workspace->id])->save();
 
         $response = $this->actingAs($user)->post('/confirm-password', [
             'password' => 'password',

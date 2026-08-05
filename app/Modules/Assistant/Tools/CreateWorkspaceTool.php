@@ -7,22 +7,12 @@ namespace App\Modules\Assistant\Tools;
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
 use App\Modules\Workspace\Actions\CreateWorkspaceAction;
-use App\Modules\Workspace\Data\WorkspaceData;
+use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
-use Illuminate\Support\Str;
-/**
- * AI tool: create a workspace.
- *
- * Minimal-friction version: only asks for the name. Description and
- * template are skipped — they can be added later via the workspace
- * settings if the user wants. The system prompt should also reflect
- * this so the AI doesn't try to volunteer questions.
- */
-class CreateWorkspaceTool implements AssistantTool
+
+final class CreateWorkspaceTool implements AssistantTool
 {
-    public function __construct(
-        private readonly CreateWorkspaceAction $action,
-    ) {}
+    public function __construct(private readonly CreateWorkspaceAction $action) {}
 
     public function name(): string
     {
@@ -31,13 +21,14 @@ class CreateWorkspaceTool implements AssistantTool
 
     public function description(): string
     {
-        return 'Creates a new workspace for the current user. Use this when '
-            . 'the user wants to start a new team space, project area, or '
-            . 'organizational unit. Only ask for the workspace name — do NOT '
-            . 'ask about description, template, or any other settings. After '
-            . 'creating, the user will be automatically switched to it.';
+        return 'Creates a new workspace for the current user. Use this when the user wants to start a new team '
+            .'space, project area, or organizational unit. Only ask for the workspace name — never ask about '
+            .'description, template, or other settings. The user is switched to the new workspace automatically.';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function parameters(): array
     {
         return [
@@ -45,9 +36,9 @@ class CreateWorkspaceTool implements AssistantTool
             'properties' => [
                 'name' => [
                     'type' => 'string',
-                    'description' => 'The workspace display name. 1-50 characters.',
-                    'minLength' => 1,
-                    'maxLength' => 50,
+                    'description' => 'The workspace display name.',
+                    'minLength' => 2,
+                    'maxLength' => 60,
                 ],
             ],
             'required' => ['name'],
@@ -62,20 +53,23 @@ class CreateWorkspaceTool implements AssistantTool
 
     public function authorize(User $user): bool
     {
-        return $user !== null;
+        return $user->exists;
     }
 
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
     public function execute(array $args, User $user): array
     {
-        $name = trim($args['name']);
+        $name = trim((string) $args['name']);
 
-        // Business rule: prevent duplicate names per user.
-        $exists = Workspace::query()
+        $duplicate = Workspace::query()
             ->where('owner_id', $user->id)
             ->where('name', $name)
             ->exists();
 
-        if ($exists) {
+        if ($duplicate) {
             return [
                 'success' => false,
                 'error_code' => 'duplicate_name',
@@ -83,29 +77,23 @@ class CreateWorkspaceTool implements AssistantTool
             ];
         }
 
-        $workspaceDTO = WorkspaceData::from([
-            'name' => $name,
-            'slug' => Str::slug($name),
-            'settings' => [],
-            'is_active' => true,
-        ]);
-        // Reuse the existing Action — single source of truth.
-        // Adjust the call signature to match YOUR CreateWorkspace::handle().
-        $workspace = $this->action->handle(
-            $workspaceDTO,
-            $user,
-        );
+        try {
+            $workspace = $this->action->handleForUser($user, $name);
+        } catch (WorkspaceException $e) {
+            return [
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'error' => $e->getMessage(),
+            ];
+        }
 
-        // Return shape includes a 'switch_to' field — the frontend reads
-        // this and triggers an Inertia visit to the new workspace.
         return [
             'success' => true,
             'workspace' => [
                 'id' => $workspace->id,
                 'name' => $workspace->name,
-                'slug' => $workspace->slug ?? null,
+                'slug' => $workspace->slug,
             ],
-            // Frontend signal: navigate the user to this URL after creation.
             'switch_to' => "/{$workspace->slug}/dashboard",
             'message' => "Workspace '{$workspace->name}' was created. Switching you over now.",
         ];

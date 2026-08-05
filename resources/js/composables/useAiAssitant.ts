@@ -1,8 +1,7 @@
-import { router } from '@inertiajs/vue3';
-import { ref } from 'vue';
 import { getSuggestions, type AIContext } from '@/lib/ai-suggestions';
-import { usePage } from '@inertiajs/vue3';
 import type { SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
 
 export type AssistantState = 'collapsed' | 'dock' | 'expanded';
 
@@ -52,13 +51,23 @@ const pageContext = ref<{
 }>({});
 
 // ---- State transitions ----
-function collapse() { state.value = 'collapsed'; }
-function openDock() { state.value = 'dock'; }
-function expand() { state.value = 'expanded'; }
+function collapse() {
+    state.value = 'collapsed';
+}
+function openDock() {
+    state.value = 'dock';
+}
+function expand() {
+    state.value = 'expanded';
+}
 
 // ---- Suggestions ----
-function setSuggestions(items: string[]) { suggestions.value = items; }
-function clearSuggestions() { suggestions.value = []; }
+function setSuggestions(items: string[]) {
+    suggestions.value = items;
+}
+function clearSuggestions() {
+    suggestions.value = [];
+}
 
 // ---- Page context ----
 function setPageContext(ctx: PageContext) {
@@ -66,8 +75,12 @@ function setPageContext(ctx: PageContext) {
 }
 
 // ---- Visibility ----
-function hide() { isHidden.value = true; }
-function show() { isHidden.value = false; }
+function hide() {
+    isHidden.value = true;
+}
+function show() {
+    isHidden.value = false;
+}
 
 // ---- Conversation ----
 function clearConversation() {
@@ -113,9 +126,7 @@ function finishMessage(id: string) {
 }
 
 function getCookie(name: string): string | null {
-    const value = document.cookie
-        .split('; ')
-        .find((row) => row.startsWith(`${name}=`));
+    const value = document.cookie.split('; ').find((row) => row.startsWith(`${name}=`));
 
     if (!value) {
         return null;
@@ -125,13 +136,7 @@ function getCookie(name: string): string | null {
 }
 
 function getCsrfToken(): string {
-    return (
-        getCookie('XSRF-TOKEN') ||
-        document
-            .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-            ?.getAttribute('content') ||
-        ''
-    );
+    return getCookie('XSRF-TOKEN') || document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
 /**
@@ -166,9 +171,7 @@ function getToolIntro(name: string): string {
     }
 }
 
-async function* parseSSE(
-    response: Response,
-): AsyncGenerator<Record<string, unknown>> {
+async function* parseSSE(response: Response): AsyncGenerator<Record<string, unknown>> {
     if (!response.body) return;
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -185,9 +188,7 @@ async function* parseSSE(
                 const rawEvent = buffer.slice(0, boundary);
                 buffer = buffer.slice(boundary + 2);
 
-                const dataLine = rawEvent
-                    .split('\n')
-                    .find((line) => line.startsWith('data: '));
+                const dataLine = rawEvent.split('\n').find((line) => line.startsWith('data: '));
 
                 if (!dataLine) continue;
 
@@ -206,16 +207,15 @@ async function* parseSSE(
     }
 }
 
-async function consumeSseStream(
-    response: Response,
-    assistantMsg: AssistantMessage,
-): Promise<void> {
+async function consumeSseStream(response: Response, assistantMsg: AssistantMessage): Promise<void> {
     if (!response.ok) {
         let errorMsg = `Request failed (${response.status})`;
         try {
             const errBody = await response.json();
             errorMsg = errBody.message ?? errorMsg;
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
         appendToMessage(assistantMsg.id, `\n\n⚠️ ${errorMsg}`);
         finishMessage(assistantMsg.id);
         return;
@@ -237,9 +237,7 @@ async function consumeSseStream(
                 break;
 
             case 'user_message_saved': {
-                const userMsg = [...messages.value]
-                    .reverse()
-                    .find((m) => m.role === 'user' && m.serverId === null);
+                const userMsg = [...messages.value].reverse().find((m) => m.role === 'user' && m.serverId === null);
                 if (userMsg) userMsg.serverId = event.id as number;
                 break;
             }
@@ -255,9 +253,7 @@ async function consumeSseStream(
 
             case 'tool_superseded': {
                 const oldMessageId = event.message_id as number;
-                const host = messages.value.find(
-                    (m) => m.pendingTool?.messageId === oldMessageId,
-                );
+                const host = messages.value.find((m) => m.pendingTool?.messageId === oldMessageId);
                 if (host) {
                     supersededHosts.set(oldMessageId, host.id);
                     host.pendingTool = undefined;
@@ -278,11 +274,8 @@ async function consumeSseStream(
                     summary: summarizeTool(toolName, args),
                 };
 
-                const hostId =
-                    replacesId !== undefined ? supersededHosts.get(replacesId) : undefined;
-                const host = hostId
-                    ? messages.value.find((m) => m.id === hostId)
-                    : undefined;
+                const hostId = replacesId !== undefined ? supersededHosts.get(replacesId) : undefined;
+                const host = hostId ? messages.value.find((m) => m.id === hostId) : undefined;
 
                 if (host) {
                     // In-place update of the existing card.
@@ -294,8 +287,7 @@ async function consumeSseStream(
                     if (current) {
                         current.isLoading = false;
                         if (!current.content.trim()) {
-                            current.content =
-                                'Updated the pending action. Please confirm when ready.';
+                            current.content = 'Updated the pending action. Please confirm when ready.';
                         }
                     }
                 } else {
@@ -312,16 +304,11 @@ async function consumeSseStream(
             }
 
             case 'tool_executed': {
-                const result = event.result as
-                    | { success?: boolean; switch_to?: string; error?: string }
-                    | undefined;
+                const result = event.result as { success?: boolean; switch_to?: string; error?: string } | undefined;
 
                 // If the tool failed, surface the error to the user.
                 if (result && result.success === false) {
-                    appendToMessage(
-                        assistantMsg.id,
-                        `\n\n⚠️ ${result.error ?? 'Action failed.'}`,
-                    );
+                    appendToMessage(assistantMsg.id, `\n\n⚠️ ${result.error ?? 'Action failed.'}`);
                 }
 
                 // If the tool returned a switch_to URL, navigate via Inertia.
@@ -338,16 +325,11 @@ async function consumeSseStream(
             }
 
             case 'tool_failed':
-                appendToMessage(
-                    assistantMsg.id,
-                    `\n\n⚠️ The action could not be completed.`,
-                );
+                appendToMessage(assistantMsg.id, `\n\n⚠️ The action could not be completed.`);
                 break;
 
             case 'tool_rejected': {
-                const msg = messages.value.find(
-                    (m) => m.pendingTool?.messageId === event.message_id,
-                );
+                const msg = messages.value.find((m) => m.pendingTool?.messageId === event.message_id);
                 if (msg) {
                     msg.toolStatus = 'rejected';
                     msg.pendingTool = undefined;
@@ -395,7 +377,7 @@ async function submit(prompt: string) {
     const assistantMsg = addAssistantMessage('', true, true);
 
     try {
-        const response = await fetch('/api/assistant/chat', {
+        const response = await fetch('/assistant/chat', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -414,10 +396,7 @@ async function submit(prompt: string) {
         await consumeSseStream(response, assistantMsg);
     } catch (e) {
         console.error('[assistant] submit error:', e);
-        appendToMessage(
-            assistantMsg.id,
-            '\n\n⚠️ Connection error. Please check your network and try again.',
-        );
+        appendToMessage(assistantMsg.id, '\n\n⚠️ Connection error. Please check your network and try again.');
     } finally {
         const msg = messages.value.find((m) => m.id === assistantMsg.id);
 
@@ -434,15 +413,10 @@ async function submit(prompt: string) {
     }
 }
 
-async function confirmTool(
-    messageId: number,
-    action: 'confirm' | 'reject',
-): Promise<void> {
+async function confirmTool(messageId: number, action: 'confirm' | 'reject'): Promise<void> {
     if (isStreaming.value) return;
 
-    const sourceMsg = messages.value.find(
-        (m) => m.pendingTool?.messageId === messageId,
-    );
+    const sourceMsg = messages.value.find((m) => m.pendingTool?.messageId === messageId);
 
     if (sourceMsg) {
         sourceMsg.toolStatus = action === 'confirm' ? 'executed' : 'rejected';
@@ -459,7 +433,7 @@ async function confirmTool(
     const assistantMsg = addAssistantMessage('', true, true);
 
     try {
-        const response = await fetch('/api/assistant/confirm', {
+        const response = await fetch('/assistant/confirm', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -477,10 +451,7 @@ async function confirmTool(
         await consumeSseStream(response, assistantMsg);
     } catch (e) {
         console.error('[assistant] confirmTool error:', e);
-        appendToMessage(
-            assistantMsg.id,
-            '\n\n⚠️ Connection error during action. Please try again.',
-        );
+        appendToMessage(assistantMsg.id, '\n\n⚠️ Connection error during action. Please try again.');
     } finally {
         const msg = messages.value.find((m) => m.id === assistantMsg.id);
 
@@ -521,7 +492,6 @@ export function useDockContext(context: AIContext) {
     const dock = useAiAssistant();
     dock.setSuggestions(getSuggestions(context));
 }
-
 
 export function useAssistantPageContext(ctx: PageContext) {
     const dock = useAiAssistant();

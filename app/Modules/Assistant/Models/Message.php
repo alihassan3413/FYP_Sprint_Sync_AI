@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Models;
 
+use App\Modules\Assistant\Database\Factories\MessageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,20 +12,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $conversation_id
- * @property string $role  user | assistant | tool | system
+ * @property string $role
  * @property string|null $content
- * @property array|null $tool_calls
+ * @property array<int, mixed>|null $tool_calls
  * @property string|null $tool_call_id
- * @property string|null $tool_status  pending | confirmed | rejected | executed | failed
+ * @property string|null $tool_status
  * @property string|null $provider
  * @property string|null $model
  * @property int $input_tokens
  * @property int $output_tokens
- * @property array|null $metadata
+ * @property array<string, mixed>|null $metadata
  */
-class Message extends Model
+final class Message extends Model
 {
+    /** @use HasFactory<MessageFactory> */
     use HasFactory;
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_CONFIRMED = 'confirmed';
+
+    public const STATUS_REJECTED = 'rejected';
+
+    public const STATUS_EXECUTED = 'executed';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const STATUS_SUPERSEDED = 'superseded';
 
     protected $table = 'assistant_messages';
 
@@ -42,20 +56,15 @@ class Message extends Model
         'metadata',
     ];
 
-    protected $casts = [
-        'tool_calls' => 'array',
-        'metadata' => 'array',
-        'input_tokens' => 'integer',
-        'output_tokens' => 'integer',
-    ];
-
-    // Status constants — keep these here so refactoring is easy.
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_CONFIRMED = 'confirmed';
-    public const STATUS_REJECTED = 'rejected';
-    public const STATUS_EXECUTED = 'executed';
-    public const STATUS_FAILED = 'failed';
-    public const STATUS_SUPERSEDED = 'superseded';
+    protected function casts(): array
+    {
+        return [
+            'tool_calls' => 'array',
+            'metadata' => 'array',
+            'input_tokens' => 'integer',
+            'output_tokens' => 'integer',
+        ];
+    }
 
     public function conversation(): BelongsTo
     {
@@ -63,8 +72,7 @@ class Message extends Model
     }
 
     /**
-     * Convert this message into the OpenAI-compatible array format.
-     * Used when building the messages array for the next LLM call.
+     * @return array<string, mixed>
      */
     public function toApiFormat(): array
     {
@@ -74,14 +82,19 @@ class Message extends Model
             $payload['content'] = $this->content;
         }
 
-        if ($this->role === 'assistant' && $this->tool_calls) {
+        if ($this->role === 'assistant' && $this->tool_calls !== null) {
             $payload['tool_calls'] = $this->tool_calls;
         }
 
-        if ($this->role === 'tool' && $this->tool_call_id) {
+        if ($this->role === 'tool' && $this->tool_call_id !== null) {
             $payload['tool_call_id'] = $this->tool_call_id;
         }
 
         return $payload;
+    }
+
+    protected static function newFactory(): MessageFactory
+    {
+        return MessageFactory::new();
     }
 }

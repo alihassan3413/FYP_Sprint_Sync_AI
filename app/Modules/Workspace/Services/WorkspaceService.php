@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Services;
 
 use App\Models\User;
+use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Support\Collection;
 
@@ -10,18 +13,19 @@ final class WorkspaceService
 {
     public function currentFor(?User $user): ?Workspace
     {
-        if (! $user || ! $user->current_workspace_id) {
+        if ($user === null || $user->current_workspace_id === null) {
             return null;
         }
 
-        return $user->workspaces()
-            ->whereKey($user->current_workspace_id)
-            ->first();
+        return $user->workspaces()->whereKey($user->current_workspace_id)->first();
     }
 
+    /**
+     * @return Collection<int, Workspace>
+     */
     public function availableFor(?User $user): Collection
     {
-        if (! $user) {
+        if ($user === null) {
             return collect();
         }
 
@@ -33,50 +37,50 @@ final class WorkspaceService
 
     public function belongsTo(User $user, Workspace $workspace): bool
     {
-        return $user->workspaces()
-            ->whereKey($workspace->id)
-            ->exists();
+        return $workspace->hasMember($user);
     }
 
     public function switchTo(User $user, Workspace $workspace): void
     {
         if (! $this->belongsTo($user, $workspace)) {
-            abort(403);
+            throw WorkspaceException::notFound();
         }
 
-        $user->forceFill([
-            'current_workspace_id' => $workspace->id,
-        ])->save();
+        $user->forceFill(['current_workspace_id' => $workspace->id])->save();
     }
 
+    /**
+     * @return array{current: array<string, mixed>|null, available: array<int, array<string, mixed>>}|null
+     */
     public function inertiaFor(?User $user): ?array
     {
-        if (! $user) {
+        if ($user === null) {
             return null;
         }
 
         $workspaces = $this->availableFor($user);
-
         $current = $workspaces->firstWhere('id', $user->current_workspace_id);
 
         return [
-            'current' => $current ? [
-                'id' => $current->id,
-                'name' => $current->name,
-                'role' => $current->pivot->role,
-                'slug' => $current->slug,
-            ] : null,
-
+            'current' => $current === null ? null : $this->toArray($current, $user),
             'available' => $workspaces
-                ->map(fn (Workspace $workspace) => [
-                    'id' => $workspace->id,
-                    'name' => $workspace->name,
-                    'role' => $workspace->pivot->role,
-                    'is_current' => $workspace->id === $user->current_workspace_id,
-                    'slug' => $workspace->slug,
-                ])
+                ->map(fn (Workspace $workspace) => $this->toArray($workspace, $user))
                 ->values()
                 ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toArray(Workspace $workspace, User $user): array
+    {
+        return [
+            'id' => $workspace->id,
+            'name' => $workspace->name,
+            'slug' => $workspace->slug,
+            'role' => $workspace->pivot->role,
+            'is_current' => $workspace->id === $user->current_workspace_id,
         ];
     }
 }

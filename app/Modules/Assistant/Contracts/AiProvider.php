@@ -34,8 +34,8 @@ interface AiProvider
      * provider implementation translates raw API events into this shape so
      * downstream code stays provider-agnostic.
      *
-     * @param array<int, array{role: string, content?: string, tool_calls?: array, tool_call_id?: string}> $messages
-     * @param array<int, array> $tools  JSON Schema function definitions
+     * @param  array<int, array{role: string, content?: string, tool_calls?: array, tool_call_id?: string}>  $messages
+     * @param  array<int, array>  $tools  JSON Schema function definitions
      * @return Generator<int, array{type: string, ...}>
      */
     public function streamChat(

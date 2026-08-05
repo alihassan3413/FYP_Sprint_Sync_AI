@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AuthBase from '@/layouts/AuthLayout.vue';
-import { Eye, EyeOff, LoaderCircle } from 'lucide-vue-next';
 import { Link } from '@inertiajs/vue3';
+import { Eye, EyeOff, LoaderCircle } from 'lucide-vue-next';
 
 const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
@@ -46,12 +46,7 @@ watch(
 
         <form @submit.prevent="submit" class="space-y-3.5">
             <div class="space-y-1.5">
-                <Label
-                    for="name"
-                    class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
-                >
-                    Full name
-                </Label>
+                <Label for="name" class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase"> Full name </Label>
                 <Input
                     id="name"
                     type="text"
@@ -61,18 +56,13 @@ watch(
                     autocomplete="name"
                     v-model="form.name"
                     placeholder="John Doe"
-                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 />
                 <InputError :message="form.errors.name" />
             </div>
 
             <div class="space-y-1.5">
-                <Label
-                    for="email"
-                    class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
-                >
-                    Email address
-                </Label>
+                <Label for="email" class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase"> Email address </Label>
                 <Input
                     id="email"
                     type="email"
@@ -81,18 +71,13 @@ watch(
                     autocomplete="email"
                     v-model="form.email"
                     placeholder="you@example.com"
-                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 />
                 <InputError :message="form.errors.email" />
             </div>
 
             <div class="space-y-1.5">
-                <Label
-                    for="password"
-                    class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
-                >
-                    Password
-                </Label>
+                <Label for="password" class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase"> Password </Label>
                 <div class="relative">
                     <Input
                         id="password"
@@ -102,12 +87,12 @@ watch(
                         autocomplete="new-password"
                         v-model="form.password"
                         placeholder="Create a password"
-                        class="h-9 rounded-[6px] border-[1.5px] border-black bg-white pr-10 focus-visible:border-2 focus-visible:border-black focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        class="h-9 rounded-[6px] border-[1.5px] border-black bg-white pr-10 focus-visible:border-2 focus-visible:border-black focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                     />
                     <button
                         type="button"
                         tabindex="-1"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-zinc-400 transition-colors hover:text-black"
+                        class="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-zinc-400 transition-colors hover:text-black"
                         @click="showPassword = !showPassword"
                     >
                         <EyeOff v-if="showPassword" class="h-4 w-4" />
@@ -118,12 +103,7 @@ watch(
             </div>
 
             <div class="space-y-1.5">
-                <Label
-                    for="password_confirmation"
-                    class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
-                >
-                    Confirm password
-                </Label>
+                <Label for="password_confirmation" class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase"> Confirm password </Label>
                 <div class="relative">
                     <Input
                         id="password_confirmation"
@@ -133,12 +113,12 @@ watch(
                         autocomplete="new-password"
                         v-model="form.password_confirmation"
                         placeholder="Repeat your password"
-                        class="h-9 rounded-[6px] border-[1.5px] border-black bg-white pr-10 focus-visible:border-2 focus-visible:border-black focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        class="h-9 rounded-[6px] border-[1.5px] border-black bg-white pr-10 focus-visible:border-2 focus-visible:border-black focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                     />
                     <button
                         type="button"
                         tabindex="-1"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-zinc-400 transition-colors hover:text-black"
+                        class="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-zinc-400 transition-colors hover:text-black"
                         @click="showPasswordConfirmation = !showPasswordConfirmation"
                     >
                         <EyeOff v-if="showPasswordConfirmation" class="h-4 w-4" />
@@ -149,12 +129,7 @@ watch(
             </div>
 
             <div class="space-y-1.5">
-                <Label
-                    for="workspace_name"
-                    class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
-                >
-                    Workspace name
-                </Label>
+                <Label for="workspace_name" class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase"> Workspace name </Label>
                 <Input
                     id="workspace_name"
                     type="text"
@@ -162,7 +137,7 @@ watch(
                     v-model="form.workspace_name"
                     @input="handleWorkspaceNameInput"
                     placeholder="Your workspace name"
-                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    class="h-9 rounded-[6px] border-[1.5px] border-black bg-white focus-visible:border-2 focus-visible:border-black focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 />
                 <InputError :message="form.errors.workspace_name" />
             </div>
@@ -171,7 +146,7 @@ watch(
                 type="submit"
                 tabindex="6"
                 :disabled="form.processing"
-                class="w-full rounded-[6px] border-[1.5px] border-black bg-black font-bold text-white shadow-[4px_4px_0_#000] transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:bg-primary hover:text-black hover:shadow-[2px_2px_0_#000] disabled:opacity-60"
+                class="hover:bg-primary w-full rounded-[6px] border-[1.5px] border-black bg-black font-bold text-white shadow-[4px_4px_0_#000] transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:text-black hover:shadow-[2px_2px_0_#000] disabled:opacity-60"
             >
                 <LoaderCircle v-if="form.processing" class="h-4 w-4 animate-spin" />
                 {{ form.processing ? 'Creating account...' : 'Create account' }}
@@ -183,7 +158,7 @@ watch(
             <Link
                 :href="route('login')"
                 tabindex="7"
-                class="relative isolate cursor-pointer ml-0.5 inline-block px-1.5 py-0.5 font-semibold text-black no-underline before:absolute before:inset-0 before:-z-10 before:-skew-x-6 before:bg-[#D4FF4A] before:opacity-0 before:transition-opacity hover:before:opacity-100"
+                class="relative isolate ml-0.5 inline-block cursor-pointer px-1.5 py-0.5 font-semibold text-black no-underline before:absolute before:inset-0 before:-z-10 before:-skew-x-6 before:bg-[#D4FF4A] before:opacity-0 before:transition-opacity hover:before:opacity-100"
             >
                 Sign in
             </Link>

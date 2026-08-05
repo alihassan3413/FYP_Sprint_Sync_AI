@@ -2,18 +2,7 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import {
-    ShieldCheck,
-    Users,
-    Mail,
-    CreditCard,
-    Lock,
-    Bell,
-    Building2,
-    AlertTriangle,
-    ArrowRight,
-    Info,
-} from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ShieldCheck, Users } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -24,8 +13,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
     {
         title: 'Settings',
-        href: ''
-    }
+        href: '',
+    },
 ];
 
 type BadgeVariant = 'available' | 'soon' | 'later';
@@ -130,13 +119,8 @@ const badgeClasses: Record<BadgeVariant, string> = {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
-
             <!-- Page Header -->
-            <AppPageHeader
-                eyebrow="Workspace"
-                title="Settings"
-                description="Manage your workspace details, members, roles, and access controls."
-            />
+            <AppPageHeader eyebrow="Workspace" title="Settings" description="Manage your workspace details, members, roles, and access controls." />
 
             <!-- Settings Grid -->
             <section aria-label="Settings categories">
@@ -148,20 +132,20 @@ const badgeClasses: Record<BadgeVariant, string> = {
                                 card.highlighted
                                     ? 'border-zinc-900 shadow-sm ring-1 ring-zinc-900/10'
                                     : card.danger
-                                    ? 'border-red-200 hover:border-red-300 hover:shadow-sm'
-                                    : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm',
+                                      ? 'border-red-200 hover:border-red-300 hover:shadow-sm'
+                                      : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm',
                             ]"
                         >
                             <!-- Top row: icon + badge -->
-                            <div class="flex items-start justify-between gap-3 mb-4">
+                            <div class="mb-4 flex items-start justify-between gap-3">
                                 <div
                                     :class="[
                                         'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
                                         card.highlighted
                                             ? 'bg-zinc-900 text-white'
                                             : card.danger
-                                            ? 'bg-red-50 text-red-500'
-                                            : 'bg-zinc-100 text-zinc-500',
+                                              ? 'bg-red-50 text-red-500'
+                                              : 'bg-zinc-100 text-zinc-500',
                                     ]"
                                 >
                                     <component :is="card.icon" class="h-4 w-4" :stroke-width="1.75" />
@@ -169,7 +153,7 @@ const badgeClasses: Record<BadgeVariant, string> = {
 
                                 <span
                                     :class="[
-                                        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium leading-4',
+                                        'inline-flex items-center rounded-full px-2 py-0.5 text-xs leading-4 font-medium',
                                         badgeClasses[card.badge],
                                     ]"
                                 >
@@ -178,16 +162,11 @@ const badgeClasses: Record<BadgeVariant, string> = {
                             </div>
 
                             <!-- Title + description -->
-                            <div class="flex flex-col flex-1 gap-1 mb-5">
-                                <h3
-                                    :class="[
-                                        'text-sm font-semibold leading-snug',
-                                        card.danger ? 'text-red-600' : 'text-zinc-900',
-                                    ]"
-                                >
+                            <div class="mb-5 flex flex-1 flex-col gap-1">
+                                <h3 :class="['text-sm leading-snug font-semibold', card.danger ? 'text-red-600' : 'text-zinc-900']">
                                     {{ card.title }}
                                 </h3>
-                                <p class="text-sm text-zinc-500 leading-relaxed">
+                                <p class="text-sm leading-relaxed text-zinc-500">
                                     {{ card.description }}
                                 </p>
                             </div>
@@ -198,9 +177,7 @@ const badgeClasses: Record<BadgeVariant, string> = {
                                     :href="card.action.href"
                                     :class="[
                                         'inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-100',
-                                        card.highlighted
-                                            ? 'text-zinc-900 hover:text-zinc-600'
-                                            : 'text-zinc-600 hover:text-zinc-900',
+                                        card.highlighted ? 'text-zinc-900 hover:text-zinc-600' : 'text-zinc-600 hover:text-zinc-900',
                                     ]"
                                 >
                                     {{ card.action.label }}
@@ -219,17 +196,14 @@ const badgeClasses: Record<BadgeVariant, string> = {
             </section>
 
             <!-- Workspace Access Model -->
-            <section
-                class="rounded-xl border border-zinc-200 bg-zinc-50 p-6"
-                aria-label="Workspace access model explainer"
-            >
-                <div class="flex items-start gap-3 mb-5">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white border border-zinc-200 text-zinc-400 shadow-xs">
+            <section class="rounded-xl border border-zinc-200 bg-zinc-50 p-6" aria-label="Workspace access model explainer">
+                <div class="mb-5 flex items-start gap-3">
+                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-400 shadow-xs">
                         <Info class="h-3.5 w-3.5" :stroke-width="2" />
                     </div>
                     <div>
                         <h2 class="text-sm font-semibold text-zinc-800">Workspace access model</h2>
-                        <p class="mt-0.5 text-xs text-zinc-500 leading-relaxed">
+                        <p class="mt-0.5 text-xs leading-relaxed text-zinc-500">
                             This workspace uses a two-layer permission model to balance structure with flexibility.
                         </p>
                     </div>
@@ -237,22 +211,23 @@ const badgeClasses: Record<BadgeVariant, string> = {
 
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-lg border border-zinc-200 bg-white p-4">
-                        <p class="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-2">System Roles</p>
-                        <p class="text-sm font-medium text-zinc-800 mb-1">Owner · Admin · Member</p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                            Built-in roles that control platform-level access — who can manage billing, invite members, or administer the workspace itself.
+                        <p class="mb-2 text-xs font-semibold tracking-widest text-zinc-400 uppercase">System Roles</p>
+                        <p class="mb-1 text-sm font-medium text-zinc-800">Owner · Admin · Member</p>
+                        <p class="text-xs leading-relaxed text-zinc-500">
+                            Built-in roles that control platform-level access — who can manage billing, invite members, or administer the workspace
+                            itself.
                         </p>
                     </div>
                     <div class="rounded-lg border border-zinc-200 bg-white p-4">
-                        <p class="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-2">Workspace Roles</p>
-                        <p class="text-sm font-medium text-zinc-800 mb-1">Frontend Dev · QA · Sales · Designer…</p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                            Custom roles you define to reflect your team structure. Assign granular permissions that match how your team actually works.
+                        <p class="mb-2 text-xs font-semibold tracking-widest text-zinc-400 uppercase">Workspace Roles</p>
+                        <p class="mb-1 text-sm font-medium text-zinc-800">Frontend Dev · QA · Sales · Designer…</p>
+                        <p class="text-xs leading-relaxed text-zinc-500">
+                            Custom roles you define to reflect your team structure. Assign granular permissions that match how your team actually
+                            works.
                         </p>
                     </div>
                 </div>
             </section>
-
         </div>
     </AppLayout>
 </template>

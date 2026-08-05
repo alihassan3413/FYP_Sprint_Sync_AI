@@ -1,25 +1,31 @@
 <?php
 
-namespace App\Models;
+declare(strict_types=1);
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+namespace App\Models;
 
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
+use App\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property int|null $current_workspace_id
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
-     *
      * @var list<string>
      */
     protected $fillable = [
@@ -30,8 +36,6 @@ class User extends Authenticatable
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
      * @var list<string>
      */
     protected $hidden = [
@@ -40,8 +44,6 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
      * @return array<string, string>
      */
     protected function casts(): array
@@ -59,21 +61,29 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    public function currentWorkspace()
+    public function currentWorkspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'current_workspace_id');
     }
 
-    public function activeWorkspaceOrFail()
+    public function activeWorkspaceOrFail(): Workspace
     {
-        $workspace = $this->workspaces()
-            ->whereKey($this->current_workspace_id)
-            ->first();
+        $workspace = $this->workspaces()->whereKey($this->current_workspace_id)->first();
 
-        if (! $workspace) {
+        if ($workspace === null) {
             throw WorkspaceException::noActiveWorkspace();
         }
 
         return $workspace;
+    }
+
+    public function belongsToWorkspace(Workspace $workspace): bool
+    {
+        return $workspace->hasMember($this);
+    }
+
+    public function roleIn(Workspace $workspace): ?UserRole
+    {
+        return $workspace->roleFor($this);
     }
 }

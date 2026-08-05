@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Assistant\Providers;
+namespace App\Modules\Assistant\Drivers;
 
-use Generator;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use App\Modules\Assistant\Contracts\AiProvider;
 use App\Modules\Assistant\Exceptions\AiProviderException;
+use Generator;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * OpenAI provider with native streaming support.
@@ -75,7 +76,7 @@ class OpenAiProvider implements AiProvider
             ->retry(2, 100, function ($exception, $request) {
                 // Retry only transient errors. Don't retry on 4xx (our bug)
                 // or 401 (bad key) — those won't fix themselves.
-                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                return $exception instanceof ConnectionException;
             })
             // withOptions stream:true tells Guzzle to give us a stream
             // resource instead of buffering the whole response.
@@ -155,6 +156,7 @@ class OpenAiProvider implements AiProvider
                 'input_tokens' => $chunk['usage']['prompt_tokens'] ?? 0,
                 'output_tokens' => $chunk['usage']['completion_tokens'] ?? 0,
             ];
+
             return;
         }
 

@@ -61,7 +61,7 @@ You read top-down, you build bottom-up. Define your contracts first, then implem
 Here's what happens when a user sends a message:
 
 ```
-1. Frontend POST /api/assistant/chat
+1. Frontend POST /assistant/chat
    { message: "Create a workspace called Marketing", workspace_id: 7 }
    
 2. Laravel: auth middleware → rate limiter → ChatController
@@ -104,7 +104,7 @@ Here's what happens when a user sends a message:
 Tool confirmation flow (continuing from step 7 above):
 
 ```
-10. User clicks Confirm in UI → frontend POSTs /api/assistant/confirm
+10. User clicks Confirm in UI → frontend POSTs /assistant/confirm
     { message_id: 42, action: "confirm" }
 
 11. ConfirmActionController:
@@ -308,7 +308,7 @@ php artisan migrate
 ### 5. Test the endpoint
 
 ```bash
-curl -X POST http://localhost:8000/api/assistant/chat \
+curl -X POST http://localhost:8000/assistant/chat \
   -H "Content-Type: application/json" \
   -H "X-CSRF-TOKEN: ..." \
   --cookie "laravel_session=..." \
@@ -327,7 +327,7 @@ Before going live, work through every item:
 
 - [ ] **Disable nginx buffering for SSE routes**. Add to your nginx config:
   ```nginx
-  location /api/assistant/ {
+  location /assistant/ {
       proxy_pass http://app;
       proxy_http_version 1.1;
       proxy_buffering off;
@@ -396,7 +396,7 @@ async function submit(prompt: string) {
   let conversationId = currentConversationId.value;
 
   try {
-    const response = await fetch('/api/assistant/chat', {
+    const response = await fetch('/assistant/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -478,7 +478,7 @@ async function submit(prompt: string) {
 }
 ```
 
-For the confirm/reject flow, add a separate function that hits `/api/assistant/confirm` with the same SSE parsing logic.
+For the confirm/reject flow, add a separate function that hits `/assistant/confirm` with the same SSE parsing logic.
 
 ---
 

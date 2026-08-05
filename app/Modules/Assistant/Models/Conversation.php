@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Assistant\Models;
 
 use App\Models\User;
-use App\Modules\Assistant\Models\Message;
+use App\Modules\Assistant\Database\Factories\ConversationFactory;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -21,8 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $total_input_tokens
  * @property int $total_output_tokens
  */
-class Conversation extends Model
+final class Conversation extends Model
 {
+    /** @use HasFactory<ConversationFactory> */
     use HasFactory;
 
     protected $table = 'assistant_conversations';
@@ -36,11 +38,14 @@ class Conversation extends Model
         'total_output_tokens',
     ];
 
-    protected $casts = [
-        'is_archived' => 'boolean',
-        'total_input_tokens' => 'integer',
-        'total_output_tokens' => 'integer',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'is_archived' => 'boolean',
+            'total_input_tokens' => 'integer',
+            'total_output_tokens' => 'integer',
+        ];
+    }
 
     public function user(): BelongsTo
     {
@@ -57,18 +62,18 @@ class Conversation extends Model
         return $this->hasMany(Message::class)->orderBy('created_at');
     }
 
-    /**
-     * Increment token totals atomically. Called after each LLM round-trip.
-     * Uses raw SQL increment to avoid race conditions when two requests
-     * land for the same conversation simultaneously (rare but possible).
-     */
     public function recordTokenUsage(int $input, int $output): void
     {
         $this->newQuery()
-            ->where('id', $this->id)
+            ->whereKey($this->getKey())
             ->update([
-                'total_input_tokens' => \DB::raw("total_input_tokens + {$input}"),
-                'total_output_tokens' => \DB::raw("total_output_tokens + {$output}"),
+                'total_input_tokens' => DB::raw('total_input_tokens + '.$input),
+                'total_output_tokens' => DB::raw('total_output_tokens + '.$output),
             ]);
+    }
+
+    protected static function newFactory(): ConversationFactory
+    {
+        return ConversationFactory::new();
     }
 }

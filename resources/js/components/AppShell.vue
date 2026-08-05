@@ -8,11 +8,7 @@ interface Props {
 
 defineProps<Props>();
 
-const isOpen = ref(
-    typeof window === 'undefined'
-        ? true
-        : localStorage.getItem('sidebar') !== 'false'
-);
+const isOpen = ref(typeof window === 'undefined' ? true : localStorage.getItem('sidebar') !== 'false');
 
 const handleSidebarChange = (open: boolean) => {
     isOpen.value = open;

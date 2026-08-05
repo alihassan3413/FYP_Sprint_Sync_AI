@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,6 +27,9 @@ class RegistrationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+
+        $workspace = User::query()->where('email', 'test@example.com')->firstOrFail()->activeWorkspaceOrFail();
+
+        $response->assertRedirect(route('dashboard', $workspace, absolute: false));
     }
 }

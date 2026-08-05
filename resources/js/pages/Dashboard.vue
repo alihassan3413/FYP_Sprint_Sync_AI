@@ -33,7 +33,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-
 const onlineMembers = computed(() => props.members.filter((m) => m.status === 'active'));
 
 const teamMembers = computed(() => props.members.filter((m) => m.status !== 'pending'));

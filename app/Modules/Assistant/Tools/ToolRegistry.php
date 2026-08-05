@@ -6,8 +6,9 @@ namespace App\Modules\Assistant\Tools;
 
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use LogicException;
 
-class ToolRegistry
+final class ToolRegistry
 {
     /** @var array<string, AssistantTool> */
     private array $tools = [];
@@ -17,9 +18,7 @@ class ToolRegistry
         $name = $tool->name();
 
         if (isset($this->tools[$name])) {
-            throw new \LogicException(
-                "Tool '{$name}' is already registered. Tool names must be unique."
-            );
+            throw new LogicException("Tool '{$name}' is already registered. Tool names must be unique.");
         }
 
         $this->tools[$name] = $tool;
@@ -31,7 +30,7 @@ class ToolRegistry
     }
 
     /**
-     * @return AssistantTool[]
+     * @return array<int, AssistantTool>
      */
     public function all(): array
     {
@@ -39,10 +38,7 @@ class ToolRegistry
     }
 
     /**
-     * Tools the given user is authorized to use.
-     * This is the ONLY list ever sent to the LLM.
-     *
-     * @return AssistantTool[]
+     * @return array<int, AssistantTool>
      */
     public function availableFor(User $user): array
     {
@@ -53,9 +49,7 @@ class ToolRegistry
     }
 
     /**
-     * OpenAI-style function schema. Gemini accepts the same shape.
-     *
-     * @return array<int, array{type: string, function: array}>
+     * @return array<int, array{type: string, function: array<string, mixed>}>
      */
     public function asOpenAiSchema(User $user): array
     {

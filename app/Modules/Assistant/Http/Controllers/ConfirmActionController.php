@@ -4,118 +4,118 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\User;
 use App\Modules\Assistant\Actions\ExecuteToolCall;
 use App\Modules\Assistant\Actions\ProcessChatMessage;
-use App\Modules\Assistant\Models\Conversation;
+use App\Modules\Assistant\Http\Requests\ConfirmActionRequest;
 use App\Modules\Assistant\Models\Message;
+use App\Modules\Assistant\Support\EventStream;
+use App\Modules\Assistant\Support\ToolArgumentValidator;
 use App\Modules\Assistant\Tools\ToolRegistry;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class ConfirmActionController
+final class ConfirmActionController
 {
     public function __invoke(
-        Request $request,
+        ConfirmActionRequest $request,
         ToolRegistry $registry,
         ExecuteToolCall $executor,
         ProcessChatMessage $processor,
+        ToolArgumentValidator $argumentValidator,
     ): StreamedResponse {
-        $validated = $request->validate([
-            'message_id' => 'required|integer|exists:assistant_messages,id',
-            'action' => 'required|in:confirm,reject',
-        ]);
-
         $user = $request->user();
-
-        $pendingMessage = Message::where('id', $validated['message_id'])
-            ->where('tool_status', Message::STATUS_PENDING)
-            ->whereHas('conversation', fn ($q) => $q->where('user_id', $user->id))
-            ->firstOrFail();
-
+        $pendingMessage = $request->pendingMessage();
         $conversation = $pendingMessage->conversation;
-        $toolName = $pendingMessage->metadata['name'] ?? null;
-        $args = $pendingMessage->metadata['args'] ?? [];
+        $confirmed = $request->isConfirmation();
 
-        return new StreamedResponse(
-            function () use (
-                $validated,
-                $pendingMessage,
-                $conversation,
-                $registry,
-                $executor,
-                $processor,
-                $user,
-                $toolName,
-                $args,
-            ) {
-                while (ob_get_level() > 0) {
-                    ob_end_flush();
-                }
-                ignore_user_abort(true);
-                set_time_limit(0);
+        return EventStream::respond(function (EventStream $stream) use (
+            $argumentValidator,
+            $confirmed,
+            $conversation,
+            $executor,
+            $pendingMessage,
+            $processor,
+            $registry,
+            $user,
+        ) {
+            $confirmed
+                ? $this->execute($stream, $registry, $executor, $argumentValidator, $pendingMessage, $user)
+                : $this->reject($stream, $pendingMessage);
 
-                if ($validated['action'] === 'reject') {
-                    // User canceled. Update the pending message.
-                    $pendingMessage->update([
-                        'tool_status' => Message::STATUS_REJECTED,
-                        'content' => json_encode([
-                            'success' => false,
-                            'error' => 'User canceled this action.',
-                        ]),
-                    ]);
+            $events = $processor->handle(
+                user: $user,
+                conversation: $conversation,
+                userMessage: '[User responded via confirmation UI]',
+            );
 
-                    $this->emit(['type' => 'tool_rejected', 'message_id' => $pendingMessage->id]);
-                } else {
-                    // User confirmed. Execute the tool.
-                    $tool = $registry->get($toolName);
-
-                    if (! $tool) {
-                        $this->emit(['type' => 'error', 'message' => 'Tool no longer available.']);
-                        return;
-                    }
-
-                    $result = $executor->handle($tool, $args, $user);
-
-                    $pendingMessage->update([
-                        'tool_status' => $result['success'] ?? false
-                            ? Message::STATUS_EXECUTED
-                            : Message::STATUS_FAILED,
-                        'content' => json_encode($result),
-                    ]);
-
-                    $this->emit([
-                        'type' => 'tool_executed',
-                        'message_id' => $pendingMessage->id,
-                        'result' => $result,
-                    ]);
+            foreach ($events as $event) {
+                if ($stream->aborted()) {
+                    return;
                 }
 
+                $stream->emit($event);
+            }
 
-                foreach ($processor->handle(
-                    user: $user,
-                    conversation: $conversation,
-                    userMessage: '[User responded via confirmation UI]',
-                    pageContext: [],
-                ) as $event) {
-                    if (connection_aborted()) return;
-                    $this->emit($event);
-                }
-
-                $this->emit(['type' => 'stream_end']);
-            },
-            200,
-            [
-                'Content-Type' => 'text/event-stream',
-                'Cache-Control' => 'no-cache, no-transform',
-                'X-Accel-Buffering' => 'no',
-            ],
-        );
+            $stream->emit(['type' => 'stream_end']);
+        });
     }
 
-    private function emit(array $event): void
+    private function reject(EventStream $stream, Message $pendingMessage): void
     {
-        echo 'data: ' . json_encode($event) . "\n\n";
-        @ob_flush();
-        flush();
+        $pendingMessage->update([
+            'tool_status' => Message::STATUS_REJECTED,
+            'content' => json_encode(['success' => false, 'error' => 'User canceled this action.']),
+        ]);
+
+        $stream->emit(['type' => 'tool_rejected', 'message_id' => $pendingMessage->id]);
+    }
+
+    private function execute(
+        EventStream $stream,
+        ToolRegistry $registry,
+        ExecuteToolCall $executor,
+        ToolArgumentValidator $argumentValidator,
+        Message $pendingMessage,
+        User $user,
+    ): void {
+        $tool = $registry->get($pendingMessage->metadata['name'] ?? '');
+
+        if ($tool === null) {
+            $this->fail($stream, $pendingMessage, 'That action is no longer available.');
+
+            return;
+        }
+
+        try {
+            $args = $argumentValidator->validate($tool, $pendingMessage->metadata['args'] ?? []);
+        } catch (ValidationException) {
+            $this->fail($stream, $pendingMessage, 'The requested action had invalid details. Please ask again.');
+
+            return;
+        }
+
+        $result = $executor->handle($tool, $args, $user);
+
+        $pendingMessage->update([
+            'tool_status' => ($result['success'] ?? false) ? Message::STATUS_EXECUTED : Message::STATUS_FAILED,
+            'content' => json_encode($result),
+        ]);
+
+        $stream->emit([
+            'type' => 'tool_executed',
+            'message_id' => $pendingMessage->id,
+            'result' => $result,
+        ]);
+    }
+
+    private function fail(EventStream $stream, Message $pendingMessage, string $error): void
+    {
+        $pendingMessage->update([
+            'tool_status' => Message::STATUS_FAILED,
+            'content' => json_encode(['success' => false, 'error' => $error]),
+        ]);
+
+        $stream->emit(['type' => 'tool_failed', 'message_id' => $pendingMessage->id, 'error' => $error]);
     }
 }

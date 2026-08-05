@@ -10,18 +10,19 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Spatie\TypeScriptTransformer\Attributes\TypeScriptType;
 
 #[TypeScript]
-class WorkspaceRoleData extends Data
+final class WorkspaceRoleData extends Data
 {
+    /**
+     * @param  array<string, bool>|null  $permissions
+     */
     public function __construct(
         public ?int $id,
-
         public string $name,
-
-        public string $slug,
-
+        public ?string $slug = null,
         #[TypeScriptType('Record<string, boolean> | null')]
-        public ?array $permissions,
-
+        public ?array $permissions = null,
+        public ?int $workspace_id = null,
+        public ?int $member_count = null,
     ) {}
 
     public static function fromModel(WorkspaceRole $role): self
@@ -31,6 +32,8 @@ class WorkspaceRoleData extends Data
             name: $role->name,
             slug: $role->slug,
             permissions: $role->permissions,
+            workspace_id: $role->workspace_id,
+            member_count: $role->members_count ?? null,
         );
     }
 }

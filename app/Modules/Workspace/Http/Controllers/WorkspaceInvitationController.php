@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Workspace\Actions\AcceptWorkspaceInvitationAction;
 use App\Modules\Workspace\Actions\CreateWorkspaceInvitationAction;
@@ -11,121 +12,129 @@ use App\Modules\Workspace\Http\Requests\StoreWorkspaceInvitationRequest;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
 use Inertia\Response;
 
-final class WorkspaceInvitationController extends Controller
+final class WorkspaceInvitationController
 {
+    public function create(Workspace $workspace): Response
+    {
+        return Inertia::render('workspace/invitations/Create', [
+            'workspace' => ['name' => $workspace->name, 'slug' => $workspace->slug],
+        ]);
+    }
+
     public function store(
         StoreWorkspaceInvitationRequest $request,
-        CreateWorkspaceInvitationAction $createWorkspaceInvitationAction,
-    ) {
-        $workspace = Workspace::query()
-            ->where('slug', $request->route('workspace'))
-            ->firstOrFail();
+        Workspace $workspace,
+        CreateWorkspaceInvitationAction $action,
+    ): RedirectResponse {
+        $invitation = $action->handle($workspace, $request->user(), $request->toDTO());
 
-        $createWorkspaceInvitationAction->handle($workspace, $request->user(), $request->toDTO());
+        return back()->with('success', "Invitation sent to {$invitation->email}.");
+    }
 
-        return back()->with('success', 'Invitation sent successfully.');
+    public function resend(
+        Request $request,
+        Workspace $workspace,
+        WorkspaceInvitation $invitation,
+        CreateWorkspaceInvitationAction $action,
+    ): RedirectResponse {
+        abort_unless($request->user()->can('invite', $workspace), 403);
+
+        $action->resend($workspace, $request->user(), $invitation);
+
+        return back()->with('success', "Invitation resent to {$invitation->email}.");
+    }
+
+    public function destroy(Request $request, Workspace $workspace, WorkspaceInvitation $invitation): RedirectResponse
+    {
+        abort_unless($request->user()->can('invite', $workspace), 403);
+
+        $invitation->delete();
+
+        return back()->with('success', "Invitation to {$invitation->email} revoked.");
+    }
+
+    public function showAccept(string $token): Response|RedirectResponse
+    {
+        $invitation = $this->findInvitation($token);
+
+        if ($invitation->isAccepted()) {
+            return to_route('login')->with('error', 'This invitation has already been accepted.');
+        }
+
+        if ($invitation->isExpired()) {
+            return to_route('login')->with('error', 'This invitation has expired.');
+        }
+
+        $user = Auth::user();
+
+        if ($user !== null && $user->email !== $invitation->email) {
+            return to_route('login')->with(
+                'error',
+                "This invitation was sent to {$invitation->email}. Sign in with that address to accept it.",
+            );
+        }
+
+        if ($user === null && User::query()->where('email', $invitation->email)->exists()) {
+            session(['pending_invitation_token' => $token]);
+
+            return to_route('login')->with('status', 'Please sign in to accept your workspace invitation.');
+        }
+
+        return Inertia::render('workspace/invitations/Accept', [
+            'token' => $token,
+            'requiresRegistration' => $user === null,
+            'invitation' => [
+                'email' => $invitation->email,
+                'role' => $invitation->role->value,
+                'workspace' => ['name' => $invitation->workspace->name],
+            ],
+        ]);
     }
 
     public function accept(
         string $token,
         AcceptWorkspaceInvitationRequest $request,
-        AcceptWorkspaceInvitationAction $acceptWorkspaceInvitationAction
+        AcceptWorkspaceInvitationAction $action,
     ): RedirectResponse {
-        $invitation = WorkspaceInvitation::query()
-            ->where('token', $token)
-            ->firstOrFail();
+        $invitation = $this->findInvitation($token);
+        $user = $request->user() ?? $this->registerInvitee($request, $invitation);
 
-        $user = $request->user();
+        $action->handle($invitation, $user);
 
-        /**
-         * Guest invited user:
-         * create account first using invitation email.
-         */
-        if (! $user) {
-            if (User::query()->where('email', $invitation->email)->exists()) {
-                session(['pending_invitation_token' => $token]);
+        session()->forget('pending_invitation_token');
 
-                return redirect()
-                    ->route('login')
-                    ->with('error', 'An account already exists for this email. Please login to accept the invitation.');
-            }
-
-            $user = User::query()->create([
-                'name' => $request->string('name')->toString(),
-                'email' => $invitation->email,
-                'password' => Hash::make($request->string('password')->toString()),
-            ]);
-
-            Auth::login($user);
-        }
-
-        $acceptWorkspaceInvitationAction->handle($token, $user);
-
-        return redirect()
-            ->route('dashboard', ['workspace' => $invitation->workspace->slug])
-            ->with('success', 'Invitation accepted successfully.');
+        return to_route('dashboard', ['workspace' => $invitation->workspace->slug])
+            ->with('success', "You have joined {$invitation->workspace->name}.");
     }
 
-    public function showAccept(string $token): Response|RedirectResponse
+    private function findInvitation(string $token): WorkspaceInvitation
     {
-        $invitation = WorkspaceInvitation::query()
+        return WorkspaceInvitation::query()
             ->with('workspace')
             ->where('token', $token)
             ->firstOrFail();
+    }
 
-        if ($invitation->accepted_at) {
-            return redirect()
-                ->route('login')
-                ->with('error', 'This invitation has already been accepted.');
-        }
+    private function registerInvitee(AcceptWorkspaceInvitationRequest $request, WorkspaceInvitation $invitation): User
+    {
+        $user = DB::transaction(fn () => User::create([
+            'name' => $request->string('name')->toString(),
+            'email' => $invitation->email,
+            'password' => Hash::make($request->string('password')->toString()),
+        ]));
 
-        if ($invitation->expires_at->isPast()) {
-            return redirect()
-                ->route('login')
-                ->with('error', 'This invitation has expired.');
-        }
+        $user->forceFill(['email_verified_at' => now()])->save();
 
-        $authUser = Auth::user();
+        Auth::login($user);
+        $request->session()->regenerate();
 
-        if ($authUser) {
-            if ($authUser->email !== $invitation->email) {
-                return redirect()
-                    ->route('dashboard', ['workspace' => $invitation->workspace->slug])
-                    ->with('error', "This invitation was sent to {$invitation->email}. Please login with that email to accept it.");
-            }
-
-            app(AcceptWorkspaceInvitationAction::class)->handle($token, $authUser);
-
-            return redirect()
-                ->route('dashboard', ['workspace' => $invitation->workspace->slug])
-                ->with('success', 'Invitation accepted successfully.');
-        }
-
-        $existingUser = User::query()
-            ->where('email', $invitation->email)
-            ->exists();
-
-        if ($existingUser) {
-            session(['pending_invitation_token' => $token]);
-
-            return redirect()
-                ->route('login')
-                ->with('status', 'Please login to accept your workspace invitation.');
-        }
-
-        return inertia('workspace/invitations/Accept', [
-            'token' => $token,
-            'invitation' => [
-                'email' => $invitation->email,
-                'role' => $invitation->role,
-                'workspace' => [
-                    'name' => $invitation->workspace->name,
-                ],
-            ],
-        ]);
+        return $user;
     }
 }

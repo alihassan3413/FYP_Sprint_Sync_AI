@@ -6,8 +6,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('assistant_messages', function (Blueprint $table) {
@@ -17,13 +17,11 @@ return new class extends Migration {
                 ->constrained('assistant_conversations')
                 ->cascadeOnDelete();
 
-
             $table->string('role', 20);
 
             $table->longText('content')->nullable();
 
             $table->json('tool_calls')->nullable();
-
 
             $table->string('tool_call_id', 64)->nullable();
 
@@ -34,7 +32,6 @@ return new class extends Migration {
 
             $table->unsignedInteger('input_tokens')->default(0);
             $table->unsignedInteger('output_tokens')->default(0);
-
 
             $table->json('metadata')->nullable();
 

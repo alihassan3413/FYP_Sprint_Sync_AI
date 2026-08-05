@@ -6,6 +6,8 @@ namespace App\Modules\Assistant\Tools;
 
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Workspace\Models\Workspace;
+use App\Modules\Workspace\Models\WorkspaceInvitation;
 
 final class GetWorkspaceInfoTool implements AssistantTool
 {
@@ -16,9 +18,13 @@ final class GetWorkspaceInfoTool implements AssistantTool
 
     public function description(): string
     {
-        return 'Gets complete information about the current workspace. Use this when the user asks about the current workspace, workspace details, member count, members list, admins, pending invitations, or their role in the workspace.';
+        return 'Gets information about the current workspace. Use this when the user asks about the workspace, '
+            .'member count, the member list, admins, pending invitations, or their own role.';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function parameters(): array
     {
         return [
@@ -26,16 +32,16 @@ final class GetWorkspaceInfoTool implements AssistantTool
             'properties' => [
                 'include_members' => [
                     'type' => 'boolean',
-                    'description' => 'Whether to include the full list of workspace members. Use true when the user asks who the members are or asks for the member list.',
+                    'description' => 'Include the full member list. Use true when the user asks who the members are.',
                 ],
                 'include_invitations' => [
                     'type' => 'boolean',
-                    'description' => 'Whether to include pending invitations. Use true when the user asks about invites or pending invitations.',
+                    'description' => 'Include pending invitations. Use true when the user asks about invites.',
                 ],
                 'role_filter' => [
                     'type' => 'string',
                     'enum' => ['admin', 'member'],
-                    'description' => 'Optional member role filter. Use this when the user asks for only admins or only members.',
+                    'description' => 'Filter members by role when the user asks for only admins or only members.',
                 ],
             ],
             'required' => [],
@@ -50,47 +56,22 @@ final class GetWorkspaceInfoTool implements AssistantTool
 
     public function authorize(User $user): bool
     {
-        return $user->currentWorkspace !== null;
+        $workspace = $user->currentWorkspace;
+
+        return $workspace !== null && $workspace->hasMember($user);
     }
 
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
     public function execute(array $args, User $user): array
     {
         $workspace = $user->currentWorkspace;
 
-        if (! $workspace) {
-            return [
-                'success' => false,
-                'message' => 'No active workspace is selected.',
-            ];
+        if ($workspace === null || ! $workspace->hasMember($user)) {
+            return ['success' => false, 'message' => 'No active workspace is selected.'];
         }
-
-        $includeMembers = (bool) ($args['include_members'] ?? false);
-        $includeInvitations = (bool) ($args['include_invitations'] ?? false);
-        $roleFilter = $args['role_filter'] ?? null;
-
-        $currentUserMembership = $workspace->users()
-            ->whereKey($user->id)
-            ->first();
-
-        $membersQuery = $workspace->users();
-
-        if ($roleFilter) {
-            $membersQuery->wherePivot('role', $roleFilter);
-        }
-
-        $membersCount = $workspace->users()->count();
-
-        $adminsCount = $workspace->users()
-            ->wherePivot('role', 'admin')
-            ->count();
-
-        $normalMembersCount = $workspace->users()
-            ->wherePivot('role', 'member')
-            ->count();
-
-        $pendingInvitationsQuery = $workspace->invitations()
-            ->whereNull('accepted_at')
-            ->where('expires_at', '>', now());
 
         $data = [
             'success' => true,
@@ -98,53 +79,80 @@ final class GetWorkspaceInfoTool implements AssistantTool
                 'id' => $workspace->id,
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
-                'created_at' => optional($workspace->created_at)->toDateTimeString(),
-                'updated_at' => optional($workspace->updated_at)->toDateTimeString(),
+                'created_at' => $workspace->created_at?->toDateTimeString(),
             ],
             'current_user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $currentUserMembership?->pivot?->role,
+                'role' => $workspace->roleFor($user)?->value,
             ],
-            'stats' => [
-                'members_count' => $membersCount,
-                'admins_count' => $adminsCount,
-                'normal_members_count' => $normalMembersCount,
-                'pending_invitations_count' => (clone $pendingInvitationsQuery)->count(),
-            ],
+            'stats' => $this->stats($workspace),
         ];
 
-        if ($includeMembers) {
-            $data['members'] = $membersQuery
-                ->select('users.id', 'users.name', 'users.email')
-                ->orderBy('users.name')
-                ->get()
-                ->map(fn (User $member) => [
-                    'id' => $member->id,
-                    'name' => $member->name,
-                    'email' => $member->email,
-                    'role' => $member->pivot->role,
-                ])
-                ->values()
-                ->all();
+        if (($args['include_members'] ?? false) === true) {
+            $data['members'] = $this->members($workspace, $args['role_filter'] ?? null);
         }
 
-        if ($includeInvitations) {
-            $data['pending_invitations'] = $pendingInvitationsQuery
-                ->latest()
-                ->get()
-                ->map(fn ($invitation) => [
-                    'id' => $invitation->id,
-                    'email' => $invitation->email,
-                    'role' => $invitation->role,
-                    'expires_at' => optional($invitation->expires_at)->toDateTimeString(),
-                    'created_at' => optional($invitation->created_at)->toDateTimeString(),
-                ])
-                ->values()
-                ->all();
+        if (($args['include_invitations'] ?? false) === true) {
+            $data['pending_invitations'] = $this->invitations($workspace);
         }
 
         return $data;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function stats(Workspace $workspace): array
+    {
+        return [
+            'members_count' => $workspace->users()->count(),
+            'admins_count' => $workspace->users()->wherePivot('role', 'admin')->count(),
+            'normal_members_count' => $workspace->users()->wherePivot('role', 'member')->count(),
+            'pending_invitations_count' => $workspace->pendingInvitations()->count(),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function members(Workspace $workspace, ?string $roleFilter): array
+    {
+        $query = $workspace->users()->select('users.id', 'users.name', 'users.email');
+
+        if ($roleFilter !== null) {
+            $query->wherePivot('role', $roleFilter);
+        }
+
+        return $query
+            ->orderBy('users.name')
+            ->limit(50)
+            ->get()
+            ->map(fn (User $member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->pivot->role,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function invitations(Workspace $workspace): array
+    {
+        return $workspace->pendingInvitations()
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (WorkspaceInvitation $invitation) => [
+                'id' => $invitation->id,
+                'email' => $invitation->email,
+                'role' => $invitation->role->value,
+                'expires_at' => $invitation->expires_at?->toDateTimeString(),
+            ])
+            ->all();
     }
 }
