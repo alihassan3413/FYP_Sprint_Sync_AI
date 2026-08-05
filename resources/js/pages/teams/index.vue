@@ -94,6 +94,7 @@ function onCopyInviteLink(m: Member) {
 function onChangeRole(m: Member) {
     console.log('change role', m);
 }
+
 function onTransferTasks(m: Member) {
     console.log('transfer tasks', m);
 }
