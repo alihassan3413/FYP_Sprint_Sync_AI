@@ -66,9 +66,14 @@ class User extends Authenticatable
         return $this->belongsTo(Workspace::class, 'current_workspace_id');
     }
 
+    public function activeWorkspace(): ?Workspace
+    {
+        return $this->workspaces()->whereKey($this->current_workspace_id)->first();
+    }
+
     public function activeWorkspaceOrFail(): Workspace
     {
-        $workspace = $this->workspaces()->whereKey($this->current_workspace_id)->first();
+        $workspace = $this->activeWorkspace();
 
         if ($workspace === null) {
             throw WorkspaceException::noActiveWorkspace();

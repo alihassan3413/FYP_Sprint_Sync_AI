@@ -45,6 +45,26 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_an_authenticated_user_visiting_a_guest_route_is_sent_to_their_workspace_dashboard()
+    {
+        $user = User::factory()->create();
+        $workspace = Workspace::factory()->ownedBy($user)->create();
+        $user->forceFill(['current_workspace_id' => $workspace->id])->save();
+
+        $this->actingAs($user)
+            ->get('/login')
+            ->assertRedirect(route('dashboard', $workspace));
+    }
+
+    public function test_an_authenticated_user_without_a_workspace_visiting_a_guest_route_is_sent_home()
+    {
+        $user = User::factory()->create(['current_workspace_id' => null]);
+
+        $this->actingAs($user)
+            ->get('/login')
+            ->assertRedirect(route('home'));
+    }
+
     public function test_users_can_logout()
     {
         $user = User::factory()->create();

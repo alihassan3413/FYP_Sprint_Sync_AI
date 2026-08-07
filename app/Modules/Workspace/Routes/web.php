@@ -30,6 +30,8 @@ TenantRoute::group(function () {
 
     Route::name('workspace.')->group(function () {
         Route::get('settings', [WorkspaceController::class, 'edit'])->name('settings');
+        Route::put('settings', [WorkspaceController::class, 'update'])->name('update');
+        Route::delete('settings', [WorkspaceController::class, 'destroy'])->name('destroy');
 
         Route::prefix('invitations')->name('invitations.')->group(function () {
             Route::get('create', [WorkspaceInvitationController::class, 'create'])->name('create');
