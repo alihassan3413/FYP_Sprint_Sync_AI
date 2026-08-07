@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
+use App\ProjectRole;
 use App\TaskStatus;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,6 +80,8 @@ final class TaskTest extends TestCase
 
     public function test_a_task_can_be_created_with_an_assignee(): void
     {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
         $this->actingAs($this->owner)
             ->post($this->taskRoute('workspace.projects.tasks.store'), [
                 'title' => 'Assigned task',
@@ -106,6 +109,33 @@ final class TaskTest extends TestCase
         $this->assertDatabaseMissing('tasks', ['title' => 'Bad assignment']);
     }
 
+    public function test_a_task_cannot_be_assigned_to_a_workspace_member_who_is_not_a_project_member(): void
+    {
+        $this->actingAs($this->owner)
+            ->post($this->taskRoute('workspace.projects.tasks.store'), [
+                'title' => 'Bad assignment',
+                'assigned_to' => $this->member->id,
+            ])
+            ->assertSessionHasErrors('assigned_to');
+
+        $this->assertDatabaseMissing('tasks', ['title' => 'Bad assignment']);
+    }
+
+    public function test_a_task_can_be_assigned_to_the_workspace_owner_without_project_membership(): void
+    {
+        $this->actingAs($this->owner)
+            ->post($this->taskRoute('workspace.projects.tasks.store'), [
+                'title' => 'Owner assigned',
+                'assigned_to' => $this->owner->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tasks', [
+            'title' => 'Owner assigned',
+            'assigned_to' => $this->owner->id,
+        ]);
+    }
+
     public function test_the_title_is_required(): void
     {
         $this->actingAs($this->owner)
@@ -127,6 +157,7 @@ final class TaskTest extends TestCase
     public function test_an_owner_can_update_a_task(): void
     {
         $task = Task::factory()->forProject($this->project)->create(['title' => 'Old title']);
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
 
         $this->actingAs($this->owner)
             ->put($this->taskRoute('workspace.projects.tasks.update', $task), [
@@ -242,6 +273,39 @@ final class TaskTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $task->id]);
     }
 
+    public function test_a_project_manager_can_create_update_and_delete_tasks(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->post($this->taskRoute('workspace.projects.tasks.store'), ['title' => 'Manager task'])
+            ->assertRedirect();
+
+        $task = Task::query()->where('title', 'Manager task')->firstOrFail();
+
+        $this->actingAs($this->member)
+            ->put($this->taskRoute('workspace.projects.tasks.update', $task), ['title' => 'Manager task updated'])
+            ->assertRedirect();
+
+        $this->assertSame('Manager task updated', $task->fresh()->title);
+
+        $this->actingAs($this->member)
+            ->delete($this->taskRoute('workspace.projects.tasks.destroy', $task))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
+    }
+
+    public function test_a_project_manager_of_another_project_cannot_manage_this_project_tasks(): void
+    {
+        $otherProject = Project::factory()->forWorkspace($this->workspace)->create();
+        $otherProject->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->post($this->taskRoute('workspace.projects.tasks.store'), ['title' => 'Not allowed'])
+            ->assertForbidden();
+    }
+
     public function test_an_outsider_cannot_create_a_task(): void
     {
         $outsider = User::factory()->create();
@@ -278,6 +342,7 @@ final class TaskTest extends TestCase
 
     public function test_the_project_show_page_includes_tasks_and_members_for_the_board(): void
     {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
         Task::factory()->forProject($this->project)->assignedTo($this->member)->create();
         Task::factory()->forProject($this->project)->withStatus(TaskStatus::DONE)->create();
 

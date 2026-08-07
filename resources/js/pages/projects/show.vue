@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, Users, Video } from 'lucide-vue-next';
+import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, Users } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { Meeting } from '@/lib/meetings';
 import type { Project } from '@/lib/projects';
 import type { Task, TaskMember } from '@/lib/tasks';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -10,7 +11,9 @@ const props = defineProps<{
     project: Project;
     canManageProjects: boolean;
     canManageTasks: boolean;
+    canManageMeetings: boolean;
     tasks: Task[];
+    meetings: Meeting[];
     members: TaskMember[];
 }>();
 
@@ -38,6 +41,10 @@ const isDeleteDialogOpen = ref(false);
 const isCreateTaskModalOpen = ref(false);
 const taskModalTarget = ref<Task | null>(null);
 const deleteTaskTarget = ref<Task | null>(null);
+
+const isCreateMeetingModalOpen = ref(false);
+const meetingModalTarget = ref<Meeting | null>(null);
+const deleteMeetingTarget = ref<Meeting | null>(null);
 
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -95,13 +102,15 @@ function onDeleted() {
                         </AppEmptyState>
                     </TabsContent>
 
-                    <!-- Meetings (placeholder) -->
+                    <!-- Meetings -->
                     <TabsContent value="meetings">
-                        <AppEmptyState title="Meetings are coming soon" description="Schedule and join project meetings from here once this ships.">
-                            <template #icon>
-                                <Video class="size-5" />
-                            </template>
-                        </AppEmptyState>
+                        <MeetingsList
+                            :meetings="meetings"
+                            :can-manage="canManageMeetings"
+                            @create="isCreateMeetingModalOpen = true"
+                            @edit="(meeting) => (meetingModalTarget = meeting)"
+                            @delete="(meeting) => (deleteMeetingTarget = meeting)"
+                        />
                     </TabsContent>
 
                     <!-- Activity (placeholder) -->
@@ -189,4 +198,18 @@ function onDeleted() {
     />
 
     <DeleteTaskDialog :open="deleteTaskTarget !== null" :task="deleteTaskTarget" @update:open="(value) => !value && (deleteTaskTarget = null)" />
+
+    <CreateMeetingModal :open="isCreateMeetingModalOpen" :project-id="project.id" @update:open="(value) => (isCreateMeetingModalOpen = value)" />
+
+    <EditMeetingModal
+        :open="meetingModalTarget !== null"
+        :meeting="meetingModalTarget"
+        @update:open="(value) => !value && (meetingModalTarget = null)"
+    />
+
+    <DeleteMeetingDialog
+        :open="deleteMeetingTarget !== null"
+        :meeting="deleteMeetingTarget"
+        @update:open="(value) => !value && (deleteMeetingTarget = null)"
+    />
 </template>

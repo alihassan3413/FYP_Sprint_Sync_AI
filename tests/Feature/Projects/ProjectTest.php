@@ -7,6 +7,7 @@ namespace Tests\Feature\Projects;
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use App\ProjectRole;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,7 +32,37 @@ final class ProjectTest extends TestCase
         $this->workspace->users()->attach($this->member->id, ['role' => UserRole::MEMBER->value]);
     }
 
-    public function test_a_member_can_list_projects(): void
+    public function test_an_owner_lists_every_project_in_the_workspace(): void
+    {
+        Project::factory()->count(3)->forWorkspace($this->workspace)->create();
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.projects.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/index')
+                ->has('projects', 3)
+                ->where('canManageProjects', true));
+    }
+
+    public function test_a_member_only_sees_projects_they_are_assigned_to(): void
+    {
+        $assigned = Project::factory()->forWorkspace($this->workspace)->create();
+        Project::factory()->count(2)->forWorkspace($this->workspace)->create();
+
+        $assigned->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/index')
+                ->has('projects', 1)
+                ->where('projects.0.id', $assigned->id)
+                ->where('canManageProjects', false));
+    }
+
+    public function test_an_unassigned_member_sees_no_projects(): void
     {
         Project::factory()->count(3)->forWorkspace($this->workspace)->create();
 
@@ -40,8 +71,7 @@ final class ProjectTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('projects/index')
-                ->has('projects', 3)
-                ->where('canManageProjects', false));
+                ->has('projects', 0));
     }
 
     public function test_an_owner_can_create_a_project_with_a_description(): void
@@ -103,9 +133,10 @@ final class ProjectTest extends TestCase
         $this->assertSame(0, $this->workspace->projects()->count());
     }
 
-    public function test_a_member_can_view_a_single_project(): void
+    public function test_an_assigned_member_can_view_a_single_project(): void
     {
         $project = Project::factory()->forWorkspace($this->workspace)->create();
+        $project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
 
         $this->actingAs($this->member)
             ->get(route('workspace.projects.show', [$this->workspace, $project]))
@@ -114,6 +145,63 @@ final class ProjectTest extends TestCase
                 ->component('projects/show')
                 ->where('project.id', $project->id)
                 ->where('canManageProjects', false));
+    }
+
+    public function test_an_unassigned_member_cannot_view_a_project(): void
+    {
+        $project = Project::factory()->forWorkspace($this->workspace)->create();
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $project]))
+            ->assertForbidden();
+    }
+
+    public function test_an_owner_can_view_any_project_without_being_assigned(): void
+    {
+        $project = Project::factory()->forWorkspace($this->workspace)->create();
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.projects.show', [$this->workspace, $project]))
+            ->assertOk();
+    }
+
+    public function test_a_project_manager_can_update_their_project_without_being_a_workspace_admin(): void
+    {
+        $project = Project::factory()->forWorkspace($this->workspace)->create(['name' => 'Old Name']);
+        $project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->put(route('workspace.projects.update', [$this->workspace, $project]), [
+                'name' => 'New Name',
+                'description' => 'Updated by manager.',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('New Name', $project->fresh()->name);
+    }
+
+    public function test_a_project_member_cannot_update_their_project(): void
+    {
+        $project = Project::factory()->forWorkspace($this->workspace)->create(['name' => 'Untouchable']);
+        $project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $this->actingAs($this->member)
+            ->put(route('workspace.projects.update', [$this->workspace, $project]), ['name' => 'Hijacked'])
+            ->assertForbidden();
+
+        $this->assertSame('Untouchable', $project->fresh()->name);
+    }
+
+    public function test_a_project_manager_cannot_delete_their_project(): void
+    {
+        $project = Project::factory()->forWorkspace($this->workspace)->create();
+        $project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->delete(route('workspace.projects.destroy', [$this->workspace, $project]))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
     }
 
     public function test_an_owner_can_update_a_project(): void

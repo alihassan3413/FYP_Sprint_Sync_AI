@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tasks\Http\Requests;
 
+use App\Models\User;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
+use App\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdateTaskRequest extends FormRequest
@@ -33,8 +35,18 @@ final class UpdateTaskRequest extends FormRequest
         $validator->after(function ($validator) {
             $assignedTo = $this->input('assigned_to');
 
-            if ($assignedTo !== null && ! $this->task()->workspace->users()->whereKey($assignedTo)->exists()) {
-                $validator->errors()->add('assigned_to', 'The assignee must be a member of this workspace.');
+            if ($assignedTo === null) {
+                return;
+            }
+
+            $assignee = User::find($assignedTo);
+            $project = $this->task()->project;
+
+            $isAssignable = $assignee !== null
+                && ($project->workspace->userHasAtLeast($assignee, UserRole::ADMIN) || $project->hasMember($assignee));
+
+            if (! $isAssignable) {
+                $validator->errors()->add('assigned_to', 'The assignee must be a member of this project.');
             }
         });
     }

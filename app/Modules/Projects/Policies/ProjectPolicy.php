@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Policies;
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use App\ProjectRole;
 use App\UserRole;
 
 final class ProjectPolicy
@@ -18,7 +19,11 @@ final class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
-        return $project->workspace->hasMember($user);
+        if ($project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $project->hasMember($user);
     }
 
     public function create(User $user, Workspace $workspace): bool
@@ -28,11 +33,24 @@ final class ProjectPolicy
 
     public function update(User $user, Project $project): bool
     {
-        return $project->workspace->userHasAtLeast($user, UserRole::ADMIN);
+        if ($project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 
     public function delete(User $user, Project $project): bool
     {
         return $project->workspace->userHasAtLeast($user, UserRole::ADMIN);
+    }
+
+    public function manageMembers(User $user, Project $project): bool
+    {
+        if ($project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 }

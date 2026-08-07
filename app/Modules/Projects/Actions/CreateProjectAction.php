@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Projects\Actions;
 
+use App\Models\User;
 use App\Modules\Projects\Data\StoreProjectData;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use App\ProjectRole;
 
 final class CreateProjectAction
 {
-    public function handle(Workspace $workspace, StoreProjectData $data): Project
+    public function handle(Workspace $workspace, StoreProjectData $data, User $creator): Project
     {
-        return $workspace->projects()->create([
+        $project = $workspace->projects()->create([
             'name' => $data->name,
             'description' => $data->description,
         ]);
+
+        $project->members()->attach($creator->id, ['role' => ProjectRole::MANAGER->value]);
+
+        return $project;
     }
 }

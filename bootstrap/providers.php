@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
+use App\Modules\Meetings\Providers\MeetingsServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
 use App\Modules\Tasks\Providers\TasksServiceProvider;
 use App\Modules\Teams\Providers\TeamsServiceProvider;
@@ -14,5 +15,6 @@ return [
     TeamsServiceProvider::class,
     ProjectsServiceProvider::class,
     TasksServiceProvider::class,
+    MeetingsServiceProvider::class,
     AssistantServiceProvider::class,
 ];

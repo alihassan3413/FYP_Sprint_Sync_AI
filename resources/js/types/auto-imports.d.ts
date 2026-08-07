@@ -21,7 +21,10 @@ declare global {
   const effectScope: typeof import('vue').effectScope
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
+  const formatDuration: typeof import('../lib/meetings').formatDuration
   const formatLastActive: typeof import('../lib/members').formatLastActive
+  const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
+  const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
@@ -34,6 +37,7 @@ declare global {
   const initializeTheme: typeof import('../composables/useAppearance').initializeTheme
   const inject: typeof import('vue').inject
   const isOverdue: typeof import('../lib/tasks').isOverdue
+  const isPastMeeting: typeof import('../lib/meetings').isPastMeeting
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -68,6 +72,7 @@ declare global {
   const shallowRef: typeof import('vue').shallowRef
   const storeToRefs: typeof import('pinia').storeToRefs
   const taskStatusLabel: typeof import('../lib/tasks').taskStatusLabel
+  const toDateTimeLocalValue: typeof import('../lib/meetings').toDateTimeLocalValue
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
@@ -119,6 +124,9 @@ declare global {
   export type { AIContext } from '../lib/ai-suggestions'
   import('../lib/ai-suggestions')
   // @ts-ignore
+  export type { Meeting } from '../lib/meetings'
+  import('../lib/meetings')
+  // @ts-ignore
   export type { MemberStatus, MemberRole, Member } from '../lib/members'
   import('../lib/members')
   // @ts-ignore
@@ -149,7 +157,10 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
+    readonly formatDuration: UnwrapRef<typeof import('../lib/meetings')['formatDuration']>
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
+    readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
+    readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
@@ -162,6 +173,7 @@ declare module 'vue' {
     readonly initializeTheme: UnwrapRef<typeof import('../composables/useAppearance')['initializeTheme']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isOverdue: UnwrapRef<typeof import('../lib/tasks')['isOverdue']>
+    readonly isPastMeeting: UnwrapRef<typeof import('../lib/meetings')['isPastMeeting']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
@@ -196,6 +208,7 @@ declare module 'vue' {
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly taskStatusLabel: UnwrapRef<typeof import('../lib/tasks')['taskStatusLabel']>
+    readonly toDateTimeLocalValue: UnwrapRef<typeof import('../lib/meetings')['toDateTimeLocalValue']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
