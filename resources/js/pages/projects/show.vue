@@ -3,7 +3,7 @@ import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, 
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Meeting } from '@/lib/meetings';
-import type { Project } from '@/lib/projects';
+import type { Project, ProjectMember } from '@/lib/projects';
 import type { Task, TaskMember } from '@/lib/tasks';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 
@@ -12,9 +12,12 @@ const props = defineProps<{
     canManageProjects: boolean;
     canManageTasks: boolean;
     canManageMeetings: boolean;
+    canManageProjectMembers: boolean;
     tasks: Task[];
     meetings: Meeting[];
     members: TaskMember[];
+    projectMembers: ProjectMember[];
+    workspaceMembers: TaskMember[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -45,6 +48,10 @@ const deleteTaskTarget = ref<Task | null>(null);
 const isCreateMeetingModalOpen = ref(false);
 const meetingModalTarget = ref<Meeting | null>(null);
 const deleteMeetingTarget = ref<Meeting | null>(null);
+
+const isAddMemberModalOpen = ref(false);
+const roleModalTarget = ref<ProjectMember | null>(null);
+const removeMemberTarget = ref<ProjectMember | null>(null);
 
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -115,7 +122,10 @@ function onDeleted() {
 
                     <!-- Activity (placeholder) -->
                     <TabsContent value="activity">
-                        <AppEmptyState title="Activity is coming soon" description="A timeline of everything that happens in this project will show up here.">
+                        <AppEmptyState
+                            title="Activity is coming soon"
+                            description="A timeline of everything that happens in this project will show up here."
+                        >
                             <template #icon>
                                 <Activity class="size-5" />
                             </template>
@@ -134,23 +144,19 @@ function onDeleted() {
                                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div class="sm:col-span-2">
                                         <dt class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Description</dt>
-                                        <dd class="text-foreground mt-1 text-sm leading-relaxed">{{ project.description || 'No description yet.' }}</dd>
+                                        <dd class="text-foreground mt-1 text-sm leading-relaxed">
+                                            {{ project.description || 'No description yet.' }}
+                                        </dd>
                                     </div>
 
                                     <div>
-                                        <dt class="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] uppercase">
+                                        <dt
+                                            class="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] uppercase"
+                                        >
                                             <CalendarClock class="size-3" />
                                             Created
                                         </dt>
                                         <dd class="text-foreground mt-1 text-sm">{{ formatDate(project.created_at) }}</dd>
-                                    </div>
-
-                                    <div>
-                                        <dt class="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] uppercase">
-                                            <Users class="size-3" />
-                                            Members
-                                        </dt>
-                                        <dd class="text-foreground mt-1 text-sm">{{ members.length }} in this workspace</dd>
                                     </div>
                                 </dl>
 
@@ -160,12 +166,69 @@ function onDeleted() {
                                 </Button>
                             </div>
 
-                            <div v-if="canManageProjects" class="rounded-xl border border-red-200 bg-red-50/40 p-5 dark:border-red-900/40 dark:bg-red-950/10">
+                            <div class="bg-card rounded-xl border p-5 shadow-sm">
+                                <div class="mb-4 flex items-center justify-between">
+                                    <div class="flex items-center gap-2 text-sm font-medium">
+                                        <Users class="text-muted-foreground size-4" />
+                                        Project members
+                                    </div>
+
+                                    <Button
+                                        v-if="canManageProjectMembers"
+                                        size="sm"
+                                        variant="outline"
+                                        class="gap-1.5"
+                                        @click="isAddMemberModalOpen = true"
+                                    >
+                                        <Plus class="size-3.5" />
+                                        Add member
+                                    </Button>
+                                </div>
+
+                                <div v-if="projectMembers.length > 0" class="divide-y">
+                                    <div v-for="pm in projectMembers" :key="pm.id" class="flex items-center justify-between py-2.5">
+                                        <div class="flex items-center gap-3">
+                                            <AppAvatar :name="pm.name" size="sm" />
+                                            <div>
+                                                <p class="text-sm font-medium">{{ pm.name }}</p>
+                                                <p class="text-muted-foreground text-xs">{{ pm.email }}</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2">
+                                            <AppRoleBadge :role="pm.role" />
+                                            <ProjectMemberActionsMenu
+                                                v-if="canManageProjectMembers"
+                                                :member="pm"
+                                                @change-role="(m) => (roleModalTarget = m)"
+                                                @remove="(m) => (removeMemberTarget = m)"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <AppEmptyState
+                                    v-else
+                                    title="No members assigned"
+                                    description="Workspace owners and admins can always access this project. Assign members to give others access."
+                                >
+                                    <template #icon>
+                                        <Users class="size-5" />
+                                    </template>
+                                </AppEmptyState>
+                            </div>
+
+                            <div
+                                v-if="canManageProjects"
+                                class="rounded-xl border border-red-200 bg-red-50/40 p-5 dark:border-red-900/40 dark:bg-red-950/10"
+                            >
                                 <div class="mb-1 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
                                     <Trash2 class="size-4" />
                                     Danger zone
                                 </div>
-                                <p class="text-muted-foreground mb-4 text-sm">Deleting this project also deletes all of its tasks. This cannot be undone.</p>
+                                <p class="text-muted-foreground mb-4 text-sm">
+                                    Deleting this project also deletes all of its tasks. This cannot be undone.
+                                </p>
                                 <Button variant="destructive" size="sm" class="gap-1.5" @click="isDeleteDialogOpen = true">
                                     <Trash2 class="size-3.5" />
                                     Delete project
@@ -211,5 +274,27 @@ function onDeleted() {
         :open="deleteMeetingTarget !== null"
         :meeting="deleteMeetingTarget"
         @update:open="(value) => !value && (deleteMeetingTarget = null)"
+    />
+
+    <AddProjectMemberModal
+        :open="isAddMemberModalOpen"
+        :project-id="project.id"
+        :workspace-members="workspaceMembers"
+        :project-members="projectMembers"
+        @update:open="(value) => (isAddMemberModalOpen = value)"
+    />
+
+    <ChangeProjectMemberRoleModal
+        :open="roleModalTarget !== null"
+        :project-id="project.id"
+        :member="roleModalTarget"
+        @update:open="(value) => !value && (roleModalTarget = null)"
+    />
+
+    <RemoveProjectMemberDialog
+        :open="removeMemberTarget !== null"
+        :project-id="project.id"
+        :member="removeMemberTarget"
+        @update:open="(value) => !value && (removeMemberTarget = null)"
     />
 </template>

@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   KeyRound,
   User,
+  UserCog,
   Eye,
   CreditCard,
   type LucideIcon,
@@ -41,6 +42,11 @@ const config = computed<RoleConfig>(() => {
       label: 'Member',
       variant: 'neutral',
       icon: User,
+    },
+    manager: {
+      label: 'Manager',
+      variant: 'teal',
+      icon: UserCog,
     },
     guest: {
       label: 'Guest',

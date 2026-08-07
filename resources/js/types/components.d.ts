@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActivityTimeLine: typeof import('./../components/dashboard/ActivityTimeLine.vue')['default']
+    AddProjectMemberModal: typeof import('./../components/projects/AddProjectMemberModal.vue')['default']
     AIAssistant: typeof import('./../components/ai/AIAssistant.vue')['default']
     AppAiInsight: typeof import('./../components/ui/AppAiInsight.vue')['default']
     AppAvatar: typeof import('./../components/ui/AppAvatar.vue')['default']
@@ -69,6 +70,7 @@ declare module 'vue' {
     CardHeader: typeof import('./../components/ui/card/CardHeader.vue')['default']
     CardTitle: typeof import('./../components/ui/card/CardTitle.vue')['default']
     ChangeMemberRoleModal: typeof import('./../components/team/ChangeMemberRoleModal.vue')['default']
+    ChangeProjectMemberRoleModal: typeof import('./../components/projects/ChangeProjectMemberRoleModal.vue')['default']
     Checkbox: typeof import('./../components/ui/checkbox/Checkbox.vue')['default']
     Collapsible: typeof import('./../components/ui/collapsible/Collapsible.vue')['default']
     CollapsibleContent: typeof import('./../components/ui/collapsible/CollapsibleContent.vue')['default']
@@ -138,7 +140,9 @@ declare module 'vue' {
     OnlineNowCard: typeof import('./../components/dashboard/OnlineNowCard.vue')['default']
     PlaceholderPattern: typeof import('./../components/PlaceholderPattern.vue')['default']
     ProjectActionsMenu: typeof import('./../components/projects/ProjectActionsMenu.vue')['default']
+    ProjectMemberActionsMenu: typeof import('./../components/projects/ProjectMemberActionsMenu.vue')['default']
     RemoveMemberDialog: typeof import('./../components/team/RemoveMemberDialog.vue')['default']
+    RemoveProjectMemberDialog: typeof import('./../components/projects/RemoveProjectMemberDialog.vue')['default']
     RenameWorkspaceModal: typeof import('./../components/workspace/popups/RenameWorkspaceModal.vue')['default']
     SeatUsageCard: typeof import('./../components/team/SeatUsageCard.vue')['default']
     Separator: typeof import('./../components/ui/separator/Separator.vue')['default']
@@ -189,6 +193,7 @@ declare module 'vue' {
     TooltipTrigger: typeof import('./../components/ui/tooltip/TooltipTrigger.vue')['default']
     UserInfo: typeof import('./../components/UserInfo.vue')['default']
     UserMenuContent: typeof import('./../components/UserMenuContent.vue')['default']
+    WorkspaceMemberPicker: typeof import('./../components/projects/WorkspaceMemberPicker.vue')['default']
     WorkspaceSwitcher: typeof import('./../components/workspace/WorkspaceSwitcher.vue')['default']
   }
 }

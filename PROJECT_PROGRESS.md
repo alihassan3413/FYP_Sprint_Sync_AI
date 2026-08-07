@@ -21,6 +21,13 @@ meeting's full details/join flow and edit-notice (FR06–FR09), transcription
 in-app/email notifications (FR21–FR23), notification preferences (FR25),
 profile pictures (FR26), and audit log (FR28).
 
+Projects and Tasks (FR32, FR14–FR17) now also have **project-level
+membership and access control** layered underneath them — see work-log
+entry #8. This is an authorization hardening of those existing FRs, not a
+newly tracked FR number on its own (no line item in the FYP1 report maps to
+it directly, as far as this session could tell without re-reading the
+source `.docx`), so the table above is unchanged.
+
 ## Completed work log
 
 ### 1. FR01–FR35 implementation audit
@@ -143,6 +150,109 @@ unfinished — it currently breaks two pre-existing Task tests (see Test
 results below) — and is unrelated to FR05, so it was left untouched rather
 than fixed or reverted here.
 
+**Update:** that work is entry #8 below, completed in a later session. Both
+`TaskTest` failures flagged above are fixed as part of it — see Test
+results.
+
+### 8. Project-level membership & project manager assignment
+
+Projects previously had exactly one authorization tier: workspace
+Owner/Admin manage everything, any workspace member (even a total stranger
+to that specific project) can view any project and its tasks. That's now
+replaced with a second, project-scoped tier sitting underneath the existing
+workspace roles.
+
+**Data model** — new `project_users` pivot (`project_id`, `user_id`, `role`
+string, unique on the pair), mirroring `workspace_users`'s exact shape. New
+`App\ProjectRole` enum (`manager` / `member`, with `rank()`/`atLeast()`
+matching `App\UserRole`'s pattern), placed at the top level rather than
+inside `app/Modules/Projects` — same precedent as `TaskStatus`/`UserRole`.
+`Project::members()` (`BelongsToMany` through `project_users`),
+`managers()`, `hasMember()`, `roleFor()`, `userHasAtLeast()` all added,
+directly mirroring the equivalent `Workspace` methods.
+
+**Access-control rule** (the actual requirement): workspace Owner/Admin
+always retain full access to every project regardless of `project_users`
+rows. Below that rank, a user must appear in `project_users` to see or act
+on a project at all — a project **Manager** can update the project's
+details, manage its `project_users` roster, and create/update/delete its
+tasks; a plain project **Member** can only view the project/its tasks and
+update the status of tasks assigned to them (unchanged from the existing
+assignee rule). A workspace member with no `project_users` row for that
+project is treated the same as a total outsider to it.
+
+- `ProjectPolicy::view/update/manageMembers` and `TaskPolicy::viewAny/view/
+  create/update/updateStatus/delete` all now check
+  `$workspace->userHasAtLeast(ADMIN) || $project->userHasAtLeast(MANAGER)`
+  (view-only checks use `hasMember()` instead of the Manager-rank check).
+  `delete` on a project stays Admin-only — "manage their assigned
+  projects" was read as day-to-day operation, not the power to destroy the
+  project entity, matching the existing least-privilege posture on
+  `WorkspacePolicy::delete`.
+- **Found and fixed a real authorization gap while wiring this up**:
+  `ProjectController::show()` never actually called `$user->can('view',
+  $project)` anywhere — the route was only gated by `EnsureWorkspaceMember`
+  (workspace membership), so `ProjectPolicy::view()` had been dead code
+  since FR32 shipped. Any workspace member could already open any
+  project's page and task board; the new membership rule would have been
+  silently unenforceable without adding the missing `abort_unless($user
+  ->can('view', $project), 403)` call. Worth double-checking other
+  controllers for the same "policy method exists but nothing calls it"
+  gap.
+- **Task assignment is now project-scoped, not workspace-scoped.**
+  `StoreTaskRequest`/`UpdateTaskRequest` previously allowed assigning a
+  task to *any* workspace member; that's a direct hole in "unassigned
+  members can't access project tasks" (an assignee who could see/act on
+  their own task without being a project member). Both requests now
+  require the assignee to be a project member OR a workspace Admin+.
+  `ProjectController::show()`'s `members` prop (the assignee-picker data
+  source for `CreateTaskModal`/`EditTaskModal`) was narrowed to match —
+  project members ∪ workspace admins — so the picker never offers a
+  choice that would fail validation.
+- **New `AddProjectMemberAction`/`UpdateProjectMemberRoleAction`/
+  `RemoveProjectMemberAction`** + `ProjectMemberController` (`store`/
+  `update`/`destroy`) + `StoreProjectMemberRequest`/
+  `UpdateProjectMemberRequest`, routed at
+  `{workspace}/projects/{project}/members[/{member}]`
+  (`workspace.projects.members.*`). Both the assign-and-change-role
+  FormRequests authorize via a new `ProjectPolicy::manageMembers` ability
+  (Admin+ or that project's Manager), matching the
+  `UpdateTeamMemberRequest` pattern already used for workspace roles.
+- **Route param is `{member}`, not `{user}`.** Laravel's scoped
+  route-model-binding derives the parent relationship name from
+  `Str::plural(Str::camel($paramName))` — `{user}` would look for
+  `Project::users()`, which doesn't exist (the required relation is named
+  `members()`). Naming the param `{member}` makes Laravel resolve it via
+  `Project::members()` automatically, giving the same "404 if not
+  actually a member" behavior as `workspace.members.{user}` gets from
+  `Workspace::users()` — confirmed by reading
+  `Illuminate\Database\Eloquent\Model::childRouteBindingRelationshipName()`
+  rather than guessing.
+- **`ProjectController::index()` now filters the list per viewer.**
+  Owner/Admin still see every project; everyone else sees only projects
+  they have a `project_users` row for. Matches "members can only access
+  projects they are assigned to" — a member who can't open a project
+  shouldn't see it listed as a dead link either.
+- **`CreateProjectAction` auto-attaches the creator as that project's
+  first Manager.** Not strictly required for access (the creator is
+  already an Admin), but avoids shipping a project with zero visible
+  managers in the new members UI, and gives a sensible default.
+- **Frontend**: a "Project members" panel replaces the old static
+  "Members: N in this workspace" line inside the existing Settings tab
+  (per the task's instruction — this lives in Project Settings, not a new
+  tab). Lists each member with `AppAvatar` + `AppRoleBadge` (added a
+  `manager` entry to the shared badge's role map — teal, `UserCog` icon —
+  it previously had no case for this role and would've fallen back to a
+  plain gray badge), a per-row actions menu (change role / remove) gated
+  on the new `canManageProjectMembers` prop, and an "Add member" button
+  opening a picker over workspace members not already on the project.
+  Three new modals (`AddProjectMemberModal`, `ChangeProjectMemberRoleModal`,
+  `RemoveProjectMemberDialog`) directly mirror the Team page's existing
+  `ChangeMemberRoleModal`/`RemoveMemberDialog` pair for UI consistency.
+- **Explicitly not built** (per this task's own scope): custom/configurable
+  project roles — only the fixed `manager`/`member` pair exists, same
+  spirit as `UserRole` before `WorkspaceRole` was added on top of it later.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -176,6 +286,23 @@ than fixed or reverted here.
   trusting global "current workspace" state instead of the page's own
   scoped params. Every new page/component built since has passed explicit
   `{ paramName: id }` objects rather than relying on that fallback.
+- **Project membership is a second, independent authorization tier below
+  workspace roles, not a replacement for them.** Every policy check is
+  `workspace admin-rank OR project role-rank`, never project role alone —
+  so an Owner/Admin's access never regresses just because nobody added
+  them to a project's `project_users` table. This mirrors how
+  `WorkspaceRole` (custom roles) layers under the fixed `UserRole` enum
+  rather than replacing it.
+- **`{member}` route params over `{user}` for nested project-membership
+  routes** — see entry #8. General lesson for this codebase: when adding a
+  child resource under a model whose collection relationship isn't named
+  after the English plural of the route segment, name the route param
+  after the actual relationship method, not the underlying model class.
+- **A policy method that exists but is never called by a controller is
+  equivalent to no policy at all.** `ProjectPolicy::view()` had been
+  unreachable dead code since Projects shipped (entry #8). Worth a
+  deliberate sweep of the other modules for the same gap rather than
+  assuming a policy file's presence means it's enforced.
 
 ## Test results
 
@@ -195,36 +322,48 @@ npm run build
 ✓ built in 2.29s (3143 modules, no errors)
 ```
 
-Running the **full** suite at the end of this task shows 2 pre-existing
-failures in `tests/Feature/Tasks/TaskTest.php`
-(`a_task_can_be_created_with_an_assignee`, `an_owner_can_update_a_task`):
+At the time FR05 was finished, running the **full** suite showed 2
+pre-existing failures in `tests/Feature/Tasks/TaskTest.php`
+(`a_task_can_be_created_with_an_assignee`, `an_owner_can_update_a_task`),
+caused by the concurrent project-membership work landing mid-flight (see
+entry #7's note and entry #8). **Both are now fixed** as part of entry #8,
+which also updated the two `ProjectTest` cases that assumed any workspace
+member could list/view any project (now correctly scoped to project
+membership) and added dedicated coverage for the new membership rules.
+
+Full suite after entry #8:
 
 ```
 php artisan test --compact
-Tests:    2 failed, 144 passed (448 assertions)
-```
+Tests:    176 passed (559 assertions)
 
-These are **not caused by FR05**. `git status` shows `TaskPolicy.php`,
-`StoreTaskRequest.php`, `UpdateTaskRequest.php`, `ProjectPolicy.php`,
-`CreateProjectAction.php`, and `Project.php` were modified outside this
-session while FR05 was being built (a new `App\ProjectRole` enum and
-`project_users` pivot table, adding project-level membership — see the
-note at the end of work-log entry #7). That change is mid-flight and
-currently breaks the two Task tests above; it was left untouched since
-fixing or reverting someone else's in-progress work is out of scope here.
-Re-run `php artisan test --compact tests/Feature/Tasks/TaskTest.php` once
-that work is finished to confirm.
+vendor/bin/pint --dirty --format agent
+→ passed
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.25s (no errors)
+```
 
 Covers: auth, email verification, password reset/update, profile update,
 dashboard, workspace tenant isolation, workspace CRUD, workspace roles,
 workspace invitations, team member management, AI assistant endpoints,
-module boundaries, Projects (18 tests), Tasks (20 tests, 2 currently
-failing for the reason above), Meetings (18 tests, all passing).
+module boundaries, Projects (25 tests, updated for project-scoped
+visibility), Tasks (26 tests, updated for project-scoped assignment),
+project membership (19 new tests in `ProjectMemberTest.php` — assign/
+change-role/remove as admin/manager/member/outsider, duplicate-assignment
+rejection, cross-project and cross-workspace isolation, non-member 404s),
+Meetings (18 tests — 1 updated: the "project show page includes meetings"
+test assumed an unassigned member could view the project, which is no
+longer true, so it now attaches that member to the project first).
 
 No JS test runner exists in this project (`package.json` only has
-build/lint/format scripts) — meeting scheduling/edit/delete were verified
-by ESLint + a successful production build (catches type/template errors)
-plus manual code review, not by exercising them in a browser.
+build/lint/format scripts) — the new members UI (avatar list, role
+badges, add/change-role/remove modals) was verified by ESLint + a
+successful production build (catches type/template errors) plus manual
+code review, not by exercising it in a browser.
 
 ## Known gaps worth flagging
 
@@ -256,17 +395,53 @@ plus manual code review, not by exercising them in a browser.
 - No Zoom/Meet integration, recording, transcription, or AI summary
   (FR10–FR13) — `meeting_link` is a free-text URL the creator pastes in,
   exactly as scoped ("Do not implement Zoom integration... yet").
-- **2 pre-existing `TaskTest` failures**, caused by unrelated concurrent
-  changes to Task/Project authorization discovered mid-task — see Test
-  results above. Not introduced by FR05; needs follow-up once that other
-  work lands.
+- ~~2 pre-existing `TaskTest` failures~~ — fixed in entry #8; the full
+  suite is green again.
+- **No custom project roles** — only the fixed `manager`/`member` pair,
+  by explicit instruction for this task. If workspaces later want the same
+  "define your own role + permissions" flexibility `WorkspaceRole` gives
+  at the workspace level, that's the natural follow-up (a
+  `project_roles`-style table), not a redesign of what shipped here.
+- **Adding project members is one-at-a-time**, no multi-select/bulk-assign
+  UI. Fine for the current member-count scale; would want a checklist-style
+  picker if workspaces grow large.
+- **The projects index page's empty state doesn't distinguish "this
+  workspace has no projects" from "you have no projects assigned to
+  you."** Both render the same generic "No projects yet" copy
+  (`resources/js/pages/projects/index.vue`) — a member who's simply
+  unassigned from everything sees the same message as a genuinely empty
+  workspace. Minor UX polish, not a security issue (the underlying access
+  control is correct either way).
+- **`WorkspacePermission`'s `ProjectsView`/`ProjectsCreate`/
+  `ProjectsDelete` cases are still unused** by `ProjectPolicy` (pre-existing,
+  unrelated to entry #8) — custom `WorkspaceRole`s can't currently grant
+  project access more granularly than the fixed `UserRole` rank check.
+  Noted here because it's adjacent to project-level access control and
+  the next person touching this area will likely wonder why those enum
+  cases exist but do nothing.
+- **`MeetingPolicy` was intentionally left untouched by entry #8** — it
+  still lets any workspace member view/list meetings for any project
+  (`hasMember()`), which is now *more permissive* than `ProjectPolicy`'s
+  new rule for the project the meeting belongs to. The task that requested
+  project membership scoped it to "ProjectPolicy and TaskPolicy" only, so
+  this was left as-is rather than assumed in scope. Worth a deliberate
+  decision (not an oversight) on whether Meetings should respect project
+  membership too, since right now an unassigned member can't open a
+  project's Board tab but could still see that project's meetings if a
+  future UI exposed meetings outside the project page.
 
 ## Next recommended task
 
-First, **resolve the 2 `TaskTest` failures** noted above once the
-concurrent `ProjectRole`/`project_users` work (observed mid-task, not part
-of this session) lands or is reconciled — the suite should return to 100%
-green before building further on top of Tasks/Projects authorization.
+The suite is 100% green again (176 passed) — the blocker noted in the
+previous version of this section is resolved, so it's safe to build
+further on top of Tasks/Projects authorization now.
+
+**Housekeeping first**: everything in the working tree as of this entry —
+Meetings (FR05) and project membership (entry #8) — is still uncommitted.
+Both are independently green (own suites and the full suite pass), but
+review and commit them (as separate commits, given they're genuinely
+unrelated features that happened to land in the same session) before
+starting anything else, so a `git status` accident doesn't lose either.
 
 Then, **FR06–FR09 — Meeting details, join, edit, cancel**, continuing the
 meetings domain FR05 just started:

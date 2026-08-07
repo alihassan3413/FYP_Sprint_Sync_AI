@@ -9,6 +9,7 @@ declare global {
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
+  const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const TASK_STATUSES: typeof import('../lib/tasks').TASK_STATUSES
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
@@ -130,7 +131,7 @@ declare global {
   export type { MemberStatus, MemberRole, Member } from '../lib/members'
   import('../lib/members')
   // @ts-ignore
-  export type { Project } from '../lib/projects'
+  export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
   // @ts-ignore
   export type { TaskStatusValue, Task, TaskMember } from '../lib/tasks'
@@ -145,6 +146,7 @@ declare module 'vue' {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
+    readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly TASK_STATUSES: UnwrapRef<typeof import('../lib/tasks')['TASK_STATUSES']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>

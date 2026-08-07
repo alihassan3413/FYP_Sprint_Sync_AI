@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use App\ProjectRole;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -259,6 +260,7 @@ final class MeetingTest extends TestCase
     {
         Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
         Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
 
         $this->actingAs($this->member)
             ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
