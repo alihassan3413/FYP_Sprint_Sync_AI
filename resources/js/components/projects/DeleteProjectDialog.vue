@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import type { Member } from '@/lib/members';
 import { Loader2 } from 'lucide-vue-next';
+
+import type { Project } from '@/lib/projects';
 
 const props = defineProps<{
     open: boolean;
-    member: Member | null;
+    project: Project | null;
 }>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
+    deleted: [];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -16,13 +18,16 @@ const { workspaceRoute } = useCurrentWorkspace();
 const processing = ref(false);
 
 function confirm() {
-    if (!props.member || processing.value) return;
+    if (!props.project || processing.value) return;
 
     processing.value = true;
 
-    router.delete(workspaceRoute('workspace.members.destroy', { user: props.member.id }), {
+    router.delete(workspaceRoute('workspace.projects.destroy', { project: props.project.id }), {
         preserveScroll: true,
-        onSuccess: () => emit('update:open', false),
+        onSuccess: () => {
+            emit('deleted');
+            emit('update:open', false);
+        },
         onFinish: () => {
             processing.value = false;
         },
@@ -38,8 +43,8 @@ function handleClose(value: boolean) {
 <template>
     <AppModal
         :open="open"
-        title="Remove member"
-        :description="member ? `${member.name} will immediately lose access to this workspace.` : undefined"
+        title="Delete project"
+        :description="project ? `“${project.name}” will be permanently deleted. This cannot be undone.` : undefined"
         size="sm"
         @update:open="handleClose"
     >
@@ -47,7 +52,7 @@ function handleClose(value: boolean) {
             <Button type="button" variant="outline" :disabled="processing" @click="handleClose(false)"> Cancel </Button>
             <Button type="button" variant="destructive" :disabled="processing" @click="confirm">
                 <Loader2 v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ processing ? 'Removing…' : 'Remove member' }}
+                {{ processing ? 'Deleting…' : 'Delete project' }}
             </Button>
         </template>
     </AppModal>

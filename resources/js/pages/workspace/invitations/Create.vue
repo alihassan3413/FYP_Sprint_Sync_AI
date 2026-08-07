@@ -5,7 +5,8 @@ import { CreditCard, Key, LoaderCircle, Mail, Send, User } from 'lucide-vue-next
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 
-defineProps<{
+const props = defineProps<{
+    workspace: { name: string; slug: string };
     seats?: { used: number; total: number };
 }>();
 
@@ -17,16 +18,14 @@ const form = useForm({
 });
 
 const submit = () => {
-    console.log(form);
-
-    form.post(workspaceRoute('workspace.invitations.store'), {
+    form.post(workspaceRoute('workspace.invitations.store', { workspace: props.workspace.slug }), {
         onSuccess: () => form.reset(),
     });
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Team', href: workspaceRoute('workspace.teams.index') },
-    { title: 'Invite member', href: workspaceRoute('workspace.invitations.create') },
+    { title: 'Team', href: workspaceRoute('workspace.teams.index', { workspace: props.workspace.slug }) },
+    { title: 'Invite member', href: workspaceRoute('workspace.invitations.create', { workspace: props.workspace.slug }) },
 ];
 
 const roleOptions = [
@@ -92,7 +91,7 @@ const roleOptions = [
 
                     <div class="flex items-center justify-end gap-2">
                         <Button as-child variant="ghost" size="sm" type="button" tabindex="3">
-                            <Link :href="workspaceRoute('workspace.teams.index')"> Cancel </Link>
+                            <Link :href="workspaceRoute('workspace.teams.index', { workspace: props.workspace.slug })"> Cancel </Link>
                         </Button>
 
                         <Button type="submit" size="sm" tabindex="2" :disabled="form.processing" class="gap-1.5">

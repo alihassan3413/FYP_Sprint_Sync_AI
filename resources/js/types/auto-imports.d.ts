@@ -117,6 +117,9 @@ declare global {
   // @ts-ignore
   export type { MemberStatus, MemberRole, Member } from '../lib/members'
   import('../lib/members')
+  // @ts-ignore
+  export type { Project } from '../lib/projects'
+  import('../lib/projects')
 }
 
 // for vue template auto import

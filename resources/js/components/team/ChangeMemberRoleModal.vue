@@ -40,7 +40,7 @@ function submit() {
     error.value = null;
 
     router.patch(
-        workspaceRoute('workspace.members.update', props.member.id),
+        workspaceRoute('workspace.members.update', { user: props.member.id }),
         { role: selectedRole.value },
         {
             preserveScroll: true,

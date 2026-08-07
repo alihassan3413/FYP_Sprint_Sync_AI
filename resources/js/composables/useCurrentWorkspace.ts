@@ -10,14 +10,14 @@ export function useCurrentWorkspace() {
     });
 
     function workspaceRoute(name: string, params: Record<string, unknown> = {}): string {
-        if (!currentWorkspace.value) {
+        const workspace = (params.workspace as string | undefined) ?? currentWorkspace.value?.slug;
+
+        if (!workspace) {
+            console.error(`workspaceRoute(): no workspace context available for route "${name}".`);
             return route('login');
         }
 
-        return route(name, {
-            workspace: currentWorkspace.value.slug,
-            ...params,
-        });
+        return route(name, { ...params, workspace });
     }
 
     return {

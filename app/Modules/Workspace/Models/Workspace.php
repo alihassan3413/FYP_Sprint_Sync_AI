@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Database\Factories\WorkspaceFactory;
 use App\UserRole;
 use Illuminate\Database\Eloquent\Builder;
@@ -75,6 +76,11 @@ final class Workspace extends Model
         return $this->invitations()
             ->whereNull('accepted_at')
             ->where('expires_at', '>', now());
+    }
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
     }
 
     public function hasMember(User $user): bool

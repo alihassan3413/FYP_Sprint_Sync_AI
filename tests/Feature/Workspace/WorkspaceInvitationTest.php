@@ -50,6 +50,27 @@ final class WorkspaceInvitationTest extends TestCase
         Mail::assertQueued(MemberInvitationMail::class);
     }
 
+    public function test_an_admin_can_invite_into_a_workspace_that_is_not_their_current_workspace(): void
+    {
+        $otherWorkspace = Workspace::factory()->ownedBy($this->owner)->create();
+        $this->owner->forceFill(['current_workspace_id' => $otherWorkspace->id])->save();
+
+        $this->actingAs($this->owner->refresh())
+            ->post(route('workspace.invitations.store', $this->workspace), [
+                'email' => 'newbie@example.com',
+                'role' => UserRole::MEMBER->value,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('workspace_invitations', [
+            'workspace_id' => $this->workspace->id,
+            'email' => 'newbie@example.com',
+        ]);
+
+        $this->assertSame(0, $otherWorkspace->invitations()->count());
+    }
+
     public function test_an_existing_member_cannot_be_invited_again(): void
     {
         $member = User::factory()->create(['email' => 'member@example.com']);
