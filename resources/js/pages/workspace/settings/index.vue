@@ -4,7 +4,19 @@ import { Link } from '@inertiajs/vue3';
 
 import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ShieldCheck, Users } from 'lucide-vue-next';
 
+const props = defineProps<{
+    workspaceProfile: {
+        id: number;
+        name: string;
+        slug: string;
+        created_at: string;
+    };
+}>();
+
 const { workspaceRoute } = useCurrentWorkspace();
+
+const isRenameModalOpen = ref(false);
+const isDeleteDialogOpen = ref(false);
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -28,7 +40,8 @@ interface SettingsCard {
     badgeLabel: string;
     action?: {
         label: string;
-        href: string;
+        href?: string;
+        onClick?: () => void;
     };
     highlighted?: boolean;
     danger?: boolean;
@@ -52,9 +65,13 @@ const settings: SettingsCard[] = [
         key: 'profile',
         icon: Building2,
         title: 'Workspace Profile',
-        description: 'Update your workspace name, logo, and general information visible to all members.',
-        badge: 'soon',
-        badgeLabel: 'Soon',
+        description: 'Update your workspace name and URL identifier.',
+        badge: 'available',
+        badgeLabel: 'Available',
+        action: {
+            label: 'Rename workspace',
+            onClick: () => (isRenameModalOpen.value = true),
+        },
     },
     {
         key: 'members',
@@ -101,9 +118,13 @@ const settings: SettingsCard[] = [
         icon: AlertTriangle,
         title: 'Danger Zone',
         description: 'Permanently delete this workspace and all associated data. This action cannot be undone.',
-        badge: 'later',
-        badgeLabel: 'Coming later',
+        badge: 'available',
+        badgeLabel: 'Available',
         danger: true,
+        action: {
+            label: 'Delete workspace',
+            onClick: () => (isDeleteDialogOpen.value = true),
+        },
     },
 ];
 
@@ -174,6 +195,7 @@ const badgeClasses: Record<BadgeVariant, string> = {
                             <!-- Action -->
                             <div v-if="card.action" class="mt-auto">
                                 <Link
+                                    v-if="card.action.href"
                                     :href="card.action.href"
                                     :class="[
                                         'inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-100',
@@ -183,6 +205,18 @@ const badgeClasses: Record<BadgeVariant, string> = {
                                     {{ card.action.label }}
                                     <ArrowRight class="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" :stroke-width="2" />
                                 </Link>
+                                <button
+                                    v-else
+                                    type="button"
+                                    :class="[
+                                        'inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-100',
+                                        card.danger ? 'text-red-600 hover:text-red-700' : 'text-zinc-600 hover:text-zinc-900',
+                                    ]"
+                                    @click="card.action.onClick?.()"
+                                >
+                                    {{ card.action.label }}
+                                    <ArrowRight class="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" :stroke-width="2" />
+                                </button>
                             </div>
 
                             <!-- Highlighted accent bar -->
@@ -230,4 +264,8 @@ const badgeClasses: Record<BadgeVariant, string> = {
             </section>
         </div>
     </AppLayout>
+
+    <RenameWorkspaceModal v-model:open="isRenameModalOpen" :workspace="props.workspaceProfile" />
+
+    <DeleteWorkspaceDialog v-model:open="isDeleteDialogOpen" :workspace="props.workspaceProfile" />
 </template>

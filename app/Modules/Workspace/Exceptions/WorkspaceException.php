@@ -89,4 +89,13 @@ class WorkspaceException extends AppException
             message: 'No active workspace. Please select a workspace to continue.',
         );
     }
+
+    public static function cannotDeleteOnlyWorkspace(): self
+    {
+        return new self(
+            code: ErrorCode::WORKSPACE_CANNOT_DELETE_ONLY,
+            status: 422,
+            message: 'You cannot delete your only workspace. Create another workspace first.',
+        );
+    }
 }

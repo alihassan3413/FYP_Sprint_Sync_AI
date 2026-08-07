@@ -9,6 +9,7 @@ const props = defineProps<{
     //   seats?: { used: number; total: number };
     counts?: { active: number; pending: number; total: number };
     loading?: boolean;
+    canManageMembers?: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -66,6 +67,9 @@ const seatUsage = computed(() => {
 
 const currentUserId = computed(() => allMembers.value.find((m) => m.is_self)?.id ?? null);
 
+const roleModalMember = ref<Member | null>(null);
+const removeTarget = ref<Member | null>(null);
+
 useDockContext('teams');
 
 const columns: Column<Member>[] = [
@@ -92,15 +96,14 @@ function onCopyInviteLink(m: Member) {
     console.log('copy link', m);
 }
 function onChangeRole(m: Member) {
-    console.log('change role', m);
+    roleModalMember.value = m;
 }
 
 function onTransferTasks(m: Member) {
     console.log('transfer tasks', m);
 }
 function onRemove(m: Member) {
-    // router.delete(workspaceRoute('workspace.members.destroy', m.id));
-    console.log('remove', m);
+    removeTarget.value = m;
 }
 function onRevokeInvite(m: Member) {
     // router.delete(workspaceRoute('workspace.invitations.destroy', m.id));
@@ -209,6 +212,7 @@ function handleClick() {
 
                     <template #cell-actions="{ row }">
                         <MemberActionsMenu
+                            v-if="canManageMembers"
                             :member="row"
                             @resend-invite="onResendInvite"
                             @copy-invite-link="onCopyInviteLink"
@@ -265,4 +269,8 @@ function handleClick() {
             </div>
         </div>
     </AppLayout>
+
+    <ChangeMemberRoleModal :open="roleModalMember !== null" :member="roleModalMember" @update:open="(value) => !value && (roleModalMember = null)" />
+
+    <RemoveMemberDialog :open="removeTarget !== null" :member="removeTarget" @update:open="(value) => !value && (removeTarget = null)" />
 </template>
