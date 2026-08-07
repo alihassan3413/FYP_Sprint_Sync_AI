@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Projects\Http\Controllers;
 
+use App\Models\User;
 use App\Modules\Projects\Actions\CreateProjectAction;
 use App\Modules\Projects\Actions\DeleteProjectAction;
 use App\Modules\Projects\Actions\UpdateProjectAction;
@@ -11,6 +12,8 @@ use App\Modules\Projects\Data\ProjectData;
 use App\Modules\Projects\Http\Requests\StoreProjectRequest;
 use App\Modules\Projects\Http\Requests\UpdateProjectRequest;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Tasks\Data\TaskData;
+use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,9 +36,28 @@ final class ProjectController
 
     public function show(Request $request, Workspace $workspace, Project $project): Response
     {
+        $user = $request->user();
+
         return Inertia::render('projects/show', [
             'project' => ProjectData::fromModel($project),
-            'canManageProjects' => $request->user()->can('update', $project),
+            'canManageProjects' => $user->can('update', $project),
+            'canManageTasks' => $user->can('create', [Task::class, $project]),
+            'tasks' => $project->tasks()
+                ->with('assignee:id,name,email')
+                ->latest()
+                ->get()
+                ->map(TaskData::fromModel(...))
+                ->values(),
+            'members' => $workspace->users()
+                ->select('users.id', 'users.name', 'users.email')
+                ->orderBy('users.name')
+                ->get()
+                ->map(fn (User $member) => [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                    'email' => $member->email,
+                ])
+                ->values(),
         ]);
     }
 

@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Tasks\Providers;
+
+use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Policies\TaskPolicy;
+use App\Support\Modules\ModuleServiceProvider;
+
+final class TasksServiceProvider extends ModuleServiceProvider
+{
+    protected string $module = 'Tasks';
+
+    protected array $policies = [
+        Task::class => TaskPolicy::class,
+    ];
+}

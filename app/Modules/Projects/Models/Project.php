@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Projects\Models;
 
 use App\Modules\Projects\Database\Factories\ProjectFactory;
+use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -30,6 +32,11 @@ final class Project extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
     }
 
     protected static function newFactory(): ProjectFactory

@@ -85,11 +85,10 @@ function openProject(project: Project) {
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <div @click.stop>
+                        <div v-if="canManageProjects" @click.stop>
                             <ProjectActionsMenu
                                 :project="row"
                                 :can-manage="canManageProjects"
-                                @view="openProject"
                                 @edit="(project) => (editTarget = project)"
                                 @delete="(project) => (deleteTarget = project)"
                             />

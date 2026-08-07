@@ -9,6 +9,7 @@ declare global {
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
+  const TASK_STATUSES: typeof import('../lib/tasks').TASK_STATUSES
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -19,6 +20,7 @@ declare global {
   const defineStore: typeof import('pinia').defineStore
   const effectScope: typeof import('vue').effectScope
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
+  const formatDueDate: typeof import('../lib/tasks').formatDueDate
   const formatLastActive: typeof import('../lib/members').formatLastActive
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -31,6 +33,7 @@ declare global {
   const handleError: typeof import('../lib/errors/handleError').handleError
   const initializeTheme: typeof import('../composables/useAppearance').initializeTheme
   const inject: typeof import('vue').inject
+  const isOverdue: typeof import('../lib/tasks').isOverdue
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -64,6 +67,7 @@ declare global {
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
   const storeToRefs: typeof import('pinia').storeToRefs
+  const taskStatusLabel: typeof import('../lib/tasks').taskStatusLabel
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
@@ -120,6 +124,9 @@ declare global {
   // @ts-ignore
   export type { Project } from '../lib/projects'
   import('../lib/projects')
+  // @ts-ignore
+  export type { TaskStatusValue, Task, TaskMember } from '../lib/tasks'
+  import('../lib/tasks')
 }
 
 // for vue template auto import
@@ -130,6 +137,7 @@ declare module 'vue' {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
+    readonly TASK_STATUSES: UnwrapRef<typeof import('../lib/tasks')['TASK_STATUSES']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -140,6 +148,7 @@ declare module 'vue' {
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
+    readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -152,6 +161,7 @@ declare module 'vue' {
     readonly handleError: UnwrapRef<typeof import('../lib/errors/handleError')['handleError']>
     readonly initializeTheme: UnwrapRef<typeof import('../composables/useAppearance')['initializeTheme']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
+    readonly isOverdue: UnwrapRef<typeof import('../lib/tasks')['isOverdue']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
@@ -185,6 +195,7 @@ declare module 'vue' {
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
+    readonly taskStatusLabel: UnwrapRef<typeof import('../lib/tasks')['taskStatusLabel']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
