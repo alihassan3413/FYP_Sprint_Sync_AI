@@ -1,21 +1,49 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
+use App\Modules\Workspace\Database\Factories\WorkspaceInvitationFactory;
+use App\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
-class WorkspaceInvitation extends Model
+/**
+ * @property int $id
+ * @property string $email
+ * @property UserRole $role
+ * @property string $token
+ * @property int $workspace_id
+ * @property int $invited_by
+ * @property Carbon|null $accepted_at
+ * @property Carbon|null $expires_at
+ */
+final class WorkspaceInvitation extends Model
 {
+    /** @use HasFactory<WorkspaceInvitationFactory> */
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'email',
+        'role',
+        'token',
+        'workspace_id',
+        'invited_by',
+        'accepted_at',
+        'expires_at',
+    ];
+
+    protected $hidden = ['token'];
 
     protected function casts(): array
     {
         return [
+            'role' => UserRole::class,
             'accepted_at' => 'datetime',
             'expires_at' => 'datetime',
         ];
@@ -23,12 +51,17 @@ class WorkspaceInvitation extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at && $this->expires_at->isPast();
+        return $this->expires_at !== null && $this->expires_at->isPast();
     }
 
     public function isAccepted(): bool
     {
         return $this->accepted_at !== null;
+    }
+
+    public function isPending(): bool
+    {
+        return ! $this->isAccepted() && ! $this->isExpired();
     }
 
     public function workspace(): BelongsTo
@@ -39,5 +72,15 @@ class WorkspaceInvitation extends Model
     public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
+    }
+
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->whereNull('accepted_at')->where('expires_at', '>', now());
+    }
+
+    protected static function newFactory(): WorkspaceInvitationFactory
+    {
+        return WorkspaceInvitationFactory::new();
     }
 }

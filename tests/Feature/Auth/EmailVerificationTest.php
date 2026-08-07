@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -25,6 +26,8 @@ class EmailVerificationTest extends TestCase
     public function test_email_can_be_verified()
     {
         $user = User::factory()->unverified()->create();
+        $workspace = Workspace::factory()->ownedBy($user)->create();
+        $user->forceFill(['current_workspace_id' => $workspace->id])->save();
 
         Event::fake();
 
@@ -38,7 +41,7 @@ class EmailVerificationTest extends TestCase
 
         Event::assertDispatched(Verified::class);
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
-        $response->assertRedirect(route('dashboard', absolute: false).'?verified=1');
+        $response->assertRedirect(route('dashboard', $workspace, absolute: false).'?verified=1');
     }
 
     public function test_email_is_not_verified_with_invalid_hash()

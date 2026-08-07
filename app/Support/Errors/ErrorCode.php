@@ -6,7 +6,6 @@ namespace App\Support\Errors;
 
 final class ErrorCode
 {
-    // generic error codes
     public const INTERNAL_ERROR = 'INTERNAL.ERROR';
 
     public const NOT_FOUND = 'NOT.FOUND';
@@ -17,14 +16,12 @@ final class ErrorCode
 
     public const VALIDATION_FAILED = 'VALIDATION.FAILED';
 
-    //  auth error codes
     public const AUTH_UNAUTHENTICATED = 'AUTH.UNAUTHENTICATED';
 
     public const AUTH_FORBIDDEN = 'AUTH.FORBIDDEN';
 
     public const AUTH_SESSION_EXPIRED = 'AUTH.SESSION.EXPIRED';
 
-    // workspace error codes
     public const WORKSPACE_NOT_FOUND = 'WORKSPACE.NOT.FOUND';
 
     public const WORKSPACE_LIMIT_REACHED = 'WORKSPACE.LIMIT.REACHED';
@@ -41,8 +38,17 @@ final class ErrorCode
 
     public const WORKSPACE_NO_ACTIVE = 'WORKSPACE.NO.ACTIVE';
 
-    private function __construct()
-    {
-        // prevent instantiation
-    }
+    public const TEAM_CANNOT_REMOVE_OWNER = 'TEAM.CANNOT.REMOVE.OWNER';
+
+    public const TEAM_CANNOT_REMOVE_SELF = 'TEAM.CANNOT.REMOVE.SELF';
+
+    public const TEAM_CANNOT_CHANGE_OWNER_ROLE = 'TEAM.CANNOT.CHANGE.OWNER.ROLE';
+
+    public const ASSISTANT_QUOTA_EXCEEDED = 'ASSISTANT.QUOTA.EXCEEDED';
+
+    public const ASSISTANT_PROVIDER_UNAVAILABLE = 'ASSISTANT.PROVIDER.UNAVAILABLE';
+
+    public const ASSISTANT_INVALID_TOOL_ARGUMENTS = 'ASSISTANT.INVALID.TOOL.ARGUMENTS';
+
+    private function __construct() {}
 }

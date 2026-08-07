@@ -33,9 +33,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-/* ----------------------------------------------------------------------------
- * Derived data — never trust the backend to compute display-only things
- * ------------------------------------------------------------------------- */
 const onlineMembers = computed(() => props.members.filter((m) => m.status === 'active'));
 
 const teamMembers = computed(() => props.members.filter((m) => m.status !== 'pending'));
@@ -43,6 +40,8 @@ const teamMembers = computed(() => props.members.filter((m) => m.status !== 'pen
 const firstName = computed(() => props.user.name.split(' ')[0]);
 
 const workspaceAge = computed(() => daysSince(props.workspaceMeta.created_at));
+
+useDockContext('dashboard');
 
 const onboardingSteps = computed<ChecklistStep[]>(() => [
     {

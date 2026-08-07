@@ -36,7 +36,11 @@ const billingYearly = ref(true);
 const stats = ref([
     { label: 'Avg. Issue Triage Time', value: '0.4s', sub: 'AI-classified instantly' },
     { label: 'Setup Time', value: '< 5min', sub: 'vs Jira’s 2 weeks' },
-    { label: 'Tools Replaced', value: '6+', sub: 'kanban, docs, chat, sprints, wiki, time' },
+    {
+        label: 'Tools Replaced',
+        value: '6+',
+        sub: 'kanban, docs, chat, sprints, wiki, time',
+    },
     { label: 'Self-Hosting', value: '100%', sub: 'your data, your servers' },
 ]);
 
@@ -76,14 +80,62 @@ const faqs = [
 
 // Comparison data
 const compareRows = [
-    { label: 'Setup time', sprintsync: '< 5 minutes', jira: '1-2 weeks', linear: '~10 minutes', clickup: '2-3 weeks' },
-    { label: 'Built for non-devs', sprintsync: true, jira: 'sort of', linear: false, clickup: true },
-    { label: 'Native AI triage', sprintsync: true, jira: 'add-on', linear: 'partial', clickup: 'add-on' },
-    { label: 'Self-hostable', sprintsync: true, jira: false, linear: false, clickup: false },
-    { label: 'All-in-one (docs + chat + boards)', sprintsync: true, jira: false, linear: false, clickup: 'bloated' },
-    { label: 'Keyboard-first UX', sprintsync: true, jira: false, linear: true, clickup: false },
-    { label: 'Source-available', sprintsync: true, jira: false, linear: false, clickup: false },
-    { label: 'Configuration debt', sprintsync: 'none', jira: 'crushing', linear: 'low', clickup: 'high' },
+    {
+        label: 'Setup time',
+        sprintsync: '< 5 minutes',
+        jira: '1-2 weeks',
+        linear: '~10 minutes',
+        clickup: '2-3 weeks',
+    },
+    {
+        label: 'Built for non-devs',
+        sprintsync: true,
+        jira: 'sort of',
+        linear: false,
+        clickup: true,
+    },
+    {
+        label: 'Native AI triage',
+        sprintsync: true,
+        jira: 'add-on',
+        linear: 'partial',
+        clickup: 'add-on',
+    },
+    {
+        label: 'Self-hostable',
+        sprintsync: true,
+        jira: false,
+        linear: false,
+        clickup: false,
+    },
+    {
+        label: 'All-in-one (docs + chat + boards)',
+        sprintsync: true,
+        jira: false,
+        linear: false,
+        clickup: 'bloated',
+    },
+    {
+        label: 'Keyboard-first UX',
+        sprintsync: true,
+        jira: false,
+        linear: true,
+        clickup: false,
+    },
+    {
+        label: 'Source-available',
+        sprintsync: true,
+        jira: false,
+        linear: false,
+        clickup: false,
+    },
+    {
+        label: 'Configuration debt',
+        sprintsync: 'none',
+        jira: 'crushing',
+        linear: 'low',
+        clickup: 'high',
+    },
 ];
 
 // Pricing tiers
@@ -142,7 +194,7 @@ const tiers = [
         />
     </Head>
 
-    <div class="min-h-screen bg-[#fafaf7] font-sans text-black antialiased selection:bg-lime-300 selection:text-black">
+    <div class="min-h-screen bg-[#fafaf7] font-sans text-black antialiased selection:bg-lime-500 selection:text-black">
         <div class="overflow-hidden border-b-[3px] border-black bg-black text-white">
             <div class="animate-marquee flex py-2 text-sm font-bold tracking-widest whitespace-nowrap uppercase">
                 <span class="mx-6">★ SHIP FASTER</span>
@@ -164,7 +216,7 @@ const tiers = [
             <nav class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
                 <Link :href="route('home')" class="group flex items-center gap-3">
                     <div
-                        class="flex h-10 w-10 items-center justify-center border-[3px] border-black bg-lime-300 shadow-[4px_4px_0_0_#000] transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:shadow-[6px_6px_0_0_#000]"
+                        class="flex h-10 w-10 items-center justify-center border-[3px] border-black bg-lime-500 shadow-[4px_4px_0_0_#000] transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:shadow-[6px_6px_0_0_#000]"
                     >
                         <Boxes class="h-5 w-5" :stroke-width="3" />
                     </div>
@@ -190,7 +242,7 @@ const tiers = [
                         <Link :href="route('login')" class="hidden text-sm font-bold tracking-wider uppercase hover:underline sm:inline">Log in</Link>
                         <Link
                             :href="route('register')"
-                            class="border-[3px] border-black bg-lime-300 px-5 py-2.5 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
+                            class="border-[3px] border-black bg-lime-500 px-5 py-2.5 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
                         >
                             Get Started
                         </Link>
@@ -231,7 +283,7 @@ const tiers = [
                             <span class="relative inline-block">
                                 <span class="relative z-10">that</span>
                             </span>
-                            <span class="relative ml-2 inline-block -rotate-2 border-[3px] border-black bg-lime-300 px-3 shadow-[6px_6px_0_0_#000]">
+                            <span class="relative ml-2 inline-block -rotate-2 border-[3px] border-black bg-lime-500 px-3 shadow-[6px_6px_0_0_#000]">
                                 ships.
                             </span>
                         </h1>
@@ -245,7 +297,7 @@ const tiers = [
                         <div class="mt-10 flex flex-col gap-4 sm:flex-row">
                             <Link
                                 :href="route('register')"
-                                class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-lime-300 px-8 py-4 text-base font-bold tracking-wider uppercase shadow-[6px_6px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
+                                class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-lime-500 px-8 py-4 text-base font-bold tracking-wider uppercase shadow-[6px_6px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
                             >
                                 Start Free — No Card
                                 <ArrowRight class="h-5 w-5 transition-transform group-hover:translate-x-1" :stroke-width="3" />
@@ -272,7 +324,7 @@ const tiers = [
                         <div class="relative">
                             <!-- Stacked decorative card -->
                             <div class="absolute inset-0 translate-x-3 translate-y-3 border-[3px] border-black bg-pink-300"></div>
-                            <div class="absolute inset-0 translate-x-1.5 translate-y-1.5 border-[3px] border-black bg-lime-300"></div>
+                            <div class="absolute inset-0 translate-x-1.5 translate-y-1.5 border-[3px] border-black bg-lime-500"></div>
 
                             <!-- Main "screenshot" card -->
                             <div class="relative border-[3px] border-black bg-white p-5 shadow-[10px_10px_0_0_#000]">
@@ -280,7 +332,7 @@ const tiers = [
                                 <div class="mb-4 flex items-center gap-2 border-b-2 border-black pb-3">
                                     <div class="h-3 w-3 border-2 border-black bg-red-400"></div>
                                     <div class="h-3 w-3 border-2 border-black bg-yellow-300"></div>
-                                    <div class="h-3 w-3 border-2 border-black bg-lime-300"></div>
+                                    <div class="h-3 w-3 border-2 border-black bg-lime-500"></div>
                                     <span class="ml-3 font-mono text-xs font-bold">sprintsync.app/board</span>
                                 </div>
 
@@ -310,7 +362,7 @@ const tiers = [
                                         </div>
                                     </div>
                                     <div class="space-y-2">
-                                        <div class="border-2 border-black bg-lime-300 px-2 py-1 text-[10px] font-bold uppercase">Done · 8</div>
+                                        <div class="border-2 border-black bg-lime-500 px-2 py-1 text-[10px] font-bold uppercase">Done · 8</div>
                                         <div class="border-2 border-black bg-white p-2 text-xs shadow-[2px_2px_0_0_#000]">
                                             <div class="mb-1 font-bold line-through opacity-60">Schema</div>
                                             <div class="text-[10px] text-neutral-500">SS-11</div>
@@ -319,9 +371,9 @@ const tiers = [
                                 </div>
 
                                 <!-- AI assist popup -->
-                                <div class="mt-4 flex items-start gap-2 border-[3px] border-black bg-pink-200 p-3 shadow-[3px_3px_0_0_#000]">
+                                <div class="mt-4 flex items-start gap-2 border-[3px] border-black bg-yellow-200 p-3 shadow-[3px_3px_0_0_#000]">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-black bg-black">
-                                        <Sparkles class="h-4 w-4 text-lime-300" :stroke-width="3" />
+                                        <Sparkles class="h-4 w-4 text-lime-500" :stroke-width="3" />
                                     </div>
                                     <div class="text-xs">
                                         <div class="font-bold">AI auto-triaged 4 tickets</div>
@@ -349,7 +401,9 @@ const tiers = [
                         <div class="text-4xl font-black tracking-tight md:text-5xl" style="font-family: 'Archivo Black', sans-serif">
                             {{ s.value }}
                         </div>
-                        <div class="mt-2 text-xs font-bold tracking-widest text-neutral-700 uppercase">{{ s.label }}</div>
+                        <div class="mt-2 text-xs font-bold tracking-widest text-neutral-700 uppercase">
+                            {{ s.label }}
+                        </div>
                         <div class="mt-1 text-xs text-neutral-500">{{ s.sub }}</div>
                     </div>
                 </div>
@@ -360,12 +414,13 @@ const tiers = [
             <div class="mx-auto max-w-7xl px-4 md:px-8">
                 <div class="max-w-3xl">
                     <div
-                        class="inline-flex items-center gap-2 border-[3px] border-lime-300 bg-black px-4 py-1.5 text-xs font-bold tracking-widest text-lime-300 uppercase"
+                        class="inline-flex items-center gap-2 border-[3px] border-lime-500 bg-black px-4 py-1.5 text-xs font-bold tracking-widest text-lime-500 uppercase"
                     >
                         <Zap class="h-3 w-3" :stroke-width="3" /> The problem
                     </div>
                     <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
-                        Project tools have a <span class="bg-lime-300 px-2 text-black">brand problem.</span>
+                        Project tools have a
+                        <span class="bg-lime-500 px-2 text-black">brand problem.</span>
                     </h2>
                     <p class="mt-6 text-lg text-neutral-300 md:text-xl">
                         Every sprint planning meeting starts with someone complaining about the tool. We got tired of it. So we built the one we
@@ -416,11 +471,11 @@ const tiers = [
 
                 <!-- "And then there's us" -->
                 <div class="relative mt-16">
-                    <div class="absolute inset-0 translate-x-2 translate-y-2 bg-pink-400"></div>
-                    <div class="relative border-[3px] border-white bg-lime-300 p-8 text-black md:p-12">
+                    <div class="absolute inset-0 translate-x-2 translate-y-2 bg-yellow-400"></div>
+                    <div class="relative border-[3px] border-white bg-lime-500 p-8 text-black md:p-12">
                         <div class="flex items-start gap-6 md:items-center">
                             <div class="flex h-16 w-16 shrink-0 items-center justify-center border-[3px] border-black bg-black md:h-20 md:w-20">
-                                <Boxes class="h-8 w-8 text-lime-300 md:h-10 md:w-10" :stroke-width="3" />
+                                <Boxes class="h-8 w-8 text-lime-500 md:h-10 md:w-10" :stroke-width="3" />
                             </div>
                             <div>
                                 <p class="text-sm font-bold tracking-widest uppercase">And then there’s us</p>
@@ -442,13 +497,13 @@ const tiers = [
             <div class="mx-auto max-w-7xl px-4 md:px-8">
                 <div class="max-w-3xl">
                     <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-pink-300 px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
+                        class="inline-flex items-center gap-2 border-[3px] border-black bg-yellow-400 px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
                     >
                         <Sparkles class="h-3 w-3" :stroke-width="3" /> What you get
                     </div>
                     <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
                         Everything your team needs.<br />
-                        <span class="bg-black px-2 text-lime-300">Nothing it doesn't.</span>
+                        <span class="bg-black px-2 text-lime-500">Nothing it doesn't.</span>
                     </h2>
                 </div>
 
@@ -459,7 +514,7 @@ const tiers = [
                             <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-pink-300"></div>
                             <div class="relative h-full border-[3px] border-black bg-white p-8 shadow-[6px_6px_0_0_#000] md:p-10">
                                 <div class="flex h-14 w-14 items-center justify-center border-[3px] border-black bg-black">
-                                    <Sparkles class="h-7 w-7 text-lime-300" :stroke-width="3" />
+                                    <Sparkles class="h-7 w-7 text-lime-500" :stroke-width="3" />
                                 </div>
                                 <h3 class="mt-6 text-3xl font-black tracking-tight md:text-4xl" style="font-family: 'Archivo Black', sans-serif">
                                     AI that does the boring work.
@@ -493,11 +548,11 @@ const tiers = [
 
                     <div class="lg:col-span-5">
                         <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-300"></div>
+                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-500"></div>
                             <div
                                 class="relative flex h-full flex-col border-[3px] border-black bg-black p-8 text-white shadow-[6px_6px_0_0_#000] md:p-10"
                             >
-                                <div class="flex h-14 w-14 items-center justify-center border-[3px] border-white bg-lime-300">
+                                <div class="flex h-14 w-14 items-center justify-center border-[3px] border-white bg-lime-500">
                                     <Layers class="h-7 w-7 text-black" :stroke-width="3" />
                                 </div>
                                 <h3 class="mt-6 text-3xl font-black tracking-tight md:text-4xl" style="font-family: 'Archivo Black', sans-serif">
@@ -506,19 +561,21 @@ const tiers = [
                                 <p class="mt-4 text-neutral-300">Stop paying for Notion + Slack + Jira + Toggl + Confluence. We bundled it.</p>
                                 <ul class="mt-6 space-y-3">
                                     <li class="flex items-center gap-3 text-sm">
-                                        <Kanban class="h-5 w-5 text-lime-300" :stroke-width="3" /> Kanban + Sprints
+                                        <Kanban class="h-5 w-5 text-lime-500" :stroke-width="3" /> Kanban + Sprints
                                     </li>
                                     <li class="flex items-center gap-3 text-sm">
-                                        <FileText class="h-5 w-5 text-lime-300" :stroke-width="3" /> Docs & Wiki
+                                        <FileText class="h-5 w-5 text-lime-500" :stroke-width="3" /> Docs & Wiki
                                     </li>
                                     <li class="flex items-center gap-3 text-sm">
-                                        <MessageSquare class="h-5 w-5 text-lime-300" :stroke-width="3" /> Threaded comments
+                                        <MessageSquare class="h-5 w-5 text-lime-500" :stroke-width="3" />
+                                        Threaded comments
                                     </li>
                                     <li class="flex items-center gap-3 text-sm">
-                                        <LineChart class="h-5 w-5 text-lime-300" :stroke-width="3" /> Roadmaps & goals
+                                        <LineChart class="h-5 w-5 text-lime-500" :stroke-width="3" /> Roadmaps & goals
                                     </li>
                                     <li class="flex items-center gap-3 text-sm">
-                                        <LayoutDashboard class="h-5 w-5 text-lime-300" :stroke-width="3" /> Custom dashboards
+                                        <LayoutDashboard class="h-5 w-5 text-lime-500" :stroke-width="3" />
+                                        Custom dashboards
                                     </li>
                                 </ul>
                             </div>
@@ -538,7 +595,7 @@ const tiers = [
                                 <p class="mt-3 text-sm text-neutral-700">
                                     Docker compose, run it on your VPS or air-gapped. Your roadmap never lives on someone else’s server.
                                 </p>
-                                <code class="mt-5 block border-2 border-black bg-neutral-900 p-3 font-mono text-xs text-lime-300">
+                                <code class="mt-5 block border-2 border-black bg-neutral-900 p-3 font-mono text-xs text-lime-500">
                                     $ docker compose up -d<br />
                                     <span class="text-neutral-500"># sprint-sync running on :8080</span>
                                 </code>
@@ -598,7 +655,7 @@ const tiers = [
             </div>
         </section>
 
-        <section id="compare" class="border-b-[3px] border-black bg-pink-200 py-20 md:py-28">
+        <section id="compare" class="bg-primary/10 border-b-[3px] border-black py-20 md:py-28">
             <div class="mx-auto max-w-7xl px-4 md:px-8">
                 <div class="max-w-3xl">
                     <div
@@ -619,7 +676,7 @@ const tiers = [
                             <thead class="border-b-[3px] border-black bg-black text-white">
                                 <tr>
                                     <th class="p-4 font-bold tracking-wider uppercase md:p-5">Feature</th>
-                                    <th class="border-l-[3px] border-white bg-lime-300 p-4 font-black tracking-wider text-black uppercase md:p-5">
+                                    <th class="border-l-[3px] border-white bg-lime-500 p-4 font-black tracking-wider text-black uppercase md:p-5">
                                         Sprint Sync
                                     </th>
                                     <th class="border-l-[3px] border-white p-4 font-bold tracking-wider uppercase md:p-5">Jira</th>
@@ -629,7 +686,9 @@ const tiers = [
                             </thead>
                             <tbody>
                                 <tr v-for="(row, i) in compareRows" :key="row.label" :class="i % 2 === 0 ? 'bg-white' : 'bg-neutral-50'">
-                                    <td class="border-t-2 border-black p-4 font-bold md:p-5">{{ row.label }}</td>
+                                    <td class="border-t-2 border-black p-4 font-bold md:p-5">
+                                        {{ row.label }}
+                                    </td>
                                     <td class="border-t-2 border-l-2 border-black bg-lime-100 p-4 font-bold md:p-5">
                                         <span v-if="row.sprintsync === true" class="inline-flex items-center gap-1.5">
                                             <Check class="h-4 w-4" :stroke-width="3" /> Yes
@@ -694,7 +753,7 @@ const tiers = [
                     <!-- Testimonial 1 - tilted -->
                     <div class="md:rotate-[-1deg]">
                         <div class="relative">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-300"></div>
+                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-500"></div>
                             <div class="relative border-[3px] border-black bg-white p-6 shadow-[4px_4px_0_0_#000]">
                                 <div class="mb-3 flex gap-0.5">
                                     <Star v-for="n in 5" :key="n" class="h-4 w-4 fill-black" :stroke-width="0" />
@@ -724,10 +783,10 @@ const tiers = [
                                 </div>
                                 <p class="text-base leading-relaxed font-semibold">
                                     "Self-hosted on a $20 VPS. Whole team uses it — devs, designers, our PM.
-                                    <span class="bg-lime-300 px-1 text-black">Finally</span>, a workspace nobody hates."
+                                    <span class="bg-lime-500 px-1 text-black">Finally</span>, a workspace nobody hates."
                                 </p>
                                 <div class="mt-5 flex items-center gap-3 border-t-2 border-white pt-4">
-                                    <div class="flex h-10 w-10 items-center justify-center border-2 border-white bg-lime-300 font-black text-black">
+                                    <div class="flex h-10 w-10 items-center justify-center border-2 border-white bg-lime-500 font-black text-black">
                                         D
                                     </div>
                                     <div>
@@ -803,15 +862,15 @@ const tiers = [
                     <div v-for="t in tiers" :key="t.name" class="relative" :class="t.highlighted && 'md:-translate-y-4'">
                         <div
                             class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black"
-                            :class="t.highlighted ? 'bg-pink-400' : 'bg-black'"
+                            :class="t.highlighted ? 'bg-yellow-400' : 'bg-black'"
                         ></div>
                         <div
                             class="relative flex h-full flex-col border-[3px] border-black p-8 shadow-[6px_6px_0_0_#000]"
-                            :class="t.highlighted ? 'bg-lime-300' : 'bg-white'"
+                            :class="t.highlighted ? 'bg-lime-500' : 'bg-white'"
                         >
                             <div
                                 v-if="t.highlighted"
-                                class="absolute -top-4 left-1/2 -translate-x-1/2 border-[3px] border-black bg-black px-4 py-1 text-xs font-bold tracking-widest text-lime-300 uppercase shadow-[3px_3px_0_0_#000]"
+                                class="absolute -top-4 left-1/2 -translate-x-1/2 border-[3px] border-black bg-black px-4 py-1 text-xs font-bold tracking-widest text-lime-500 uppercase shadow-[3px_3px_0_0_#000]"
                             >
                                 ★ Most popular
                             </div>
@@ -834,7 +893,7 @@ const tiers = [
                             <ul class="mt-6 space-y-2.5 border-t-2 border-black pt-6">
                                 <li v-for="f in t.features" :key="f" class="flex items-start gap-2 text-sm font-semibold">
                                     <div class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-black bg-black">
-                                        <Check class="h-3 w-3 text-lime-300" :stroke-width="4" />
+                                        <Check class="h-3 w-3 text-lime-500" :stroke-width="4" />
                                     </div>
                                     {{ f }}
                                 </li>
@@ -843,7 +902,7 @@ const tiers = [
                             <Link
                                 :href="route('register')"
                                 class="mt-8 inline-flex w-full items-center justify-center gap-2 border-[3px] border-black px-6 py-3 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
-                                :class="t.highlighted ? 'bg-black text-lime-300' : 'bg-lime-300 text-black'"
+                                :class="t.highlighted ? 'bg-black text-lime-500' : 'bg-lime-500 text-black'"
                             >
                                 {{ t.cta }}
                                 <ArrowRight class="h-4 w-4" :stroke-width="3" />
@@ -878,7 +937,7 @@ const tiers = [
                                 <span class="text-base font-bold md:text-lg">{{ item.q }}</span>
                                 <div
                                     class="flex h-8 w-8 shrink-0 items-center justify-center border-[3px] border-black transition-all"
-                                    :class="openFaq === i ? 'bg-black text-lime-300' : 'bg-lime-300 text-black'"
+                                    :class="openFaq === i ? 'bg-black text-lime-500' : 'bg-lime-500 text-black'"
                                 >
                                     <Plus v-if="openFaq !== i" class="h-4 w-4" :stroke-width="3" />
                                     <Minus v-else class="h-4 w-4" :stroke-width="3" />
@@ -893,7 +952,7 @@ const tiers = [
             </div>
         </section>
 
-        <section class="relative overflow-hidden border-b-[3px] border-black bg-lime-300 py-20 md:py-28">
+        <section class="relative overflow-hidden border-b-[3px] border-black bg-lime-500 py-20 md:py-28">
             <!-- Decorative diagonal stripes -->
             <div
                 class="absolute inset-0 opacity-10"
@@ -903,7 +962,7 @@ const tiers = [
             <div class="relative mx-auto max-w-5xl px-4 text-center md:px-8">
                 <h2 class="text-5xl leading-[0.95] tracking-tight md:text-7xl lg:text-8xl" style="font-family: 'Archivo Black', sans-serif">
                     Ship the
-                    <span class="inline-block -rotate-1 bg-black px-3 text-lime-300 shadow-[6px_6px_0_0_#000]">damn thing.</span>
+                    <span class="inline-block -rotate-1 bg-black px-3 text-lime-500 shadow-[6px_6px_0_0_#000]">damn thing.</span>
                 </h2>
                 <p class="mx-auto mt-8 max-w-2xl text-lg text-neutral-800 md:text-xl">
                     Stop fighting your tools. Start shipping. 14-day free trial, no credit card, no sales call.
@@ -912,7 +971,7 @@ const tiers = [
                 <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                     <Link
                         :href="route('register')"
-                        class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-black px-10 py-5 text-base font-bold tracking-wider text-lime-300 uppercase shadow-[8px_8px_0_0_#000] transition-all hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[11px_11px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
+                        class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-black px-10 py-5 text-base font-bold tracking-wider text-lime-500 uppercase shadow-[8px_8px_0_0_#000] transition-all hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[11px_11px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
                     >
                         Start Free Today
                         <ArrowUpRight
@@ -936,7 +995,7 @@ const tiers = [
                 <div class="grid gap-12 md:grid-cols-4">
                     <div class="md:col-span-2">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-10 w-10 items-center justify-center border-[3px] border-lime-300 bg-lime-300">
+                            <div class="flex h-10 w-10 items-center justify-center border-[3px] border-lime-500 bg-lime-500">
                                 <Boxes class="h-5 w-5 text-black" :stroke-width="3" />
                             </div>
                             <span class="text-xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif"
@@ -948,7 +1007,7 @@ const tiers = [
                         </p>
                     </div>
                     <div>
-                        <h4 class="text-sm font-black tracking-widest text-lime-300 uppercase">Product</h4>
+                        <h4 class="text-sm font-black tracking-widest text-lime-500 uppercase">Product</h4>
                         <ul class="mt-4 space-y-2 text-sm text-neutral-400">
                             <li><a href="#features" class="hover:text-white">Features</a></li>
                             <li><a href="#compare" class="hover:text-white">Compare</a></li>
@@ -957,7 +1016,7 @@ const tiers = [
                         </ul>
                     </div>
                     <div>
-                        <h4 class="text-sm font-black tracking-widest text-lime-300 uppercase">Company</h4>
+                        <h4 class="text-sm font-black tracking-widest text-lime-500 uppercase">Company</h4>
                         <ul class="mt-4 space-y-2 text-sm text-neutral-400">
                             <li><a href="#" class="hover:text-white">About</a></li>
                             <li><a href="#" class="hover:text-white">Blog</a></li>
@@ -970,7 +1029,7 @@ const tiers = [
                 <div class="mt-12 flex flex-col items-start justify-between gap-4 border-t-2 border-neutral-800 pt-8 md:flex-row md:items-center">
                     <p class="text-xs text-neutral-500">© 2026 Sprint Sync. Built with rage against bad tools.</p>
                     <div class="flex gap-2">
-                        <a href="#" class="border-2 border-neutral-700 p-2 transition-colors hover:border-lime-300 hover:text-lime-300">
+                        <a href="#" class="border-2 border-neutral-700 p-2 transition-colors hover:border-lime-500 hover:text-lime-500">
                             <Github class="h-4 w-4" :stroke-width="2.5" />
                         </a>
                     </div>

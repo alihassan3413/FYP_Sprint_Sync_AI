@@ -66,6 +66,8 @@ const seatUsage = computed(() => {
 
 const currentUserId = computed(() => allMembers.value.find((m) => m.is_self)?.id ?? null);
 
+useDockContext('teams');
+
 const columns: Column<Member>[] = [
     { key: 'name', label: 'Member', sortable: true, accessor: (m) => m.name?.toLowerCase() ?? m.email.toLowerCase() },
     { key: 'role', label: 'Role', sortable: true, width: '140px', hideOnMobile: true },
@@ -92,6 +94,7 @@ function onCopyInviteLink(m: Member) {
 function onChangeRole(m: Member) {
     console.log('change role', m);
 }
+
 function onTransferTasks(m: Member) {
     console.log('transfer tasks', m);
 }

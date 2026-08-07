@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Modules\Workspace\Actions\CreateWorkspaceForUserAction;
+use App\Modules\Workspace\Actions\CreateWorkspaceAction;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,29 +31,30 @@ class RegisteredUserController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request, CreateWorkspaceForUserAction $createWorkspaceForUserAction): RedirectResponse
+    public function store(Request $request, CreateWorkspaceAction $createWorkspace): RedirectResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'workspace_name' => 'nullable|string|max:255',
+            'workspace_name' => 'nullable|string|max:60',
         ]);
 
-        $user = DB::transaction(function () use ($request, $createWorkspaceForUserAction) {
+        $user = DB::transaction(function () use ($request, $createWorkspace) {
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'name' => $request->string('name')->toString(),
+                'email' => $request->string('email')->toString(),
+                'password' => Hash::make($request->string('password')->toString()),
             ]);
 
-            $workspaceName = $request->input('workspace_name', $user->name."'s Workspace");
-            $workspace = $createWorkspaceForUserAction->handle($user, $workspaceName);
+            $createWorkspace->handleForUser(
+                $user,
+                $request->filled('workspace_name')
+                    ? $request->string('workspace_name')->toString()
+                    : $user->name."'s Workspace",
+            );
 
-            $user->current_workspace_id = $workspace->id;
-            $user->save();
-
-            return $user;
+            return $user->refresh();
         });
 
         event(new Registered($user));

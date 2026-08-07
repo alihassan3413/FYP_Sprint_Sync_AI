@@ -1,49 +1,44 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Workspace\Actions;
 
 use App\Models\User;
+use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 final class AcceptWorkspaceInvitationAction
 {
-    public function handle(string $token, User $user): WorkspaceInvitation
+    public function handle(WorkspaceInvitation $invitation, User $user): WorkspaceInvitation
     {
-        $invitation = WorkspaceInvitation::query()->where('token', $token)->firstOrFail();
-
-        if ($invitation->accepted_at) {
-            throw ValidationException::withMessages([
-                'invitation' => 'This invitation has already been accepted.',
-            ]);
+        if ($invitation->isAccepted()) {
+            throw WorkspaceException::invitationInvalid('This invitation has already been accepted.');
         }
 
-        if ($invitation->expires_at->isPast()) {
-            throw ValidationException::withMessages([
-                'invitation' => 'This invitation has expired.',
-            ]);
+        if ($invitation->isExpired()) {
+            throw WorkspaceException::invitationExpired($invitation->expires_at);
         }
 
-        if ($user->email !== $invitation->email) {
-            throw ValidationException::withMessages([
-                'invitation' => 'This invitation belongs to another email address.',
-            ]);
+        if (! hash_equals($invitation->email, $user->email)) {
+            throw WorkspaceException::invitationInvalid('This invitation belongs to another email address.');
         }
 
-        $user->workspaces()->syncWithoutDetaching([
-            $invitation->workspace_id => [
-                'role' => $invitation->role,
-            ],
-        ]);
+        if ($invitation->workspace->hasMember($user)) {
+            throw WorkspaceException::alreadyMember($invitation->workspace->name);
+        }
 
-        $user->forceFill([
-            'current_workspace_id' => $invitation->workspace_id,
-        ])->save();
+        return DB::transaction(function () use ($invitation, $user) {
+            $user->workspaces()->syncWithoutDetaching([
+                $invitation->workspace_id => ['role' => $invitation->role->value],
+            ]);
 
-        $invitation->update([
-            'accepted_at' => now(),
-        ]);
+            $user->forceFill(['current_workspace_id' => $invitation->workspace_id])->save();
 
-        return $invitation;
+            $invitation->update(['accepted_at' => now()]);
+
+            return $invitation;
+        });
     }
 }

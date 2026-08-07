@@ -13,7 +13,7 @@ class WorkspaceData extends Data
         #[TypeScriptType('string')]
         public string $name,
 
-        #[TypeScriptType('string|null')]
+        #[TypeScriptType('string')]
         public string $slug,
 
         #[TypeScriptType('Record<string, any>|null')]

@@ -1,0 +1,35 @@
+<script setup lang="ts">
+import { Sparkles } from 'lucide-vue-next';
+import { motion } from 'motion-v';
+
+const { openDock, messages } = useAiAssistant();
+</script>
+
+<template>
+    <motion.button
+        type="button"
+        layout-id="assistant-shell"
+        :transition="{
+            layout: { type: 'spring', stiffness: 360, damping: 34, mass: 0.9 },
+            opacity: { duration: 0.2 },
+        }"
+        :initial="{ opacity: 0 }"
+        :animate="{ opacity: 1 }"
+        :exit="{ opacity: 0, transition: { duration: 0.15 } }"
+        :while-hover="{ scale: 1.06 }"
+        :while-tap="{ scale: 0.94 }"
+        aria-label="Open AI assistant"
+        class="group bg-custom-blue focus-visible:ring-offset-custom-blue fixed right-6 bottom-6 z-50 grid size-14 place-items-center rounded-full shadow-[0_8px_24px_rgba(54,90,255,0.45),inset_0_1px_0_rgba(255,255,255,0.3)] outline-none hover:shadow-[0_12px_32px_rgba(54,90,255,0.6),inset_0_1px_0_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 max-sm:right-4 max-sm:bottom-4"
+        @click="openDock"
+    >
+        <span v-if="messages.length > 0" aria-hidden="true" class="bg-custom-blue absolute inset-0 animate-ping rounded-full opacity-25" />
+
+        <motion.span
+            layout-id="assistant-icon"
+            :transition="{ type: 'spring', stiffness: 400, damping: 30 }"
+            class="relative grid place-items-center"
+        >
+            <Sparkles class="size-5 text-white" :stroke-width="2.2" />
+        </motion.span>
+    </motion.button>
+</template>
