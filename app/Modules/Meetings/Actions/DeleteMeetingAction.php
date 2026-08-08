@@ -8,6 +8,9 @@ use App\Mail\MeetingCancelledMail;
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Notifications\MeetingCancelledNotification;
+use App\Notifications\NotificationChannel;
+use App\Notifications\NotificationPreferenceGate;
+use App\Notifications\NotificationType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -18,6 +21,7 @@ final class DeleteMeetingAction
 {
     public function __construct(
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
+        private readonly NotificationPreferenceGate $preferences,
     ) {}
 
     public function handle(Meeting $meeting, User $actor): void
@@ -43,7 +47,9 @@ final class DeleteMeetingAction
         }
 
         try {
-            foreach ($recipients as $recipient) {
+            $emailRecipients = $this->preferences->filter($recipients, NotificationType::MEETING_CANCELLED, NotificationChannel::EMAIL);
+
+            foreach ($emailRecipients as $recipient) {
                 Mail::to($recipient->email)->queue(new MeetingCancelledMail(
                     projectName: $projectName,
                     meetingTitle: $meetingTitle,
@@ -52,7 +58,9 @@ final class DeleteMeetingAction
                 ));
             }
 
-            Notification::send($recipients, new MeetingCancelledNotification(
+            $inAppRecipients = $this->preferences->filter($recipients, NotificationType::MEETING_CANCELLED, NotificationChannel::IN_APP);
+
+            Notification::send($inAppRecipients, new MeetingCancelledNotification(
                 projectName: $projectName,
                 meetingTitle: $meetingTitle,
                 cancelledByName: $actor->name,

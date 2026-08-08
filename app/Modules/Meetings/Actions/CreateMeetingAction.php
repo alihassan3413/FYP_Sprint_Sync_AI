@@ -10,6 +10,9 @@ use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
 use App\Notifications\MeetingScheduledNotification;
+use App\Notifications\NotificationChannel;
+use App\Notifications\NotificationPreferenceGate;
+use App\Notifications\NotificationType;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -19,6 +22,7 @@ final class CreateMeetingAction
 {
     public function __construct(
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
+        private readonly NotificationPreferenceGate $preferences,
     ) {}
 
     public function handle(Project $project, User $creator, StoreMeetingData $data): Meeting
@@ -47,7 +51,9 @@ final class CreateMeetingAction
         }
 
         try {
-            foreach ($recipients as $recipient) {
+            $emailRecipients = $this->preferences->filter($recipients, NotificationType::MEETING_SCHEDULED, NotificationChannel::EMAIL);
+
+            foreach ($emailRecipients as $recipient) {
                 Mail::to($recipient->email)->queue(new MeetingScheduledMail(
                     projectName: $meeting->project->name,
                     meetingTitle: $meeting->title,
@@ -59,7 +65,9 @@ final class CreateMeetingAction
                 ));
             }
 
-            Notification::send($recipients, new MeetingScheduledNotification(
+            $inAppRecipients = $this->preferences->filter($recipients, NotificationType::MEETING_SCHEDULED, NotificationChannel::IN_APP);
+
+            Notification::send($inAppRecipients, new MeetingScheduledNotification(
                 projectName: $meeting->project->name,
                 meetingTitle: $meeting->title,
                 scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),

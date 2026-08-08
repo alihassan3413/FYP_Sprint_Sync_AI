@@ -7,6 +7,9 @@ namespace App\Modules\Tasks\Actions;
 use App\Models\User;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskComment;
+use App\Notifications\NotificationChannel;
+use App\Notifications\NotificationPreferenceGate;
+use App\Notifications\NotificationType;
 use App\Notifications\TaskCommentPostedNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -17,6 +20,7 @@ final class CreateTaskCommentAction
 {
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
+        private readonly NotificationPreferenceGate $preferences,
     ) {}
 
     public function handle(Task $task, User $author, string $body): TaskComment
@@ -40,6 +44,8 @@ final class CreateTaskCommentAction
         }
 
         try {
+            $recipients = $this->preferences->filter($recipients, NotificationType::TASK_COMMENT, NotificationChannel::IN_APP);
+
             Notification::send($recipients, new TaskCommentPostedNotification(
                 projectName: $task->project->name,
                 taskTitle: $task->title,

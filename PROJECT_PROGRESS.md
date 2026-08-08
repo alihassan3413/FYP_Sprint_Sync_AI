@@ -7,21 +7,21 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 19 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR29, FR32 |
+| Complete | 20 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 7 | FR10–FR13, FR25, FR26, FR28 |
+| Not started | 6 | FR10–FR13, FR26, FR28 |
 
-Strict completion: **19 / 35 (54.3%)**. Weighted (Complete=1, Partial=0.5): **67.1%**.
+Strict completion: **20 / 35 (57.1%)**. Weighted (Complete=1, Partial=0.5): **70.0%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
 a complete meeting lifecycle (schedule, view details, join, edit, cancel),
 email notifications on every meeting lifecycle event, an in-app
-notification center (meetings + task assignment/movement/comments), a
-searchable archive of completed tasks and past meetings, and a workspace/
-project analytics dashboard are all built and tested. Still missing:
-transcription + AI summary (FR10–FR13), notification preferences (FR25),
-profile pictures (FR26), and audit log (FR28).
+notification center (meetings + task assignment/movement/comments) with
+per-user, per-type/channel notification preferences, a searchable archive
+of completed tasks and past meetings, and a workspace/project analytics
+dashboard are all built and tested. Still missing: transcription + AI
+summary (FR10–FR13), profile pictures (FR26), and audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -1095,6 +1095,119 @@ model genuinely supports sprints"), no realtime broadcasting, no
 transcription/AI summary work, no unrelated page redesigns, no code
 comments.
 
+### 18. FR25 — Notification preferences
+
+Per-user, per-notification-type/channel opt-out sitting directly on top of
+entries #11 (meeting emails) and #15 (in-app notification center) — no new
+notification types, no new delivery mechanism, just a gate in front of the
+six dispatch points that already exist.
+
+**Storage**: a new `notification_preferences` table
+(`user_id`, `type`, `channel`, `enabled`, unique on
+`[user_id, type, channel]`) plus a `NotificationPreference` model. Rows are
+opt-out, not opt-in: **the absence of a row means enabled**. This was the
+only design that satisfies "existing users must keep current behavior by
+default" for free — no backfill migration was needed, and a user who never
+opens the settings page behaves identically to before this FR existed.
+
+**`App\Notifications\NotificationType`** and **`NotificationChannel`** are
+new backed enums (placed in `app/Notifications`, alongside the existing
+non-modular notification classes — this codebase already keeps
+cross-workspace notification infrastructure outside `app/Modules`, e.g.
+`NotificationController`, `routes/notifications.php`, the `notifications`
+migration itself, so preferences followed the same placement rather than
+inventing a new `Modules/Notifications` directory for one feature).
+`NotificationType` is the single source of truth for the six existing
+type strings (`meeting_scheduled`, `meeting_updated`, `meeting_cancelled`,
+`task_assigned`, `task_moved`, `task_comment` — matching the literal
+strings already hardcoded in each `Notification` class's `toArray()`,
+verified against entry #15/#23's classes rather than assumed), which group
+(`Meetings` vs `Tasks`) they belong to, and — critically — which channels
+each one supports: the three meeting types support `IN_APP` and `EMAIL`;
+the three task types support `IN_APP` only, because no task notification
+has ever had an email channel (confirmed in `CreateTaskAction`/
+`UpdateTaskAction`/`UpdateTaskStatusAction`/`CreateTaskCommentAction` before
+writing anything — they call `Notification::send()` only, never `Mail::`).
+This is what "only show channel toggles that actually exist" and "do not
+create preferences for features/channels that do not exist yet" turn into
+in code: the settings UI and the server-side validation both derive their
+allowed channel list from `NotificationType::channels()`, so there is no
+path to ever create a `task_assigned` + `email` row.
+
+**Enforcement — one reusable gate, not seven copies of the same check**:
+`App\Notifications\NotificationPreferenceGate::filter(Collection $recipients, NotificationType $type, NotificationChannel $channel): Collection`
+takes the recipients a `ResolveMeetingRecipients`/`ResolveTaskRecipients`
+call already resolved and rejects whoever has an explicit disabled row for
+that exact type/channel pair (one `whereIn` + `pluck` query, not N
+per-recipient queries). This keeps "who is eligible to be notified"
+(project membership, actor exclusion — unchanged, still `ResolveXRecipients`)
+and "does this eligible person want this notification" (the new gate) as
+genuinely separate concerns, per the task's explicit instruction. Each of
+the three meeting Actions (`CreateMeetingAction`, `UpdateMeetingAction`,
+`DeleteMeetingAction`) now calls the gate twice — once for the `EMAIL`
+channel immediately before the `Mail::to()->queue()` loop, once for
+`IN_APP` immediately before `Notification::send()` — so a user can disable
+the email and keep the in-app notification, or vice versa, independently.
+Each of the four task Actions calls it once, for `IN_APP` only, since that
+channel is all that exists there. All seven call sites are a one-line
+`$recipients = $this->preferences->filter($recipients, NotificationType::X, NotificationChannel::Y);`
+injected via the constructor, matching how `ResolveMeetingRecipients`/
+`ResolveTaskRecipients` were already injected — no duplicated preference
+logic, no changes to `ResolveMeetingRecipients`/`ResolveTaskRecipients`
+themselves.
+
+**Settings UI**: `settings/Notifications.vue`, added as a fourth entry in
+`SettingsLayout`'s sidebar nav (Profile / Password / Notifications /
+Appearance), following the exact same non-workspace-scoped `AppLayout` +
+`SettingsLayout` shell as `Profile.vue`/`Password.vue` — this is global,
+per-user account settings, not workspace-scoped, so it deliberately does
+not live under `TenantRoute::prefixed()` like every Module route does.
+`NotificationPreferenceController::edit()` builds a `Meetings`/`Tasks`
+grouped array (type → label → its supported channels → each channel's
+current enabled state, defaulting missing rows to `true`) entirely
+server-side from `NotificationType::values()`, so the frontend never has
+to know the type/channel matrix itself — it just renders whatever
+structure the backend sends. The page renders one `Checkbox` per
+type/channel pair (reusing the existing `ui/checkbox` component — no new
+dependency, same component already used on the login page's "remember
+me") and submits the full flattened preference list in one `PUT`.
+Save feedback reuses `Profile.vue`'s exact pattern: a disabled-while-
+submitting `Save` button plus a `TransitionRoot`-faded "Saved." message on
+`form.recentlySuccessful`; a validation-error banner covers the failure
+case.
+
+**Security (FR25 requirement 5)**: the controller only ever reads/writes
+`$request->user()`'s own rows — there is no route parameter or request
+field that names a target user, so there is no code path through which a
+workspace admin, project manager, or any other user could reach someone
+else's preferences. No policy class was needed for the same reason
+`ProfileController` has none: the "own resource only" guarantee comes from
+never accepting a foreign identifier in the first place, not from an
+authorization check that could be forgotten.
+
+**Tests**: new `tests/Feature/Notifications/NotificationPreferenceTest.php`
+(10 tests) — defaults are enabled for every current type/channel, a user
+can disable an in-app type and it persists, a disabled task-assignment
+notification is neither dispatched nor written to the `notifications`
+table (asserted via a real `assertDatabaseCount('notifications', 0)`, not
+just a fake-assertion), a different still-enabled type keeps working
+alongside a disabled one, a meeting's email can be disabled independently
+of its in-app notification and vice versa, preferences set by one user
+never affect another user's dispatch, a user's `PUT` never creates or
+touches another user's rows, guests are redirected to login on both
+routes, and the server rejects a type/channel combination the type
+doesn't support (`task_assigned` + `email`) with a validation error rather
+than silently accepting it. Re-ran `MeetingNotificationTest.php`,
+`TaskNotificationTest.php`, and `NotificationCenterTest.php` in full after
+wiring the gate into all seven dispatch points — all 31 stayed green
+unchanged, confirming the default-enabled behavior really is
+behavior-identical to before this FR. Full suite: **286 passed** (276
+baseline + 10 new).
+
+**Not built, per the task's explicit exclusions**: no push notifications,
+no browser notifications, no realtime broadcasting, no digest scheduling,
+no mentions, no AI/transcription work, no code comments.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -1145,6 +1258,24 @@ comments.
   unreachable dead code since Projects shipped (entry #8). Worth a
   deliberate sweep of the other modules for the same gap rather than
   assuming a policy file's presence means it's enforced.
+- **Notification preferences are opt-out rows, not a full opt-in matrix
+  seeded per user.** A missing `(user_id, type, channel)` row means
+  enabled. This is what makes "existing users keep current behavior by
+  default" true without a data migration/backfill — see entry #18. The
+  trade-off: reading a user's full preference state means unioning saved
+  rows with the enum's declared defaults (done once, server-side, in
+  `NotificationPreferenceController::groups()`), rather than a single flat
+  table scan — an acceptable cost since it only runs on the settings page
+  itself, never on the hot notification-dispatch path.
+- **`NotificationPreferenceGate` filters a recipients collection, not a
+  single notifiable.** It was tempting to filter per-recipient inside each
+  `Notification` class's `via()` method (Laravel calls `via($notifiable)`
+  per recipient under `Notification::send()`), but that would have coupled
+  plain notification classes to a preferences repository and made the
+  "recipient resolution vs. preference filtering are separate concerns"
+  requirement (FR25) harder to see in the code. Filtering the collection
+  once, right before each `Mail::`/`Notification::send()` call, keeps both
+  steps visible as two sequential one-line calls in every Action.
 
 ## Test results
 
@@ -1335,6 +1466,36 @@ rendering — stat card grid, bar-list proportions, project performance
 table — is unverified in a live browser, same standing caveat as
 entries #14/#15/#16.
 
+Full suite after entry #18 (FR25 notification preferences):
+
+```
+php artisan test --compact
+Tests:    286 passed (1239 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ fixed (fully_qualified_strict_types + ordered_imports in the new test
+  file, on the first run); passed clean on the re-run after
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.49s (settings/Notifications.vue present in
+  public/build/manifest.json as Notifications-*.js)
+```
+
+Adds `tests/Feature/Notifications/NotificationPreferenceTest.php`
+(10 tests) — 10 new over entry #17's 276 baseline. Also re-ran
+`MeetingNotificationTest.php`, `TaskNotificationTest.php`, and
+`NotificationCenterTest.php` (31 tests total) after wiring
+`NotificationPreferenceGate` into all seven dispatch points across the
+Meetings and Tasks modules — all 31 stayed green with zero changes,
+confirming the default-enabled behavior is identical to before this FR
+for any user who never touches the new settings page. The notification
+preferences settings page's visual rendering (checkbox grid layout,
+grouped sections) is unverified in a live browser, same standing caveat
+as entries #14/#15/#16/#17.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -1415,9 +1576,9 @@ entries #14/#15/#16.
   task silently expanded into.
 - ~~FR23 is email-only~~ — FR21–FR22 (entry #15) added the in-app
   notification bell/feed alongside the existing FR23 emails; meetings now
-  notify through both channels from the same recipient resolution. Still
-  no user-facing preference to opt out of either channel (FR25) — a
-  natural follow-up once this ships.
+  notify through both channels from the same recipient resolution.
+  ~~Still no user-facing preference to opt out of either channel~~ — FR25
+  (entry #18) added a per-type/channel opt-out in user settings.
 - **The notification bell has no live push** — it refreshes on the next
   Inertia navigation or on the explicit partial-reload fired by mark-
   read/mark-all-read, not in real time while the page sits idle. Same
@@ -1520,26 +1681,42 @@ entries #14/#15/#16.
   UI-heavy entry in this log. The stat card grid, bar-list proportions,
   and project performance table are code-reviewed and covered by backend
   tests, not click-tested.
+- **Notification preferences apply only to the six notification types that
+  already exist** (three meeting, three task) — there is deliberately no
+  row/UI for anything not yet built (mentions, digests, push, browser
+  notifications). Adding a new notification type in the future requires
+  adding a case to `NotificationType` and calling
+  `NotificationPreferenceGate::filter()` at its dispatch point; it will
+  not automatically appear in the settings UI as "supported" until that
+  enum case declares its channels.
+- **The settings `PUT` expects the full flattened preference list on every
+  save**, not a partial diff — the frontend always submits every
+  type/channel pair it rendered. This matches how the page is built (one
+  form, one submit) but means a future UI that lets someone toggle a
+  single row via an isolated request (e.g. an inline switch with instant
+  save) would need a smaller, single-row endpoint instead of reusing
+  `NotificationPreferenceController::update()` as-is.
+- **The notification preferences settings page has not been visually
+  verified in a browser** — no browser access in this session, same
+  standing caveat as every other UI-heavy entry in this log.
 
 ## Next recommended task
 
-Backend suite confirmed green at 276 passed as of entry #17 (FR20).
+Backend suite confirmed green at 286 passed as of entry #18 (FR25).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
 `npm run build` all pass clean. A visual browser pass is now owed for
-four separate pieces of UI work (entry #14's Task Detail redesign,
+five separate pieces of UI work (entry #14's Task Detail redesign,
 entry #15's notification bell, entry #16's archive page, entry #17's
-analytics dashboard) — worth doing in one sitting before committing,
-since none of them have been click-tested in a running app yet.
+analytics dashboard, entry #18's notification preferences settings page)
+— worth doing in one sitting before committing, since none of them have
+been click-tested in a running app yet.
 
-Back to the FR track: with FR14–FR24, FR29, and FR32 now all complete,
-the largest remaining untouched blocks are **FR25 (notification
-preferences)** — a small, natural follow-up directly on top of entry
-#15, an opt-out toggle per notification type/channel sitting on the
-existing dispatch points — and **FR26 (profile pictures)**, a
+Back to the FR track: with FR14–FR25, FR29, and FR32 now all complete,
+the two remaining untouched blocks are **FR26 (profile pictures)** — a
 self-contained, low-risk addition (an `avatar_url` on `User`, a file
 upload endpoint, wiring it into the already-parameterized `AppAvatar`
 component's `src` prop, which every avatar in the app already renders
-through). **FR28 (audit log)** is the largest remaining block — every
+through) — and **FR28 (audit log)**, the largest remaining block: every
 mutating action across Workspace/Projects/Tasks/Meetings would need a
 logging hook, so it's worth scoping carefully (which actions actually
 need auditing, one shared `AuditLogAction` vs. per-module hooks) before

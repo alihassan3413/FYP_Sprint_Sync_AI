@@ -7,6 +7,9 @@ namespace App\Modules\Tasks\Actions;
 use App\Models\User;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
+use App\Notifications\NotificationChannel;
+use App\Notifications\NotificationPreferenceGate;
+use App\Notifications\NotificationType;
 use App\Notifications\TaskAssignedNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -16,6 +19,7 @@ final class UpdateTaskAction
 {
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
+        private readonly NotificationPreferenceGate $preferences,
     ) {}
 
     public function handle(Task $task, User $actor, StoreTaskData $data): Task
@@ -43,6 +47,8 @@ final class UpdateTaskAction
         }
 
         try {
+            $recipients = $this->preferences->filter($recipients, NotificationType::TASK_ASSIGNED, NotificationChannel::IN_APP);
+
             Notification::send($recipients, new TaskAssignedNotification(
                 projectName: $task->project->name,
                 taskTitle: $task->title,

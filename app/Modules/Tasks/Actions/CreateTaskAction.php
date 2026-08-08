@@ -8,6 +8,9 @@ use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
+use App\Notifications\NotificationChannel;
+use App\Notifications\NotificationPreferenceGate;
+use App\Notifications\NotificationType;
 use App\Notifications\TaskAssignedNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -17,6 +20,7 @@ final class CreateTaskAction
 {
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
+        private readonly NotificationPreferenceGate $preferences,
     ) {}
 
     public function handle(Project $project, User $creator, StoreTaskData $data): Task
@@ -49,6 +53,8 @@ final class CreateTaskAction
         }
 
         try {
+            $recipients = $this->preferences->filter($recipients, NotificationType::TASK_ASSIGNED, NotificationChannel::IN_APP);
+
             Notification::send($recipients, new TaskAssignedNotification(
                 projectName: $project->name,
                 taskTitle: $task->title,
