@@ -7,11 +7,11 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 20 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR29, FR32 |
+| Complete | 21 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 6 | FR10–FR13, FR26, FR28 |
+| Not started | 5 | FR10–FR13, FR28 |
 
-Strict completion: **20 / 35 (57.1%)**. Weighted (Complete=1, Partial=0.5): **70.0%**.
+Strict completion: **21 / 35 (60.0%)**. Weighted (Complete=1, Partial=0.5): **72.9%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
@@ -19,9 +19,9 @@ a complete meeting lifecycle (schedule, view details, join, edit, cancel),
 email notifications on every meeting lifecycle event, an in-app
 notification center (meetings + task assignment/movement/comments) with
 per-user, per-type/channel notification preferences, a searchable archive
-of completed tasks and past meetings, and a workspace/project analytics
-dashboard are all built and tested. Still missing: transcription + AI
-summary (FR10–FR13), profile pictures (FR26), and audit log (FR28).
+of completed tasks and past meetings, a workspace/project analytics
+dashboard, and user profile pictures are all built and tested. Still
+missing: transcription + AI summary (FR10–FR13) and audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -1208,6 +1208,138 @@ baseline + 10 new).
 no browser notifications, no realtime broadcasting, no digest scheduling,
 no mentions, no AI/transcription work, no code comments.
 
+### 19. FR26 — Profile picture
+
+Per-user avatar upload/replace/remove, wired into the existing shared
+`AppAvatar` component's initials-fallback path rather than building a new
+display primitive.
+
+**Storage**: a nullable `avatar_path` string column on `users` (the
+stored reference — never the binary itself) plus a `User::avatarUrl()`
+accessor (`Illuminate\Database\Eloquent\Casts\Attribute`, appended via
+`$appends`) that turns it into a public URL through
+`Storage::disk('public')->url($path)`, or `null` when no avatar exists.
+The `local` disk stayed the app's default (`FILESYSTEM_DISK=local` in
+`.env.example`, unchanged), but avatars explicitly use the already-
+configured `public` disk (`config/filesystems.php` already had it wired
+with a `url` callback and a `public_path('storage') → storage_path('app/
+public')` symlink entry in `links`) since a profile picture has to be
+browser-viewable, unlike this app's other private storage needs. Ran
+`php artisan storage:link` once as part of this work — the symlink didn't
+exist yet in this environment, and `Storage::disk('public')->url()`
+depends on it for real (non-faked) requests.
+
+**Safe unique filenames**: `$request->file('avatar')->store('avatars', 'public')`
+— Laravel generates the stored filename from a random unique ID plus an
+extension inferred from the *actual* MIME type, never from the client-
+supplied filename. Combined with `File::image()` validation (which
+inspects real file content, not the extension) in the new
+`AvatarUpdateRequest`, this is what satisfies "do not trust filename or
+extension alone." `avatar_path` is never mass-assigned from request
+input — the controller always calls `$user->forceFill(['avatar_path' =>
+$path])->save()` with `$path` being Laravel's own generated storage path,
+never anything read out of the request — so there is no way for a client
+to make `avatar_path` point at an arbitrary filesystem location.
+
+**Validation**: `File::image()->max(2 * 1024)` — real image content only
+(Laravel's `image` rule checks MIME/content, and — per its own
+documented default — rejects SVG uploads to avoid stored-XSS via SVG
+`<script>`/event-handler payloads, which is exactly the "sensible" side
+of "sensible file-size limit" for this threat model too), capped at 2 MB.
+
+**New `Settings\AvatarController`** (`store()`/`destroy()`), mirroring
+how `PasswordController` and (per entry #18) `NotificationPreferenceController`
+are each a dedicated controller for one distinct settings concern rather
+than growing `ProfileController` — Avatar is a distinct resource from
+Profile info even though both render on the same settings page.
+`store()` uploads/replaces: the new file is stored first, the user's
+`avatar_path` is updated, and *only then* is the previous file (if any)
+deleted from the `public` disk — matching the requirement's explicit
+ordering ("delete the old stored file after the new upload succeeds"),
+so a failed upload can never destroy a working avatar. `destroy()`
+deletes the stored file and clears `avatar_path` in one step, and is a
+safe no-op when the user has no avatar (no error, nothing to orphan).
+Both methods only ever act on `$request->user()` — there is no route
+parameter or request field naming a target user, so (as with FR25) there
+is no code path through which one user could reach another's avatar; no
+policy class was needed for the same reason.
+
+**Wiring `avatar_url` into existing displays, not patching each screen**:
+per the task's "update all existing places automatically where
+practical" instruction, this only touched the places that *already* had
+`avatar_url` plumbed end-to-end in their Vue templates but the PHP side
+hardcoded it to `null` — `DashboardController::members()`/`activity()`
+(4 spots) and `TeamRoster::forWorkspace()` (1 spot, the second `null` there
+is for pending invitations, which have no `User` yet and correctly stay
+`null`) — now select `users.avatar_path` and return the real
+`$member->avatar_url`. Those screens (Dashboard member list, Dashboard
+activity feed, Team roster) picked up real avatars with zero Vue changes.
+`UserInfo.vue` (used by both the sidebar-footer `NavUser` and the header
+dropdown `UserMenuContent`) was switched from the starter kit's dead,
+never-wired `user.avatar` field and raw `Avatar`/`AvatarImage`/
+`AvatarFallback` primitives to the same `AppAvatar` component every other
+screen in the app already uses — one file change, both places update.
+**Deliberately left untouched**: task assignee avatars (`TaskCard`,
+`TaskDetailModal`, `AssigneePicker`), task comment avatars
+(`TaskCommentThread`, `TaskCommentComposer`), and project member avatars
+(`projects/show.vue`, `WorkspaceMemberPicker`) — none of these currently
+pass an `avatar_url` prop at all; wiring them up would mean extending
+several more Data classes/inline arrays (`TaskData`, `TaskCommentData`,
+project member payloads) and editing 6+ additional Vue files, which is
+building new plumbing rather than flipping on plumbing that already
+exists — judged out of scope for "where practical" and flagged below as
+a known gap instead of quietly expanding this task's surface.
+`resources/js/components/AppHeader.vue` also still references the dead
+`user.avatar` field, but that component is unreachable dead code (never
+imported by any active layout — confirmed via search), so it was left
+alone rather than "fixed" for something nothing renders.
+
+`AppAvatar.vue` gained one new size token, `2xl` (`size-20`), for the
+settings-page preview — a config-driven extension of the size map the
+component already exposes, not a new component or a one-off style
+override in the settings page.
+
+**Bug found and fixed along the way**: adding `avatar_path` immediately
+broke `ProfileUpdateTest.php`, `DashboardTest.php`, and
+`TeamMemberTest.php` with `MissingAttributeException`. Root cause:
+`AppServiceProvider` already calls
+`Model::preventAccessingMissingAttributes(! $this->app->isProduction())`,
+and `UserFactory::definition()` didn't set `avatar_path` — so a
+factory-built model handed straight to `actingAs()` (never re-queried
+from the database) simply didn't have the attribute in memory, and the
+new `avatar_url` accessor (evaluated on every request via `$appends`,
+because `auth.user` is serialized on every Inertia response) tripped the
+strict-mode guard on first touch. Fixed by adding `'avatar_path' => null`
+to `UserFactory::definition()`, following the exact precedent already set
+by that same factory's `'current_workspace_id' => null,` line. Also added
+a `withAvatar()` factory state for tests that need a pre-existing avatar.
+This is a general lesson worth remembering for any future nullable
+column that gets an appended accessor: it must be added to
+`UserFactory::definition()` in the same change, or every
+`actingAs(User::factory()->create())` test that touches an
+accessor-bearing page breaks.
+
+**Tests**: new `tests/Feature/Settings/AvatarTest.php` (12 tests) — valid
+upload persists a `avatars/…` path and a real file on the faked `public`
+disk, the URL is exposed through `auth.user.avatar_url` on the Inertia
+shared prop, replacing an avatar deletes the old file and stores the new
+one (asserted both ways: `assertMissing`/`assertExists`), removing an
+avatar deletes the file and nulls the reference, removing when no avatar
+exists is a safe no-op, a non-image file is rejected, a `.jpg`-named file
+with non-image content is rejected (proving the validator inspects
+content, not the extension), an oversized (3 MB) image is rejected, one
+user's upload/removal never touches another user's `avatar_path` or
+file, initials fallback (`auth.user.avatar_url === null`) still works
+with no avatar, and guests are redirected to login on both routes. Also
+re-ran `ProfileUpdateTest.php`, `DashboardTest.php`, and
+`TeamMemberTest.php` in full after the factory fix — all green. Full
+suite: **298 passed** (286 baseline + 12 new).
+
+**Not built, per the task's explicit exclusions**: no image cropping
+library, no external image hosting, no S3-specific logic (the app has no
+S3 credentials configured — `public` local disk matches "based on
+existing app conventions"), no Audit Log or AI work, no code comments.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -1276,6 +1408,16 @@ no mentions, no AI/transcription work, no code comments.
   requirement (FR25) harder to see in the code. Filtering the collection
   once, right before each `Mail::`/`Notification::send()` call, keeps both
   steps visible as two sequential one-line calls in every Action.
+- **New nullable columns with an appended accessor must be added to the
+  relevant factory's `definition()` in the same change**, not left to
+  default silently. `Model::preventAccessingMissingAttributes()` is
+  already enabled outside production (`AppServiceProvider`), and
+  `actingAs(User::factory()->create())` hands a never-re-queried model
+  straight to the auth guard — so a factory that doesn't set a new
+  column leaves it genuinely absent from that in-memory model, and the
+  first accessor touch (here, `avatar_url`, evaluated on every request
+  because `auth.user` is shared) throws. See entry #19 for the concrete
+  break/fix.
 
 ## Test results
 
@@ -1496,6 +1638,34 @@ preferences settings page's visual rendering (checkbox grid layout,
 grouped sections) is unverified in a live browser, same standing caveat
 as entries #14/#15/#16/#17.
 
+Full suite after entry #19 (FR26 profile picture):
+
+```
+php artisan test --compact
+Tests:    298 passed (1294 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.42s (Profile-*.js grew with the new AvatarSettings.vue
+  component bundled in)
+```
+
+Adds `tests/Feature/Settings/AvatarTest.php` (12 tests) — 12 new over
+entry #18's 286 baseline. Also re-ran `ProfileUpdateTest.php`,
+`DashboardTest.php`, and `TeamMemberTest.php` in full after the
+`UserFactory` fix described in entry #19 — all green. The avatar upload
+UI (file picker button, progress bar, remove button, current-avatar
+preview) is unverified in a live browser, same standing caveat as every
+other UI-heavy entry in this log — worth prioritizing in the overdue
+browser pass since this is the first entry to add a real `<input
+type="file">` interaction, which is harder to fully trust from code
+review alone than a read-only display.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -1699,26 +1869,54 @@ as entries #14/#15/#16/#17.
 - **The notification preferences settings page has not been visually
   verified in a browser** — no browser access in this session, same
   standing caveat as every other UI-heavy entry in this log.
+- **Avatar display was wired only into places that already had
+  `avatar_url` plumbed through** (Dashboard members/activity, Team
+  roster, the header/sidebar user menu) — see entry #19. Task assignee
+  avatars, task comment avatars, and project member list avatars still
+  render initials-only, even for a user with a real uploaded photo,
+  because those screens' underlying Data classes never carried an
+  `avatar_url` field in the first place. Extending them is a legitimate,
+  reasonably-sized follow-up (each is a one-field DTO addition plus a
+  `:src` prop on an existing `AppAvatar` call) but was judged outside
+  "where practical" for this task's scope.
+- **`resources/js/components/AppHeader.vue` still references the dead,
+  pre-FR26 `user.avatar` field.** Confirmed unreachable (no active layout
+  imports it — `AppHeaderLayout` itself is unused), so left alone rather
+  than patched; worth deleting outright in a future cleanup pass rather
+  than fixing code nothing renders.
+- **No image cropping/resizing.** An uploaded image is stored and served
+  exactly as uploaded (beyond browser-side `object-cover` CSS framing in
+  `AppAvatar`) — a very large but valid image (up to the 2 MB cap) will
+  render at whatever dimensions it has. Per the task's own "do not add
+  image cropping libraries" instruction; would need either a client-side
+  canvas resize or a server-side image library (e.g. Intervention Image)
+  if this becomes a real problem.
+- **The avatar upload UI has not been visually verified in a browser** —
+  no browser access in this session. This one is worth prioritizing over
+  the other pending browser-verification items, since it's the first
+  entry with a real file-picker/upload-progress interaction rather than
+  a read-only display.
 
 ## Next recommended task
 
-Backend suite confirmed green at 286 passed as of entry #18 (FR25).
+Backend suite confirmed green at 298 passed as of entry #19 (FR26).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
-`npm run build` all pass clean. A visual browser pass is now owed for
-five separate pieces of UI work (entry #14's Task Detail redesign,
-entry #15's notification bell, entry #16's archive page, entry #17's
-analytics dashboard, entry #18's notification preferences settings page)
-— worth doing in one sitting before committing, since none of them have
-been click-tested in a running app yet.
+`npm run build` all pass clean. A visual browser pass is now owed for six
+separate pieces of UI work (entry #14's Task Detail redesign, entry #15's
+notification bell, entry #16's archive page, entry #17's analytics
+dashboard, entry #18's notification preferences settings page, entry
+#19's avatar upload) — worth doing in one sitting before committing,
+since none of them have been click-tested in a running app yet. The
+avatar upload flow (real `<input type="file">`, upload progress, replace,
+remove) is the highest-value one to check first, since a file-picker
+interaction is the hardest of the six to fully trust from code review
+alone.
 
-Back to the FR track: with FR14–FR25, FR29, and FR32 now all complete,
-the two remaining untouched blocks are **FR26 (profile pictures)** — a
-self-contained, low-risk addition (an `avatar_url` on `User`, a file
-upload endpoint, wiring it into the already-parameterized `AppAvatar`
-component's `src` prop, which every avatar in the app already renders
-through) — and **FR28 (audit log)**, the largest remaining block: every
+Back to the FR track: with FR14–FR26, FR29, and FR32 now all complete,
+**FR28 (audit log)** is the only remaining untouched block: every
 mutating action across Workspace/Projects/Tasks/Meetings would need a
 logging hook, so it's worth scoping carefully (which actions actually
 need auditing, one shared `AuditLogAction` vs. per-module hooks) before
 starting. Save FR10–FR13 (transcription/AI summary) for last, once
-there's real meeting data to build against.
+there's real meeting data to build against — at that point FR28 and
+FR10–FR13 are the entire remaining "not started" list.

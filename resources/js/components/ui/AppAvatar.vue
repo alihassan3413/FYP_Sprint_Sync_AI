@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 type StatusKind = 'active' | 'away' | 'offline' | 'busy' | null;
 
 interface Props {
@@ -66,6 +66,7 @@ const sizeClasses = computed(() => ({
   md: 'size-8 text-xs',
   lg: 'size-10 text-sm',
   xl: 'size-12 text-base',
+  '2xl': 'size-20 text-xl',
 }[props.size]));
 
 const dotClasses = computed(() => ({
@@ -74,6 +75,7 @@ const dotClasses = computed(() => ({
   md: 'size-2.5 ring-2',
   lg: 'size-3 ring-2',
   xl: 'size-3.5 ring-[3px]',
+  '2xl': 'size-4 ring-[3px]',
 }[props.size]));
 
 const statusBg = computed(() => ({

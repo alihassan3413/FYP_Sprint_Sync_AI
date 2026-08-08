@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { TransitionRoot } from '@headlessui/vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { BadgeCheck, MailWarning, UserRound } from 'lucide-vue-next';
+import { computed } from 'vue';
 
+import AvatarSettings from '@/components/AvatarSettings.vue';
 import DeleteUser from '@/components/DeleteUser.vue';
-import HeadingSmall from '@/components/HeadingSmall.vue';
 import InputError from '@/components/InputError.vue';
+import SavedIndicator from '@/components/settings/SavedIndicator.vue';
+import SettingsSection from '@/components/settings/SettingsSection.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +18,6 @@ import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 interface Props {
     mustVerifyEmail: boolean;
     status?: string;
-    className?: string;
 }
 
 defineProps<Props>();
@@ -35,9 +37,20 @@ const form = useForm({
     email: user.email,
 });
 
+const memberSince = computed(() => {
+    const joined = new Date(user.created_at);
+
+    if (Number.isNaN(joined.getTime())) {
+        return null;
+    }
+
+    return joined.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+});
+
 const submit = () => {
     form.patch(route('profile.update'), {
         preserveScroll: true,
+        onSuccess: () => form.defaults(),
     });
 };
 </script>
@@ -47,63 +60,89 @@ const submit = () => {
         <Head title="Profile settings" />
 
         <SettingsLayout>
-            <div class="flex flex-col space-y-6">
-                <HeadingSmall title="Profile information" description="Update your name and email address" />
+            <AvatarSettings />
 
-                <form @submit.prevent="submit" class="space-y-6">
+            <SettingsSection
+                :icon="UserRound"
+                title="Personal information"
+                description="The name and address teammates see, and where account mail is sent."
+            >
+                <template #aside>
+                    <span
+                        v-if="user.email_verified_at"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                    >
+                        <BadgeCheck class="size-3.5" />
+                        Verified
+                    </span>
+                </template>
+
+                <form id="profile-form" class="grid gap-5 sm:grid-cols-2" @submit.prevent="submit">
                     <div class="grid gap-2">
-                        <Label for="name">Name</Label>
-                        <Input id="name" class="mt-1 block w-full" v-model="form.name" required autocomplete="name" placeholder="Full name" />
-                        <InputError class="mt-2" :message="form.errors.name" />
+                        <Label for="name">Full name</Label>
+                        <Input
+                            id="name"
+                            v-model="form.name"
+                            required
+                            autocomplete="name"
+                            placeholder="Your name"
+                            :aria-invalid="!!form.errors.name"
+                            :class="form.errors.name && 'border-destructive focus-visible:ring-destructive'"
+                        />
+                        <InputError :message="form.errors.name" />
                     </div>
 
                     <div class="grid gap-2">
                         <Label for="email">Email address</Label>
                         <Input
                             id="email"
-                            type="email"
-                            class="mt-1 block w-full"
                             v-model="form.email"
+                            type="email"
                             required
                             autocomplete="username"
-                            placeholder="Email address"
+                            placeholder="you@company.com"
+                            :aria-invalid="!!form.errors.email"
+                            :class="form.errors.email && 'border-destructive focus-visible:ring-destructive'"
                         />
-                        <InputError class="mt-2" :message="form.errors.email" />
+                        <InputError :message="form.errors.email" />
                     </div>
 
-                    <div v-if="mustVerifyEmail && !user.email_verified_at">
-                        <p class="mt-2 text-sm text-neutral-800">
-                            Your email address is unverified.
-                            <Link
-                                :href="route('verification.send')"
-                                method="post"
-                                as="button"
-                                class="rounded-md text-sm text-neutral-600 underline hover:text-neutral-900 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
-                            >
-                                Click here to re-send the verification email.
-                            </Link>
+                    <div
+                        v-if="mustVerifyEmail && !user.email_verified_at"
+                        class="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3.5 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <p class="flex items-start gap-2.5 text-[13px] text-amber-800 dark:text-amber-300">
+                            <MailWarning class="mt-px size-4 shrink-0" />
+                            <span v-if="status === 'verification-link-sent'"> A fresh verification link is on its way to your inbox. </span>
+                            <span v-else> Your email address hasn't been verified yet. </span>
                         </p>
 
-                        <div v-if="status === 'verification-link-sent'" class="mt-2 text-sm font-medium text-green-600">
-                            A new verification link has been sent to your email address.
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-4">
-                        <Button :disabled="form.processing">Save</Button>
-
-                        <TransitionRoot
-                            :show="form.recentlySuccessful"
-                            enter="transition ease-in-out"
-                            enter-from="opacity-0"
-                            leave="transition ease-in-out"
-                            leave-to="opacity-0"
+                        <Button
+                            v-if="status !== 'verification-link-sent'"
+                            as-child
+                            variant="outline"
+                            size="sm"
+                            class="shrink-0 self-start border-amber-500/30 bg-transparent hover:bg-amber-500/10 sm:self-auto"
                         >
-                            <p class="text-sm text-neutral-600">Saved.</p>
-                        </TransitionRoot>
+                            <Link :href="route('verification.send')" method="post" as="button">Resend link</Link>
+                        </Button>
                     </div>
                 </form>
-            </div>
+
+                <template #footer>
+                    <p class="text-muted-foreground text-[13px]">
+                        <span v-if="memberSince">Member since {{ memberSince }}</span>
+                    </p>
+
+                    <div class="flex items-center gap-3">
+                        <SavedIndicator :show="form.recentlySuccessful" />
+
+                        <Button form="profile-form" type="submit" size="sm" :disabled="form.processing || !form.isDirty">
+                            {{ form.processing ? 'Saving…' : 'Save changes' }}
+                        </Button>
+                    </div>
+                </template>
+            </SettingsSection>
 
             <DeleteUser />
         </SettingsLayout>

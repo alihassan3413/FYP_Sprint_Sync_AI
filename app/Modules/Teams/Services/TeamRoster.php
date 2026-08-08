@@ -17,7 +17,7 @@ final class TeamRoster
     public function forWorkspace(Workspace $workspace, User $viewer): Collection
     {
         $members = $workspace->users()
-            ->select('users.id', 'users.name', 'users.email')
+            ->select('users.id', 'users.name', 'users.email', 'users.avatar_path')
             ->orderBy('users.name')
             ->get()
             ->map(fn (User $member) => [
@@ -27,7 +27,7 @@ final class TeamRoster
                 'role' => $member->pivot->role,
                 'status' => 'active',
                 'last_active_at' => $member->id === $viewer->id ? now()->toIso8601String() : null,
-                'avatar_url' => null,
+                'avatar_url' => $member->avatar_url,
                 'is_self' => $member->id === $viewer->id,
             ]);
 

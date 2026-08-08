@@ -28,11 +28,17 @@ final class UserFactory extends Factory
             'password' => self::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'current_workspace_id' => null,
+            'avatar_path' => null,
         ];
     }
 
     public function unverified(): static
     {
         return $this->state(fn () => ['email_verified_at' => null]);
+    }
+
+    public function withAvatar(string $path = 'avatars/existing.jpg'): static
+    {
+        return $this->state(fn () => ['avatar_path' => $path]);
     }
 }

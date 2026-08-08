@@ -40,7 +40,7 @@ final class DashboardController
     private function members(Workspace $workspace, User $user): Collection
     {
         $accepted = $workspace->users()
-            ->select('users.id', 'users.name', 'users.email')
+            ->select('users.id', 'users.name', 'users.email', 'users.avatar_path')
             ->get()
             ->map(fn (User $member) => [
                 'id' => $member->id,
@@ -49,7 +49,7 @@ final class DashboardController
                 'role' => $member->pivot->role,
                 'status' => 'active',
                 'last_active_at' => $member->id === $user->id ? now()->toIso8601String() : null,
-                'avatar_url' => null,
+                'avatar_url' => $member->avatar_url,
                 'is_self' => $member->id === $user->id,
             ]);
 
@@ -86,7 +86,7 @@ final class DashboardController
         ]]);
 
         $joined = $workspace->users()
-            ->select('users.id', 'users.name', 'users.email')
+            ->select('users.id', 'users.name', 'users.email', 'users.avatar_path')
             ->wherePivot('role', '!=', UserRole::OWNER->value)
             ->orderByPivot('created_at', 'desc')
             ->limit($limit)
@@ -98,14 +98,14 @@ final class DashboardController
                 'actor' => [
                     'name' => $member->name,
                     'email' => $member->email,
-                    'avatar_url' => null,
+                    'avatar_url' => $member->avatar_url,
                 ],
                 'actor_is_self' => $member->id === $user->id,
                 'context' => [],
             ]);
 
         $invited = $workspace->pendingInvitations()
-            ->with('invitedBy:id,name,email')
+            ->with('invitedBy:id,name,email,avatar_path')
             ->latest()
             ->limit($limit)
             ->get()
@@ -116,7 +116,7 @@ final class DashboardController
                 'actor' => $invitation->invitedBy === null ? null : [
                     'name' => $invitation->invitedBy->name,
                     'email' => $invitation->invitedBy->email,
-                    'avatar_url' => null,
+                    'avatar_url' => $invitation->invitedBy->avatar_url,
                 ],
                 'actor_is_self' => $invitation->invited_by === $user->id,
                 'context' => ['invited_email' => $invitation->email],
