@@ -4,7 +4,7 @@ import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, 
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Meeting } from '@/lib/meetings';
 import type { Project, ProjectMember } from '@/lib/projects';
-import type { Task, TaskMember } from '@/lib/tasks';
+import type { BoardColumn, Task, TaskMember } from '@/lib/tasks';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 
 const props = defineProps<{
@@ -13,7 +13,9 @@ const props = defineProps<{
     canManageTasks: boolean;
     canManageMeetings: boolean;
     canManageProjectMembers: boolean;
+    canManageBoardColumns: boolean;
     tasks: Task[];
+    boardColumns: BoardColumn[];
     meetings: Meeting[];
     members: TaskMember[];
     projectMembers: ProjectMember[];
@@ -43,7 +45,21 @@ const isDeleteDialogOpen = ref(false);
 
 const isCreateTaskModalOpen = ref(false);
 const taskModalTarget = ref<Task | null>(null);
+const taskModalMode = ref<'view' | 'edit'>('view');
 const deleteTaskTarget = ref<Task | null>(null);
+
+function openTaskDetails(task: Task) {
+    taskModalMode.value = 'view';
+    taskModalTarget.value = task;
+}
+
+function openTaskEdit(task: Task) {
+    taskModalMode.value = 'edit';
+    taskModalTarget.value = task;
+}
+
+const isCreateColumnModalOpen = ref(false);
+const deleteColumnTarget = ref<BoardColumn | null>(null);
 
 const isCreateMeetingModalOpen = ref(false);
 const meetingModalTarget = ref<Meeting | null>(null);
@@ -96,10 +112,15 @@ function onDeleted() {
                         <KanbanBoard
                             v-if="tasks.length > 0 || canManageTasks"
                             :tasks="tasks"
+                            :board-columns="boardColumns"
                             :current-user-id="currentUserId"
                             :can-manage-tasks="canManageTasks"
-                            @edit="(task) => (taskModalTarget = task)"
+                            :can-manage-board-columns="canManageBoardColumns"
+                            @open="openTaskDetails"
+                            @edit="openTaskEdit"
                             @delete="(task) => (deleteTaskTarget = task)"
+                            @create-column="isCreateColumnModalOpen = true"
+                            @delete-column="(column) => (deleteColumnTarget = column)"
                         />
 
                         <AppEmptyState v-else title="No tasks yet" description="Nobody has added a task to this project yet.">
@@ -253,15 +274,30 @@ function onDeleted() {
         @update:open="(value) => (isCreateTaskModalOpen = value)"
     />
 
-    <EditTaskModal
+    <TaskDetailModal
         :open="taskModalTarget !== null"
         :task="taskModalTarget"
         :members="members"
+        :board-columns="boardColumns"
         :can-manage="canManageTasks"
+        :initial-mode="taskModalMode"
         @update:open="(value) => !value && (taskModalTarget = null)"
     />
 
     <DeleteTaskDialog :open="deleteTaskTarget !== null" :task="deleteTaskTarget" @update:open="(value) => !value && (deleteTaskTarget = null)" />
+
+    <CreateBoardColumnModal
+        :open="isCreateColumnModalOpen"
+        :project-id="project.id"
+        @update:open="(value) => (isCreateColumnModalOpen = value)"
+    />
+
+    <DeleteBoardColumnDialog
+        :open="deleteColumnTarget !== null"
+        :column="deleteColumnTarget"
+        :project-id="project.id"
+        @update:open="(value) => !value && (deleteColumnTarget = null)"
+    />
 
     <CreateMeetingModal :open="isCreateMeetingModalOpen" :project-id="project.id" @update:open="(value) => (isCreateMeetingModalOpen = value)" />
 

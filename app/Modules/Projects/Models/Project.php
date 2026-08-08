@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Models;
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Database\Factories\ProjectFactory;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use App\ProjectRole;
@@ -46,6 +47,11 @@ final class Project extends Model
     public function meetings(): HasMany
     {
         return $this->hasMany(Meeting::class);
+    }
+
+    public function boardColumns(): HasMany
+    {
+        return $this->hasMany(BoardColumn::class);
     }
 
     public function members(): BelongsToMany

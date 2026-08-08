@@ -11,7 +11,7 @@ final class UpdateTaskStatusAction
 {
     public function handle(Task $task, UpdateTaskStatusData $data): Task
     {
-        $task->update(['status' => $data->status]);
+        $task->update(['board_column_id' => $data->board_column_id]);
 
         return $task->refresh();
     }

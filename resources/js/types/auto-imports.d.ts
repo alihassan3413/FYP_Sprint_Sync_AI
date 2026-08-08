@@ -10,7 +10,6 @@ declare global {
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
-  const TASK_STATUSES: typeof import('../lib/tasks').TASK_STATUSES
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -73,7 +72,6 @@ declare global {
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
   const storeToRefs: typeof import('pinia').storeToRefs
-  const taskStatusLabel: typeof import('../lib/tasks').taskStatusLabel
   const toDateTimeLocalValue: typeof import('../lib/meetings').toDateTimeLocalValue
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
@@ -135,7 +133,7 @@ declare global {
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
   // @ts-ignore
-  export type { TaskStatusValue, Task, TaskMember } from '../lib/tasks'
+  export type { Task, TaskMember, BoardColumn } from '../lib/tasks'
   import('../lib/tasks')
 }
 
@@ -148,7 +146,6 @@ declare module 'vue' {
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
-    readonly TASK_STATUSES: UnwrapRef<typeof import('../lib/tasks')['TASK_STATUSES']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -211,7 +208,6 @@ declare module 'vue' {
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
-    readonly taskStatusLabel: UnwrapRef<typeof import('../lib/tasks')['taskStatusLabel']>
     readonly toDateTimeLocalValue: UnwrapRef<typeof import('../lib/meetings')['toDateTimeLocalValue']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>

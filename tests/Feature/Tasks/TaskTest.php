@@ -6,10 +6,10 @@ namespace Tests\Feature\Tasks;
 
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use App\ProjectRole;
-use App\TaskStatus;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -26,6 +26,12 @@ final class TaskTest extends TestCase
 
     private Project $project;
 
+    private BoardColumn $todoColumn;
+
+    private BoardColumn $inProgressColumn;
+
+    private BoardColumn $doneColumn;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,6 +41,10 @@ final class TaskTest extends TestCase
         $this->member = User::factory()->create();
         $this->workspace->users()->attach($this->member->id, ['role' => UserRole::MEMBER->value]);
         $this->project = Project::factory()->forWorkspace($this->workspace)->create();
+
+        $this->todoColumn = $this->project->boardColumns()->where('position', 0)->firstOrFail();
+        $this->inProgressColumn = $this->project->boardColumns()->where('position', 1)->firstOrFail();
+        $this->doneColumn = $this->project->boardColumns()->where('position', 2)->firstOrFail();
     }
 
     private function taskRoute(string $name, ?Task $task = null, array $extra = []): string
@@ -63,11 +73,11 @@ final class TaskTest extends TestCase
             'project_id' => $this->project->id,
             'workspace_id' => $this->workspace->id,
             'title' => 'Wireframe the onboarding flow',
-            'status' => TaskStatus::TODO->value,
+            'board_column_id' => $this->todoColumn->id,
         ]);
     }
 
-    public function test_a_new_task_defaults_to_to_do(): void
+    public function test_a_new_task_defaults_to_the_first_default_column(): void
     {
         $this->actingAs($this->owner)
             ->post($this->taskRoute('workspace.projects.tasks.store'), ['title' => 'Fresh task'])
@@ -75,7 +85,7 @@ final class TaskTest extends TestCase
 
         $task = Task::query()->where('title', 'Fresh task')->firstOrFail();
 
-        $this->assertSame(TaskStatus::TODO, $task->status);
+        $this->assertSame($this->todoColumn->id, $task->board_column_id);
     }
 
     public function test_a_task_can_be_created_with_an_assignee(): void
@@ -187,20 +197,20 @@ final class TaskTest extends TestCase
         $this->assertSame('Untouchable', $task->fresh()->title);
     }
 
-    public function test_the_assignee_can_change_their_own_tasks_status(): void
+    public function test_the_assignee_can_move_their_own_task_to_another_column(): void
     {
         $task = Task::factory()->forProject($this->project)->assignedTo($this->member)->create();
 
         $this->actingAs($this->member)
             ->patch($this->taskRoute('workspace.projects.tasks.update-status', $task), [
-                'status' => TaskStatus::IN_PROGRESS->value,
+                'board_column_id' => $this->inProgressColumn->id,
             ])
             ->assertRedirect();
 
-        $this->assertSame(TaskStatus::IN_PROGRESS, $task->fresh()->status);
+        $this->assertSame($this->inProgressColumn->id, $task->fresh()->board_column_id);
     }
 
-    public function test_a_member_cannot_change_the_status_of_a_task_assigned_to_someone_else(): void
+    public function test_a_member_cannot_move_a_task_assigned_to_someone_else(): void
     {
         $other = User::factory()->create();
         $this->workspace->users()->attach($other->id, ['role' => UserRole::MEMBER->value]);
@@ -208,46 +218,50 @@ final class TaskTest extends TestCase
 
         $this->actingAs($this->member)
             ->patch($this->taskRoute('workspace.projects.tasks.update-status', $task), [
-                'status' => TaskStatus::DONE->value,
+                'board_column_id' => $this->doneColumn->id,
             ])
             ->assertForbidden();
 
-        $this->assertSame(TaskStatus::TODO, $task->fresh()->status);
+        $this->assertSame($this->todoColumn->id, $task->fresh()->board_column_id);
     }
 
-    public function test_a_member_cannot_change_the_status_of_an_unassigned_task(): void
+    public function test_a_member_cannot_move_an_unassigned_task(): void
     {
         $task = Task::factory()->forProject($this->project)->create();
 
         $this->actingAs($this->member)
             ->patch($this->taskRoute('workspace.projects.tasks.update-status', $task), [
-                'status' => TaskStatus::DONE->value,
+                'board_column_id' => $this->doneColumn->id,
             ])
             ->assertForbidden();
     }
 
-    public function test_an_owner_can_change_the_status_of_any_task(): void
+    public function test_an_owner_can_move_any_task_to_any_column(): void
     {
         $task = Task::factory()->forProject($this->project)->assignedTo($this->member)->create();
 
         $this->actingAs($this->owner)
             ->patch($this->taskRoute('workspace.projects.tasks.update-status', $task), [
-                'status' => TaskStatus::DONE->value,
+                'board_column_id' => $this->doneColumn->id,
             ])
             ->assertRedirect();
 
-        $this->assertSame(TaskStatus::DONE, $task->fresh()->status);
+        $this->assertSame($this->doneColumn->id, $task->fresh()->board_column_id);
     }
 
-    public function test_an_invalid_status_is_rejected(): void
+    public function test_a_board_column_from_another_project_is_rejected(): void
     {
+        $otherProject = Project::factory()->forWorkspace($this->workspace)->create();
+        $foreignColumn = $otherProject->boardColumns()->where('position', 0)->firstOrFail();
         $task = Task::factory()->forProject($this->project)->assignedTo($this->member)->create();
 
         $this->actingAs($this->member)
             ->patch($this->taskRoute('workspace.projects.tasks.update-status', $task), [
-                'status' => 'archived',
+                'board_column_id' => $foreignColumn->id,
             ])
-            ->assertSessionHasErrors('status');
+            ->assertSessionHasErrors('board_column_id');
+
+        $this->assertSame($this->todoColumn->id, $task->fresh()->board_column_id);
     }
 
     public function test_an_owner_can_delete_a_task(): void
@@ -340,11 +354,11 @@ final class TaskTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $foreignTask->id]);
     }
 
-    public function test_the_project_show_page_includes_tasks_and_members_for_the_board(): void
+    public function test_the_project_show_page_includes_tasks_board_columns_and_members(): void
     {
         $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
         Task::factory()->forProject($this->project)->assignedTo($this->member)->create();
-        Task::factory()->forProject($this->project)->withStatus(TaskStatus::DONE)->create();
+        Task::factory()->forProject($this->project)->done()->create();
 
         $this->actingAs($this->owner)
             ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
@@ -352,8 +366,10 @@ final class TaskTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('projects/show')
                 ->has('tasks', 2)
+                ->has('boardColumns', 3)
                 ->has('members', 2)
-                ->where('canManageTasks', true));
+                ->where('canManageTasks', true)
+                ->where('canManageBoardColumns', true));
     }
 
     public function test_deleting_a_project_deletes_its_tasks(): void

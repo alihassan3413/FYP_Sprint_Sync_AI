@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Database\Factories\TaskFactory;
 use App\Modules\Workspace\Models\Workspace;
-use App\TaskStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,7 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $title
  * @property string|null $description
- * @property TaskStatus $status
+ * @property int $board_column_id
  * @property Carbon|null $due_date
  * @property int $project_id
  * @property int $workspace_id
@@ -32,7 +31,7 @@ final class Task extends Model
     protected $fillable = [
         'title',
         'description',
-        'status',
+        'board_column_id',
         'due_date',
         'project_id',
         'workspace_id',
@@ -42,7 +41,6 @@ final class Task extends Model
     protected function casts(): array
     {
         return [
-            'status' => TaskStatus::class,
             'due_date' => 'date',
         ];
     }
@@ -60,6 +58,11 @@ final class Task extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function boardColumn(): BelongsTo
+    {
+        return $this->belongsTo(BoardColumn::class);
     }
 
     public function isAssignedTo(User $user): bool

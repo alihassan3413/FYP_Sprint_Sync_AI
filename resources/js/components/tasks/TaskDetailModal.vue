@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { CalendarClock, Loader2, User as UserIcon } from 'lucide-vue-next';
+import { CalendarClock, Loader2, Pencil, User as UserIcon } from 'lucide-vue-next';
 
-import { formatDueDate, isOverdue, type Task, type TaskMember } from '@/lib/tasks';
+import { formatDueDate, isOverdue, type BoardColumn, type Task, type TaskMember } from '@/lib/tasks';
 
 const props = defineProps<{
     open: boolean;
     task: Task | null;
     members: TaskMember[];
+    boardColumns: BoardColumn[];
     canManage: boolean;
+    initialMode: 'view' | 'edit';
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +18,8 @@ const emit = defineEmits<{
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
+
+const mode = ref<'view' | 'edit'>(props.initialMode);
 
 const form = useForm<{
     title: string;
@@ -32,16 +36,20 @@ const form = useForm<{
 watch(
     () => props.task,
     (task) => {
+        if (!task) return;
+
+        mode.value = props.canManage ? props.initialMode : 'view';
         form.clearErrors();
-        form.title = task?.title ?? '';
-        form.description = task?.description ?? '';
-        form.assigned_to = task?.assigned_to ?? null;
-        form.due_date = task?.due_date ?? '';
+        form.title = task.title;
+        form.description = task.description ?? '';
+        form.assigned_to = task.assigned_to;
+        form.due_date = task.due_date ?? '';
     },
     { immediate: true },
 );
 
-const overdue = computed(() => (props.task ? isOverdue(props.task) : false));
+const currentColumn = computed(() => props.boardColumns.find((c) => c.id === props.task?.board_column_id) ?? null);
+const overdue = computed(() => (props.task ? isOverdue(props.task, currentColumn.value?.is_done ?? false) : false));
 
 function submit() {
     if (!props.task || !props.canManage) return;
@@ -50,7 +58,7 @@ function submit() {
         preserveScroll: true,
         onSuccess: () => {
             emit('updated');
-            emit('update:open', false);
+            mode.value = 'view';
         },
     });
 }
@@ -62,8 +70,8 @@ function handleClose(value: boolean) {
 </script>
 
 <template>
-    <AppModal :open="open" :title="canManage ? 'Edit task' : 'Task details'" size="md" @update:open="handleClose">
-        <form v-if="task && canManage" id="edit-task-form" class="space-y-5 pt-2" @submit.prevent="submit">
+    <AppModal :open="open" :title="mode === 'edit' ? 'Edit task' : 'Task details'" size="md" @update:open="handleClose">
+        <form v-if="task && mode === 'edit'" id="edit-task-form" class="space-y-5 pt-2" @submit.prevent="submit">
             <AppFormInput id="edit-task-title" v-model="form.title" label="Title" :error="form.errors.title" required autofocus autocomplete="off" />
 
             <div class="grid gap-1.5">
@@ -86,9 +94,11 @@ function handleClose(value: boolean) {
         </form>
 
         <div v-else-if="task" class="space-y-4 pt-2">
-            <div>
-                <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Title</p>
-                <p class="text-foreground mt-1 text-sm font-medium">{{ task.title }}</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="text-foreground text-sm font-medium">{{ task.title }}</p>
+                <AppBadge v-if="currentColumn" :variant="currentColumn.is_done ? 'success' : 'neutral'" size="sm">
+                    {{ currentColumn.name }}
+                </AppBadge>
             </div>
 
             <div>
@@ -120,10 +130,16 @@ function handleClose(value: boolean) {
         </div>
 
         <template #footer>
-            <Button v-if="!canManage" type="button" @click="handleClose(false)"> Close </Button>
+            <template v-if="mode === 'view'">
+                <Button type="button" variant="outline" @click="handleClose(false)"> Close </Button>
+                <Button v-if="canManage" type="button" class="gap-1.5" @click="mode = 'edit'">
+                    <Pencil class="size-3.5" />
+                    Edit
+                </Button>
+            </template>
 
             <template v-else>
-                <Button type="button" variant="outline" :disabled="form.processing" @click="handleClose(false)"> Cancel </Button>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="mode = 'view'"> Cancel </Button>
 
                 <Button type="submit" form="edit-task-form" :disabled="form.processing || form.title.trim().length < 2">
                     <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />

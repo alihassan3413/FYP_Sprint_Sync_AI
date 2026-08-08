@@ -1,3 +1,11 @@
+export type BoardColumnData = {
+    id: number;
+    name: string;
+    position: number;
+    is_default: boolean;
+    is_done: boolean;
+    project_id: number;
+};
 export type MeetingData = {
     id: number;
     title: string;
@@ -20,6 +28,10 @@ export type ProjectData = {
     created_at: string;
     updated_at: string;
 };
+export enum ProjectRole {
+    MANAGER = 'manager',
+    MEMBER = 'member',
+}
 export type StoreMeetingData = {
     title: string;
     description?: string;
@@ -46,7 +58,7 @@ export type TaskData = {
     id: number;
     title: string;
     description?: string;
-    status: string;
+    board_column_id: number;
     due_date?: string;
     project_id: number;
     workspace_id: number;
@@ -55,13 +67,8 @@ export type TaskData = {
     created_at: string;
     updated_at: string;
 };
-export enum TaskStatus {
-    TODO = 'todo',
-    IN_PROGRESS = 'in_progress',
-    DONE = 'done',
-}
 export type UpdateTaskStatusData = {
-    status: TaskStatus;
+    board_column_id: number;
 };
 export enum UserRole {
     OWNER = 'owner',

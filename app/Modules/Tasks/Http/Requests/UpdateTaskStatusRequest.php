@@ -6,9 +6,8 @@ namespace App\Modules\Tasks\Http\Requests;
 
 use App\Modules\Tasks\Data\UpdateTaskStatusData;
 use App\Modules\Tasks\Models\Task;
-use App\TaskStatus;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 
 final class UpdateTaskStatusRequest extends FormRequest
 {
@@ -23,7 +22,11 @@ final class UpdateTaskStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', new Enum(TaskStatus::class)],
+            'board_column_id' => [
+                'required',
+                'integer',
+                Rule::exists('board_columns', 'id')->where('project_id', $this->task()->project_id),
+            ],
         ];
     }
 

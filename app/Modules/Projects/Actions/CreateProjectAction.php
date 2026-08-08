@@ -21,6 +21,12 @@ final class CreateProjectAction
 
         $project->members()->attach($creator->id, ['role' => ProjectRole::MANAGER->value]);
 
+        $project->boardColumns()->createMany([
+            ['name' => 'To Do', 'position' => 0, 'is_default' => true, 'is_done' => false],
+            ['name' => 'In Progress', 'position' => 1, 'is_default' => true, 'is_done' => false],
+            ['name' => 'Done', 'position' => 2, 'is_default' => true, 'is_done' => true],
+        ]);
+
         return $project;
     }
 }

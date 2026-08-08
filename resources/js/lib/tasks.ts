@@ -2,13 +2,11 @@
  * Task-related types and pure helpers, mirroring `lib/projects.ts`.
  */
 
-export type TaskStatusValue = 'todo' | 'in_progress' | 'done';
-
 export interface Task {
     id: number;
     title: string;
     description: string | null;
-    status: TaskStatusValue;
+    board_column_id: number;
     /** ISO date (YYYY-MM-DD), no time component */
     due_date: string | null;
     project_id: number;
@@ -27,18 +25,17 @@ export interface TaskMember {
     email: string;
 }
 
-export const TASK_STATUSES: { value: TaskStatusValue; label: string }[] = [
-    { value: 'todo', label: 'To Do' },
-    { value: 'in_progress', label: 'In Progress' },
-    { value: 'done', label: 'Done' },
-];
-
-export function taskStatusLabel(status: TaskStatusValue): string {
-    return TASK_STATUSES.find((s) => s.value === status)?.label ?? status;
+export interface BoardColumn {
+    id: number;
+    name: string;
+    position: number;
+    is_default: boolean;
+    is_done: boolean;
+    project_id: number;
 }
 
-export function isOverdue(task: Pick<Task, 'due_date' | 'status'>): boolean {
-    if (!task.due_date || task.status === 'done') return false;
+export function isOverdue(task: Pick<Task, 'due_date'>, isDone: boolean): boolean {
+    if (!task.due_date || isDone) return false;
     return new Date(`${task.due_date}T23:59:59`).getTime() < Date.now();
 }
 

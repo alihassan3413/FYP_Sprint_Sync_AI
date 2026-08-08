@@ -14,7 +14,9 @@ use App\Modules\Projects\Data\ProjectData;
 use App\Modules\Projects\Http\Requests\StoreProjectRequest;
 use App\Modules\Projects\Http\Requests\UpdateProjectRequest;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Tasks\Data\BoardColumnData;
 use App\Modules\Tasks\Data\TaskData;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use App\UserRole;
@@ -55,6 +57,12 @@ final class ProjectController
             'canManageTasks' => $user->can('create', [Task::class, $project]),
             'canManageMeetings' => $user->can('create', [Meeting::class, $project]),
             'canManageProjectMembers' => $user->can('manageMembers', $project),
+            'canManageBoardColumns' => $user->can('create', [BoardColumn::class, $project]),
+            'boardColumns' => $project->boardColumns()
+                ->orderBy('position')
+                ->get()
+                ->map(BoardColumnData::fromModel(...))
+                ->values(),
             'tasks' => $project->tasks()
                 ->with('assignee:id,name,email')
                 ->latest()

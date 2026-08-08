@@ -36,4 +36,19 @@ final class ProjectFactory extends Factory
     {
         return $this->state(fn () => ['description' => null]);
     }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Project $project) {
+            if ($project->boardColumns()->exists()) {
+                return;
+            }
+
+            $project->boardColumns()->createMany([
+                ['name' => 'To Do', 'position' => 0, 'is_default' => true, 'is_done' => false],
+                ['name' => 'In Progress', 'position' => 1, 'is_default' => true, 'is_done' => false],
+                ['name' => 'Done', 'position' => 2, 'is_default' => true, 'is_done' => true],
+            ]);
+        });
+    }
 }

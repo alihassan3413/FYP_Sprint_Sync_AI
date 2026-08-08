@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\TaskStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -15,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->text('description')->nullable();
-            $table->string('status')->default(TaskStatus::TODO->value);
+            $table->string('status')->default('todo');
             $table->date('due_date')->nullable();
 
             $table->foreignId('project_id')->constrained('projects')->cascadeOnDelete();
