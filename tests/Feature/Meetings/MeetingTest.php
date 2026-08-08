@@ -328,6 +328,44 @@ final class MeetingTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_the_project_show_page_exposes_full_meeting_details_for_a_project_member(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+            'title' => 'Design review',
+            'description' => 'Walk through the new mockups.',
+            'scheduled_at' => '2026-09-05 14:00:00',
+            'duration_minutes' => 45,
+            'meeting_link' => 'https://meet.example.com/design-review',
+        ]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/show')
+                ->where('meetings.0.id', $meeting->id)
+                ->where('meetings.0.title', 'Design review')
+                ->where('meetings.0.description', 'Walk through the new mockups.')
+                ->where('meetings.0.duration_minutes', 45)
+                ->where('meetings.0.meeting_link', 'https://meet.example.com/design-review')
+                ->where('meetings.0.created_by', $this->owner->id)
+                ->where('meetings.0.creator_name', $this->owner->name));
+    }
+
+    public function test_the_project_show_page_reports_a_null_meeting_link_when_none_is_set(): void
+    {
+        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create(['meeting_link' => null]);
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/show')
+                ->where('meetings.0.meeting_link', null));
+    }
+
     public function test_a_project_member_of_another_project_cannot_view_this_projects_meetings(): void
     {
         $otherProject = Project::factory()->forWorkspace($this->workspace)->create();

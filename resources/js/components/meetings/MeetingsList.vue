@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'create'): void;
+    (e: 'open', meeting: Meeting): void;
     (e: 'edit', meeting: Meeting): void;
     (e: 'delete', meeting: Meeting): void;
 }>();
@@ -55,6 +56,7 @@ const past = computed(() => props.meetings.filter((meeting) => isPastMeeting(mee
                         :key="meeting.id"
                         :meeting="meeting"
                         :can-manage="canManage"
+                        @open="(m) => emit('open', m)"
                         @edit="(m) => emit('edit', m)"
                         @delete="(m) => emit('delete', m)"
                     />
@@ -71,6 +73,7 @@ const past = computed(() => props.meetings.filter((meeting) => isPastMeeting(mee
                         :key="meeting.id"
                         :meeting="meeting"
                         :can-manage="canManage"
+                        @open="(m) => emit('open', m)"
                         @edit="(m) => emit('edit', m)"
                         @delete="(m) => emit('delete', m)"
                     />

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Loader2 } from 'lucide-vue-next';
+import { CalendarClock, Clock, Loader2, User as UserIcon, Video } from 'lucide-vue-next';
 
-import { toDateTimeLocalValue, type Meeting } from '@/lib/meetings';
+import { formatDuration, formatMeetingDate, formatMeetingTime, isPastMeeting, isValidMeetingLink, toDateTimeLocalValue, type Meeting } from '@/lib/meetings';
 
 const props = defineProps<{
     open: boolean;
     meeting: Meeting | null;
+    canManage: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -42,8 +43,11 @@ watch(
     { immediate: true },
 );
 
+const past = computed(() => (props.meeting ? isPastMeeting(props.meeting) : false));
+const hasJoinLink = computed(() => isValidMeetingLink(props.meeting?.meeting_link));
+
 function submit() {
-    if (!props.meeting) return;
+    if (!props.meeting || !props.canManage) return;
 
     form.put(workspaceRoute('workspace.projects.meetings.update', { project: props.meeting.project_id, meeting: props.meeting.id }), {
         preserveScroll: true,
@@ -61,8 +65,8 @@ function handleClose(value: boolean) {
 </script>
 
 <template>
-    <AppModal :open="open" title="Edit meeting" size="md" @update:open="handleClose">
-        <form v-if="meeting" id="edit-meeting-form" class="space-y-5 pt-2" @submit.prevent="submit">
+    <AppModal :open="open" :title="canManage ? 'Edit meeting' : 'Meeting details'" size="md" @update:open="handleClose">
+        <form v-if="meeting && canManage" id="edit-meeting-form" class="space-y-5 pt-2" @submit.prevent="submit">
             <AppFormInput id="edit-meeting-title" v-model="form.title" label="Title" :error="form.errors.title" required autofocus autocomplete="off" />
 
             <div class="grid gap-1.5">
@@ -105,13 +109,66 @@ function handleClose(value: boolean) {
             <p class="text-muted-foreground text-xs">Meeting link is optional — paste a Zoom, Meet, or Teams URL.</p>
         </form>
 
-        <template #footer>
-            <Button type="button" variant="outline" :disabled="form.processing" @click="handleClose(false)"> Cancel </Button>
+        <div v-else-if="meeting" class="space-y-4 pt-2">
+            <div class="flex items-center gap-2">
+                <p class="text-foreground text-sm font-medium">{{ meeting.title }}</p>
+                <AppBadge :variant="past ? 'neutral' : 'success'" size="sm">{{ past ? 'Past' : 'Upcoming' }}</AppBadge>
+            </div>
 
-            <Button type="submit" form="edit-meeting-form" :disabled="form.processing || form.title.trim().length < 2 || !form.scheduled_at">
-                <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ form.processing ? 'Saving…' : 'Save changes' }}
-            </Button>
+            <div>
+                <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Agenda</p>
+                <p class="text-foreground mt-1 text-sm leading-relaxed">{{ meeting.description || 'No agenda added.' }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Date & time</p>
+                    <div class="mt-1.5 flex items-center gap-1.5">
+                        <CalendarClock class="text-muted-foreground size-3.5" />
+                        <span class="text-sm">{{ formatMeetingDate(meeting.scheduled_at) }} · {{ formatMeetingTime(meeting.scheduled_at) }}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Duration</p>
+                    <div class="mt-1.5 flex items-center gap-1.5">
+                        <Clock class="text-muted-foreground size-3.5" />
+                        <span class="text-sm">{{ formatDuration(meeting.duration_minutes) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Meeting link</p>
+                <div class="mt-1.5">
+                    <Button v-if="hasJoinLink" as="a" :href="meeting.meeting_link!" target="_blank" rel="noopener noreferrer" size="sm" class="gap-1.5">
+                        <Video class="size-3.5" />
+                        Join Meeting
+                    </Button>
+                    <p v-else class="text-muted-foreground text-sm">No link added yet.</p>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Created by</p>
+                <div class="mt-1.5 flex items-center gap-1.5">
+                    <UserIcon class="text-muted-foreground size-3.5" />
+                    <span class="text-sm">{{ meeting.creator_name ?? 'Unknown' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <template #footer>
+            <Button v-if="!canManage" type="button" @click="handleClose(false)"> Close </Button>
+
+            <template v-else>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="handleClose(false)"> Cancel </Button>
+
+                <Button type="submit" form="edit-meeting-form" :disabled="form.processing || form.title.trim().length < 2 || !form.scheduled_at">
+                    <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ form.processing ? 'Saving…' : 'Save changes' }}
+                </Button>
+            </template>
         </template>
     </AppModal>
 </template>

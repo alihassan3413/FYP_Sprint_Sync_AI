@@ -7,19 +7,19 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 9 | FR01, FR05, FR14, FR15, FR16, FR17, FR24, FR29, FR32 |
+| Complete | 13 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR24, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 17 | FR06–FR13, FR18–FR23, FR25, FR26, FR28 |
+| Not started | 13 | FR10–FR13, FR18–FR23, FR25, FR26, FR28 |
 
-Strict completion: **9 / 35 (25.7%)**. Weighted (Complete=1, Partial=0.5): **38.6%**.
+Strict completion: **13 / 35 (37.1%)**. Weighted (Complete=1, Partial=0.5): **50.0%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
-and meeting scheduling are all built and tested. Still missing: viewing a
-meeting's full details/join flow and edit-notice (FR06–FR09), transcription
-+ AI summary (FR10–FR13), archive/search (FR18–FR19), analytics (FR20),
-in-app/email notifications (FR21–FR23), notification preferences (FR25),
-profile pictures (FR26), and audit log (FR28).
+and a complete meeting lifecycle (schedule, view details, join, edit,
+cancel) are all built and tested. Still missing: transcription + AI summary
+(FR10–FR13), archive/search (FR18–FR19), analytics (FR20), in-app/email
+notifications (FR21–FR23), notification preferences (FR25), profile
+pictures (FR26), and audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -293,6 +293,74 @@ automatically too.
   itself, since that's the only place meetings are ever surfaced), and the
   pre-existing cross-project/cross-workspace isolation tests kept intact.
 
+### 10. FR06–FR09 — Meeting details, join, edit, and cancel
+
+Completed the meeting lifecycle on top of the unchanged FR05 backend — no
+migration, route, controller, policy, or DTO changes were needed; every
+requirement was reachable through the existing
+`workspace.projects.meetings.{store,update,destroy}` endpoints and
+`MeetingPolicy` (entry #9). This was purely a frontend completion pass,
+following the exact pattern `EditTaskModal` already established for Tasks.
+
+- **FR06 (details) + FR08 (edit) share one component**, `EditMeetingModal`,
+  now taking a `canManage` prop exactly like `EditTaskModal`: managers get
+  the existing edit form, everyone else gets a read-only "Meeting details"
+  view (title, agenda, date/time, duration, a Join Meeting button or "No
+  link added yet.", and "Created by" via `creator_name`). No "status"
+  field exists in the `meetings` table and none was added (per the task's
+  explicit "don't add status complexity" instruction); the closest honest
+  read of "status if one already exists" is the already-established
+  Upcoming/Past distinction (`isPastMeeting()`), so that's now shown as a
+  badge in both the card and the details view instead of inventing a new
+  persisted status.
+- **FR07 (join)**: `MeetingCard` now emits `open` on a click anywhere on
+  the card (mirroring `TaskCard`), which routes to the same
+  `EditMeetingModal` used for FR06/FR08 — "clicking a meeting opens its
+  details" and "click to edit" are the same action, gated by `canManage`
+  inside the modal, not by two different entry points. A dedicated **Join
+  Meeting** button (`<Button as="a">`, reka-ui's `Primitive` rendering a
+  real `<a>` styled as a button) replaced the small text link, present on
+  both the card and inside the details modal, always `target="_blank"
+  rel="noopener noreferrer"`.
+- **New `isValidMeetingLink()`** in `lib/meetings.ts` — parses the link
+  with the `URL` constructor and only accepts `http:`/`https:` protocols.
+  Missing or invalid links never render a Join button; a "No link added"
+  note shows instead. This is stricter than the backend's `url` validation
+  rule (which is intentionally permissive about schemes), added as a
+  client-side safety net so a stray `javascript:`/`data:` link — however
+  it got into the database — can never end up as a clickable
+  `target="_blank"` action.
+- **Menu-only actions unaffected**: `MeetingActionsMenu`'s Edit/Delete
+  items still route through the same `edit`/`delete` events as before;
+  the card's whole-surface click is additive, not a replacement, and both
+  the menu and the Join button call `@click.stop` so they don't also
+  trigger the card's `open`.
+- **FR09 (cancel/delete)**: `DeleteMeetingDialog` was already a complete,
+  confirmed hard-delete flow against the existing `destroy` endpoint —
+  reused as-is, no soft-delete or status field added, matching "don't add
+  status complexity unless the domain already supports it." After a
+  successful delete, Inertia's `back()` response reloads the page's props,
+  so the meeting disappears from the list immediately without a manual
+  refetch.
+- **Backend tests**: 2 new cases added to `MeetingTest.php` (23, after
+  entry #9, → 25) —
+  `test_the_project_show_page_exposes_full_meeting_details_for_a_project_member`
+  asserts every FR06 field (`title`, `description`, `duration_minutes`,
+  `meeting_link`, `created_by`, `creator_name`) round-trips correctly to a
+  Project Member's Inertia payload, and
+  `test_the_project_show_page_reports_a_null_meeting_link_when_none_is_set`
+  confirms the join-link rendering data contract (`null` vs. a URL string)
+  the frontend's `isValidMeetingLink()` branches on. View/edit/delete
+  permissions and cross-project/cross-workspace isolation were already
+  fully covered by entry #9 and needed no changes, since this task
+  introduced no new backend surface.
+- **No JS test runner exists in this project** (unchanged from prior
+  entries) — the click-to-open, Join Meeting button, and read-only-vs-edit
+  modal switch were verified by ESLint + a successful production build
+  (`show-*.js` bundle grew from 50.18 kB to 52.74 kB, confirming the new
+  code compiled) plus manual code review against the exact pattern
+  `EditTaskModal`/`TaskCard` already prove out in production.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -371,11 +439,11 @@ which also updated the two `ProjectTest` cases that assumed any workspace
 member could list/view any project (now correctly scoped to project
 membership) and added dedicated coverage for the new membership rules.
 
-Full suite after entry #9:
+Full suite after entry #10:
 
 ```
 php artisan test --compact
-Tests:    181 passed (575 assertions)
+Tests:    183 passed (611 assertions)
 
 vendor/bin/pint --dirty --format agent
 → passed
@@ -384,24 +452,28 @@ npm run lint:check
 → 0 errors
 
 npm run build
-✓ built in 2.33s (no errors)
+✓ built in 2.26s (show-*.js: 50.18 kB → 52.74 kB, no errors)
 ```
 
 Covers: auth, email verification, password reset/update, profile update,
 dashboard, workspace tenant isolation, workspace CRUD, workspace roles,
 workspace invitations, team member management, AI assistant endpoints,
 module boundaries, Projects (25 tests), Tasks (26 tests), project
-membership (19 tests in `ProjectMemberTest.php`), Meetings (23 tests —
+membership (19 tests in `ProjectMemberTest.php`), Meetings (25 tests —
 Owner, Admin-without-membership, Project Manager on their own project,
-Project Manager of a different project denied, Project Member view-only,
-Project Member of a different project denied, unassigned workspace
-member denied on schedule/update/delete/view, outsider 404, cross-project
-and cross-workspace isolation, project-deletion cascade).
+Project Manager of a different project denied, Project Member view-only
+with full-field detail exposure, Project Member of a different project
+denied, unassigned workspace member denied on schedule/update/delete/view,
+outsider 404, join-link data contract (present + null), cross-project and
+cross-workspace isolation, project-deletion cascade).
 
 No JS test runner exists in this project (`package.json` only has
-build/lint/format scripts). Entry #9 touched no frontend files, so no
-new manual UI verification was needed beyond confirming lint/build stay
-clean.
+build/lint/format scripts). Entry #10's frontend work (click-to-open,
+Join Meeting button, read-only-vs-edit modal switch) was verified by
+ESLint + a successful production build plus manual review against the
+`TaskCard`/`EditTaskModal` pattern it directly mirrors — the same
+verification approach used for every other frontend-only change in this
+project's history (entries #6, #9).
 
 ## Known gaps worth flagging
 
@@ -422,17 +494,20 @@ clean.
   (Echo/Pusher/Reverb), which hasn't been introduced.
 - FR15-01 (auto-create tasks from a distributed meeting summary) is
   intentionally not built — it depends on the entire meetings/AI-summary
-  pipeline (FR05–FR13, of which only FR05 exists so far).
+  pipeline (FR05–FR13, of which FR05–FR09 now exist).
 - The **Activity** tab on the project page is still a visual placeholder
-  only (`AppEmptyState`, no route/data behind it) — out of scope for FR05.
-- FR05 has no participant list, RSVP, calendar sync, or notification on
-  create/update/cancel — the report defers those to FR06–FR09/FR23 and the
-  meeting fields spec for this task didn't include participants, so none
-  of that was built. A meeting is visible to every workspace member with
-  access to its project, not a specific invited subset.
+  only (`AppEmptyState`, no route/data behind it) — out of scope for the
+  meetings domain.
+- Meetings still have no participant list, RSVP, calendar sync, or
+  notification on create/update/cancel — the meeting fields spec across
+  FR05–FR09 never included participants, so none of that was built. A
+  meeting is visible to every project member (or workspace Admin+), not a
+  specific invited subset. FR23 (notification triggers) is the natural
+  place to revisit this.
 - No Zoom/Meet integration, recording, transcription, or AI summary
-  (FR10–FR13) — `meeting_link` is a free-text URL the creator pastes in,
-  exactly as scoped ("Do not implement Zoom integration... yet").
+  (FR10–FR13) — `meeting_link` is a free-text URL the creator pastes in
+  and the Join Meeting button just opens it in a new tab, exactly as
+  scoped ("Do not implement Zoom integration/WebRTC/recording... yet").
 - ~~2 pre-existing `TaskTest` failures~~ — fixed in entry #8; the full
   suite is green again.
 - **No custom project roles** — only the fixed `manager`/`member` pair,
@@ -467,30 +542,35 @@ clean.
   action, so `MeetingPolicy` only needed the two tiers Tasks already uses
   for its non-status abilities. Flagging simply so a future FR (e.g.
   "participants can RSVP") isn't mistaken for something already covered.
+- **The Join Meeting button opens whatever URL is stored, unvalidated
+  beyond scheme.** `isValidMeetingLink()` only checks for `http:`/`https:`
+  — it doesn't check the link is actually reachable or actually a
+  video-call URL. Acceptable for "no Zoom API yet" scope; would need
+  revisiting if/when a real provider integration (FR10+) starts trusting
+  this field more.
+- **No dedicated "join" page or countdown/reminder UI** — FR07 was read
+  literally as "open the stored link," not a lobby/waiting-room
+  experience. If the FYP report's grading rubric expects more than a
+  same-tab-safe external link, that's a follow-up, not something this
+  task silently expanded into.
 
 ## Next recommended task
 
-The suite is 100% green (181 passed). Entries #7 and #8 (Meetings, project
-membership) are already committed (`531cc12`, `c1da90c`); entry #9
-(`MeetingPolicy.php`, `MeetingTest.php`) is the only uncommitted work as of
-this update — review and commit it before starting anything else.
+The suite is 100% green (183 passed). Entries #7–#9 (Meetings, project
+membership, meeting access control) are already committed; entry #10
+(`MeetingCard.vue`, `EditMeetingModal.vue`, `MeetingsList.vue`,
+`lib/meetings.ts`, `projects/show.vue`, `MeetingTest.php`) is the only
+uncommitted work as of this update — review and commit it before starting
+anything else.
 
-**FR06–FR09 — Meeting details, join, edit, cancel**, continuing the
-meetings domain FR05 just started:
-- FR06 (view full meeting details) is nearly free — `MeetingData` already
-  carries every field; it likely just needs a details view, similar to how
-  `EditTaskModal`'s read-only mode works for non-managers on tasks.
-- FR07 (join) is just "open `meeting_link` in a new tab," already present
-  on `MeetingCard` — confirm the report doesn't expect more (e.g. a
-  dedicated join page or in-app video).
-- FR08 (edit) and FR09 (cancel/delete) are **already fully implemented**
-  by this task's `EditMeetingModal`/`DeleteMeetingDialog` — re-check the
-  FR wording before re-building; there may be nothing left to do for
-  those two beyond report bookkeeping.
-- FR23 (email triggers on schedule/update/cancel) is the natural follow-up
-  once the above is confirmed — `CreateMeetingAction`/`UpdateMeetingAction`/
-  `DeleteMeetingAction` are the exact seams to hook a `Mail`/`Notification`
-  into, mirroring how `MemberInvitationMail` already works in this app.
+**FR23 — Email notification triggers**, the natural follow-up now that
+the full meeting lifecycle (schedule/view/join/edit/cancel) exists:
+`CreateMeetingAction`/`UpdateMeetingAction`/`DeleteMeetingAction` are the
+exact seams to hook a `Mailable` into, mirroring how `MemberInvitationMail`
+already works in this app for workspace invitations. Would need a
+participants concept first (see Known gaps) to know *who* to notify beyond
+"every project member," which is worth scoping explicitly before writing
+the mail classes.
 
 Save FR10–FR13 (transcription/AI summary) for last — it's the hardest,
 most novel piece and should come only once there's real meeting data

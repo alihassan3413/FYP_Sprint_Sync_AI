@@ -44,6 +44,7 @@ declare global {
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
+  const isValidMeetingLink: typeof import('../lib/meetings').isValidMeetingLink
   const markRaw: typeof import('vue').markRaw
   const memberPresence: typeof import('../lib/members').memberPresence
   const nextTick: typeof import('vue').nextTick
@@ -181,6 +182,7 @@ declare module 'vue' {
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
+    readonly isValidMeetingLink: UnwrapRef<typeof import('../lib/meetings')['isValidMeetingLink']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>

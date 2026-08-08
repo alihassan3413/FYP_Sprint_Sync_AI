@@ -115,6 +115,7 @@ function onDeleted() {
                             :meetings="meetings"
                             :can-manage="canManageMeetings"
                             @create="isCreateMeetingModalOpen = true"
+                            @open="(meeting) => (meetingModalTarget = meeting)"
                             @edit="(meeting) => (meetingModalTarget = meeting)"
                             @delete="(meeting) => (deleteMeetingTarget = meeting)"
                         />
@@ -267,6 +268,7 @@ function onDeleted() {
     <EditMeetingModal
         :open="meetingModalTarget !== null"
         :meeting="meetingModalTarget"
+        :can-manage="canManageMeetings"
         @update:open="(value) => !value && (meetingModalTarget = null)"
     />
 

@@ -45,3 +45,14 @@ export function toDateTimeLocalValue(iso: string): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+export function isValidMeetingLink(link: string | null | undefined): link is string {
+    if (!link) return false;
+
+    try {
+        const url = new URL(link);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
