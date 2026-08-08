@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -61,6 +62,11 @@ final class Meeting extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function hasValidJoinLink(): bool
+    {
+        return $this->meeting_link !== null && Str::startsWith($this->meeting_link, ['http://', 'https://']);
     }
 
     protected static function newFactory(): MeetingFactory

@@ -35,7 +35,7 @@ final class MeetingController
         Meeting $meeting,
         UpdateMeetingAction $action,
     ): RedirectResponse {
-        $meeting = $action->handle($meeting, $request->toDTO());
+        $meeting = $action->handle($meeting, $request->user(), $request->toDTO());
 
         return back()->with('success', "Meeting \"{$meeting->title}\" updated.");
     }
@@ -51,7 +51,7 @@ final class MeetingController
 
         $title = $meeting->title;
 
-        $action->handle($meeting);
+        $action->handle($meeting, $request->user());
 
         return back()->with('success', "Meeting \"{$title}\" deleted.");
     }

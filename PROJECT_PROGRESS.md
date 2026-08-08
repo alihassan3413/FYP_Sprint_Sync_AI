@@ -7,19 +7,20 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 13 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR24, FR29, FR32 |
+| Complete | 14 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR23, FR24, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 13 | FR10–FR13, FR18–FR23, FR25, FR26, FR28 |
+| Not started | 12 | FR10–FR13, FR18–FR22, FR25, FR26, FR28 |
 
-Strict completion: **13 / 35 (37.1%)**. Weighted (Complete=1, Partial=0.5): **50.0%**.
+Strict completion: **14 / 35 (40.0%)**. Weighted (Complete=1, Partial=0.5): **52.9%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
-and a complete meeting lifecycle (schedule, view details, join, edit,
-cancel) are all built and tested. Still missing: transcription + AI summary
-(FR10–FR13), archive/search (FR18–FR19), analytics (FR20), in-app/email
-notifications (FR21–FR23), notification preferences (FR25), profile
-pictures (FR26), and audit log (FR28).
+a complete meeting lifecycle (schedule, view details, join, edit, cancel),
+and email notifications on every meeting lifecycle event are all built and
+tested. Still missing: transcription + AI summary (FR10–FR13),
+archive/search (FR18–FR19), analytics (FR20), in-app notifications +
+notification preferences (FR21–FR22, FR25), profile pictures (FR26), and
+audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -361,6 +362,104 @@ following the exact pattern `EditTaskModal` already established for Tasks.
   code compiled) plus manual code review against the exact pattern
   `EditTaskModal`/`TaskCard` already prove out in production.
 
+### 11. FR23 — Meeting email notifications
+
+Read this file, the Meetings module, `MemberInvitationMail` (the only
+existing Mail class in the app), and the project-membership model
+(entries #8/#9) before writing anything. Every design choice below reuses
+that existing architecture rather than introducing a new one.
+
+**Trigger points — inside the Action layer, not the controller.**
+`CreateMeetingAction`, `UpdateMeetingAction`, `DeleteMeetingAction` each
+gained a private `notify()` step at the end of `handle()`, matching how
+`CreateWorkspaceInvitationAction::dispatchMail()` already does this for
+invitations. `MeetingController` only changed to pass `$request->user()`
+through to `UpdateMeetingAction`/`DeleteMeetingAction` (previously only
+`CreateMeetingAction` received the actor) — controllers stay exactly as
+thin as before, just forwarding the actor the actions now need to know
+who to exclude and whom to credit as "scheduled/updated/cancelled by."
+
+**Recipients — `ResolveMeetingRecipients`, one new shared class.** All
+three actions call it; it returns `$meeting->project->members()` (the
+`project_users` roster — Manager *and* Member roles) minus the acting
+user, deduplicated by id. Two deliberate reads of the requirement:
+
+- *"Workspace Owner/Admin may be included only if they are relevant
+  according to the existing membership model"* — the existing model's
+  definition of "relevant to a project" is a `project_users` row, not the
+  workspace-rank override that merely grants view/manage *permission*
+  without membership (entry #8). An Owner/Admin who isn't an explicit
+  project member does **not** get emailed about that project's meetings —
+  they can still see everything if they open the page, but they don't get
+  spammed for every project across the workspace. An Owner/Admin who *is*
+  a project member (e.g. the project creator, auto-attached as Manager by
+  `CreateProjectAction`) is treated exactly like any other project member.
+  This directly satisfies "do not email unrelated workspace members."
+- *"Do not send to the actor if existing conventions exclude
+  self-notifications"* — no prior precedent exists in this codebase
+  (`MemberInvitationMail` only ever emails one external invitee, never a
+  set of existing users, so there was nothing to "stay consistent" with).
+  Applied the standard, expected default instead: whoever performed the
+  create/update/delete never receives their own notification about it.
+- Duplicates are structurally impossible from the DB side (`project_users`
+  has a unique `(project_id, user_id)` constraint) but
+  `ResolveMeetingRecipients` still calls `->unique('id')` defensively, and
+  a dedicated test asserts the queued recipient list has no repeats.
+
+**Update notifications only fire on a meaningful change.**
+`UpdateMeetingAction` calls `$meeting->wasChanged([...5 fields...])`
+*after* `$meeting->update(...)` and only notifies if true — opening the
+edit modal and saving without changing anything (or Owner/Admin editing a
+project they don't otherwise interact with) doesn't spam anyone.
+
+**Three new `Mailable`s in `app/Mail/`** (not module-scoped — matches
+where `MemberInvitationMail` already lives, the one existing precedent):
+`MeetingScheduledMail`, `MeetingUpdatedMail`, `MeetingCancelledMail`. All
+three implement `ShouldQueue` with `tries = 3` / `backoff = 30`, identical
+to `MemberInvitationMail` — queue infrastructure already exists
+(`QUEUE_CONNECTION=database` in `.env.example`, `jobs` table migration
+already present), so "prefer queued delivery" required zero new
+infrastructure. Three matching Blade views in `resources/views/emails/`
+reuse the exact table-based, email-client-safe layout
+`member-invitation.blade.php` established (brand mark, offset-shadow
+card, `#d4ff4f` accent) — scheduled/updated show project name, title,
+date/time, duration, agenda if present, and a Join Meeting button if
+`hasValidJoinLink()` (new `Meeting` model method, server-side mirror of
+the frontend's `isValidMeetingLink()` from entry #10 — only `http`/`https`
+links render a join action); cancelled clearly states the meeting won't
+happen, shows what it was scheduled for, and has no join action.
+
+**Failure isolation.** `DeleteMeetingAction` captures `projectName`/
+`meetingTitle`/`scheduledAt`/recipients *before* calling
+`$meeting->delete()`, so the cancellation email is only even attempted
+once the delete has actually happened — a failed delete can't produce a
+false "cancelled" email. All three actions wrap their `Mail::queue()`
+loop in `try`/`catch (Throwable)`, logging via `Log::error()` with the
+same shape `ExecuteToolCall` already uses for its own failure logging
+(`Log::error('message', ['...context...', 'exception' => $e])`) — a mail
+dispatch failure is swallowed and reported, never bubbles up to fail the
+HTTP response or roll back the meeting write that already succeeded.
+Since `Mail::queue()` against the `database` queue connection is just a
+row insert (not a live network send), the realistic failure surface here
+is a DB error, not a provider error — so "don't expose sensitive provider
+errors to users" is satisfied by construction: the user only ever sees
+the existing `back()->with('success', ...)` response, never anything
+about mail at all.
+
+**Tests**: new `tests/Feature/Meetings/MeetingNotificationTest.php`
+(10 tests, `Mail::fake()` in `setUp()`) — scheduled email reaches exactly
+the project's Manager + Member and not the unassigned workspace member or
+the creator; email payload matches the meeting's actual fields; updates
+with a real change email the project (minus actor), updates with no real
+change email nobody; cancellation reaches the project (minus actor) with
+`cancelledByName` set; a combined "unassigned member never appears in any
+of the three mailables' recipients" check; and an explicit no-duplicate-
+recipients assertion. `MeetingTest.php`'s existing 25 tests needed no
+changes and stayed green throughout — the Action signature changes
+(`UpdateMeetingAction`/`DeleteMeetingAction` gaining a `User $actor`
+parameter) were absorbed entirely by `MeetingController`, invisible to
+every test that goes through the HTTP layer.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -439,11 +538,11 @@ which also updated the two `ProjectTest` cases that assumed any workspace
 member could list/view any project (now correctly scoped to project
 membership) and added dedicated coverage for the new membership rules.
 
-Full suite after entry #10:
+Full suite after entry #11:
 
 ```
 php artisan test --compact
-Tests:    183 passed (611 assertions)
+Tests:    193 passed (644 assertions)
 
 vendor/bin/pint --dirty --format agent
 → passed
@@ -452,28 +551,24 @@ npm run lint:check
 → 0 errors
 
 npm run build
-✓ built in 2.26s (show-*.js: 50.18 kB → 52.74 kB, no errors)
+✓ built in 2.35s (no frontend files touched — identical output hashes to entry #10)
 ```
 
 Covers: auth, email verification, password reset/update, profile update,
 dashboard, workspace tenant isolation, workspace CRUD, workspace roles,
 workspace invitations, team member management, AI assistant endpoints,
 module boundaries, Projects (25 tests), Tasks (26 tests), project
-membership (19 tests in `ProjectMemberTest.php`), Meetings (25 tests —
-Owner, Admin-without-membership, Project Manager on their own project,
-Project Manager of a different project denied, Project Member view-only
-with full-field detail exposure, Project Member of a different project
-denied, unassigned workspace member denied on schedule/update/delete/view,
-outsider 404, join-link data contract (present + null), cross-project and
-cross-workspace isolation, project-deletion cascade).
+membership (19 tests in `ProjectMemberTest.php`), Meetings (25 tests,
+unchanged from entry #10), meeting notifications (10 new tests in
+`MeetingNotificationTest.php` — scheduled email reaches the right project
+members and excludes the actor + unassigned members, email payload
+matches the meeting's fields, meaningful updates email while no-op
+updates don't, cancellation reaches the project minus the actor with the
+right "cancelled by" name, and an explicit no-duplicate-recipients check).
 
 No JS test runner exists in this project (`package.json` only has
-build/lint/format scripts). Entry #10's frontend work (click-to-open,
-Join Meeting button, read-only-vs-edit modal switch) was verified by
-ESLint + a successful production build plus manual review against the
-`TaskCard`/`EditTaskModal` pattern it directly mirrors — the same
-verification approach used for every other frontend-only change in this
-project's history (entries #6, #9).
+build/lint/format scripts). Entry #11 touched no frontend files, so
+`npm run build` is an unaffected-regression check, not new coverage.
 
 ## Known gaps worth flagging
 
@@ -498,12 +593,12 @@ project's history (entries #6, #9).
 - The **Activity** tab on the project page is still a visual placeholder
   only (`AppEmptyState`, no route/data behind it) — out of scope for the
   meetings domain.
-- Meetings still have no participant list, RSVP, calendar sync, or
-  notification on create/update/cancel — the meeting fields spec across
-  FR05–FR09 never included participants, so none of that was built. A
-  meeting is visible to every project member (or workspace Admin+), not a
-  specific invited subset. FR23 (notification triggers) is the natural
-  place to revisit this.
+- Meetings still have no participant list or RSVP — the meeting fields
+  spec across FR05–FR09 never included participants, so none of that was
+  built. A meeting is visible to (and, as of FR23, emailed to) every
+  project member, not a specific invited subset. This is a deliberate
+  reading of "relevant project members," not a gap in FR23 itself, but
+  would need revisiting if the report expects opt-in/opt-out per meeting.
 - No Zoom/Meet integration, recording, transcription, or AI summary
   (FR10–FR13) — `meeting_link` is a free-text URL the creator pastes in
   and the Join Meeting button just opens it in a new tab, exactly as
@@ -553,25 +648,45 @@ project's history (entries #6, #9).
   experience. If the FYP report's grading rubric expects more than a
   same-tab-safe external link, that's a follow-up, not something this
   task silently expanded into.
+- **FR23 is email-only** — explicitly scoped that way ("do not build the
+  full in-app notification center yet"). There's no in-app notification
+  bell/feed (FR21–FR22) and no user-facing preference to opt out of
+  meeting emails (FR25). Both are natural follow-ups once this ships.
+- **Mail delivery is only verified against `Mail::fake()` in tests and
+  `MAIL_MAILER=log` in dev** (`.env.example`) — nobody has exercised a
+  real SMTP/API provider (Postmark, SES, etc.) with these templates yet.
+  The Blade views use the same table-based email-client-safe markup
+  `member-invitation.blade.php` already established, but that pattern
+  itself has also only ever been visually spot-checked, not tested across
+  real inboxes (Gmail/Outlook rendering quirks).
+- **No retry-exhaustion handling beyond Laravel's default.** Each
+  Mailable sets `tries = 3` / `backoff = 30` like `MemberInvitationMail`,
+  but nothing observes a mail job that fails all 3 tries (no `failed()`
+  method, no alert). Acceptable for now since Log::error already fires
+  at the *dispatch* try/catch layer for synchronous failures; a job that
+  fails asynchronously after being successfully queued would currently
+  only show up in Laravel's `failed_jobs` table, unmonitored.
 
 ## Next recommended task
 
-The suite is 100% green (183 passed). Entries #7–#9 (Meetings, project
-membership, meeting access control) are already committed; entry #10
-(`MeetingCard.vue`, `EditMeetingModal.vue`, `MeetingsList.vue`,
-`lib/meetings.ts`, `projects/show.vue`, `MeetingTest.php`) is the only
-uncommitted work as of this update — review and commit it before starting
-anything else.
+The suite is 100% green (193 passed). Entries #7–#10 (Meetings, project
+membership, meeting access control, meeting lifecycle UX) are already
+committed; entry #11 (`app/Mail/Meeting*Mail.php`,
+`resources/views/emails/meeting-*.blade.php`,
+`ResolveMeetingRecipients.php`, the 3 meeting Actions,
+`MeetingController.php`, `Meeting.php`, `MeetingNotificationTest.php`) is
+the only uncommitted work as of this update — review and commit it before
+starting anything else.
 
-**FR23 — Email notification triggers**, the natural follow-up now that
-the full meeting lifecycle (schedule/view/join/edit/cancel) exists:
-`CreateMeetingAction`/`UpdateMeetingAction`/`DeleteMeetingAction` are the
-exact seams to hook a `Mailable` into, mirroring how `MemberInvitationMail`
-already works in this app for workspace invitations. Would need a
-participants concept first (see Known gaps) to know *who* to notify beyond
-"every project member," which is worth scoping explicitly before writing
-the mail classes.
+**FR18–FR19 — Archive/search**, or **FR20 — Analytics**, are the next
+largest untouched blocks with no meetings/AI dependency, so either is a
+reasonable next pick independent of FR10–FR13. If staying inside the
+notifications thread instead, **FR21–FR22 (in-app notification
+center)** is the natural next step now that FR23 proves out the
+"who gets notified" recipient logic (`ResolveMeetingRecipients` is
+reusable as-is) — an in-app feed would reuse the same trigger points
+(the three meeting Actions' `notify()` methods) rather than only emailing.
 
 Save FR10–FR13 (transcription/AI summary) for last — it's the hardest,
 most novel piece and should come only once there's real meeting data
-(and ideally FR23's notifications) to build against.
+(and now, real notification infrastructure) to build against.
