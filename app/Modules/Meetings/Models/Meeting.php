@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Meetings\Database\Factories\MeetingFactory;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -67,6 +68,26 @@ final class Meeting extends Model
     public function hasValidJoinLink(): bool
     {
         return $this->meeting_link !== null && Str::startsWith($this->meeting_link, ['http://', 'https://']);
+    }
+
+    public function scopePast(Builder $query): Builder
+    {
+        $table = $this->getTable();
+
+        return $query->whereRaw(
+            "datetime({$table}.scheduled_at, '+' || {$table}.duration_minutes || ' minutes') < ?",
+            [now()->toDateTimeString()],
+        );
+    }
+
+    public function scopeUpcoming(Builder $query): Builder
+    {
+        $table = $this->getTable();
+
+        return $query->whereRaw(
+            "datetime({$table}.scheduled_at, '+' || {$table}.duration_minutes || ' minutes') >= ?",
+            [now()->toDateTimeString()],
+        );
     }
 
     protected static function newFactory(): MeetingFactory

@@ -7,21 +7,21 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 18 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR21, FR22, FR23, FR24, FR29, FR32 |
+| Complete | 19 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 8 | FR10–FR13, FR20, FR25, FR26, FR28 |
+| Not started | 7 | FR10–FR13, FR25, FR26, FR28 |
 
-Strict completion: **18 / 35 (51.4%)**. Weighted (Complete=1, Partial=0.5): **64.3%**.
+Strict completion: **19 / 35 (54.3%)**. Weighted (Complete=1, Partial=0.5): **67.1%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
 a complete meeting lifecycle (schedule, view details, join, edit, cancel),
 email notifications on every meeting lifecycle event, an in-app
-notification center (meetings + task assignment/movement/comments), and a
-searchable archive of completed tasks and past meetings are all built and
-tested. Still missing: transcription + AI summary (FR10–FR13), analytics
-(FR20), notification preferences (FR25), profile pictures (FR26), and
-audit log (FR28).
+notification center (meetings + task assignment/movement/comments), a
+searchable archive of completed tasks and past meetings, and a workspace/
+project analytics dashboard are all built and tested. Still missing:
+transcription + AI summary (FR10–FR13), notification preferences (FR25),
+profile pictures (FR26), and audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -934,6 +934,167 @@ no AI/transcription work, no Elasticsearch/Meilisearch (query-builder
 `LIKE` search only — fine at this data scale, flagged below if that
 changes), no realtime updates to the archive list, no code comments.
 
+### 17. FR20 — Analytics
+
+Read this file, `ProjectController::index()`, `SearchArchiveAction` (entry
+#16 — the freshest precedent for a cross-project, workspace-scoped,
+server-side-aggregated feature), `Task`/`Meeting`/`BoardColumn` models,
+`AppStatCard`/`SeatUsageCard`/`AppDataTable`, and `package.json` before
+writing anything. Confirmed no chart library is installed anywhere in the
+project (`package.json` has zero chart/graph dependencies) and no prior
+analytics/aggregation infrastructure exists — this task is new ground,
+built entirely on top of already-existing Task/Meeting/Project data.
+
+**Extracted the "which projects can this user see" rule out of Archive
+and into the model layer, rather than copying it a third time.** Entry
+#16 already had this predicate once (`SearchArchiveAction::
+accessibleProjects()`) mirroring `ProjectController::index()`'s inline
+version — two copies of the same rule. Analytics needed it as a third
+consumer, which was the forcing function to finally centralize it: new
+`Workspace::accessibleProjectsFor(User $user): HasMany` (workspace
+Admin+ gets every project; everyone else gets only projects they have a
+`project_users` row for). `ProjectController::index()` and
+`SearchArchiveAction::accessibleProjects()` were both refactored to call
+it — behavior-identical (the full existing test suites for both were
+re-run and stayed green), just one source of truth now. `Analytics
+Controller` is the third and cleanest consumer.
+
+**Extracted "past meeting" out of Archive's raw SQL and into a proper
+Eloquent scope, rather than re-copying the SQLite `datetime()` string a
+second time.** Entry #16 flagged its own `whereRaw("datetime(scheduled_at,
+'+' || duration_minutes || ' minutes') < ?", ...)` as a SQLite-specific
+compromise. Analytics needed the identical "has this meeting's end time
+passed" predicate for its upcoming/past meeting counts. Rather than
+paste the same raw SQL into a second file, added `Meeting::scopePast()`
+and `Meeting::scopeUpcoming()` (same whereRaw, same SQLite dependency —
+now declared once) and refactored `SearchArchiveAction::
+pastMeetingsQuery()` to build off `Meeting::query()->past()->join(...)
+->select(...)->toBase()` instead of `DB::table('meetings')->whereRaw(...)`.
+`->toBase()` converts the Eloquent builder (with the scope's where clause
+already applied) into the plain `Illuminate\Database\Query\Builder` the
+UNION machinery needs — same SQL, same result, verified by re-running
+`ArchiveSearchTest` unchanged. Also added `Task::scopeOverdue()` (not
+extracted from anywhere — this is Analytics' own new predicate: has a
+`due_date` in the past, still sitting in a non-`is_done` column, the same
+semantics `lib/tasks.ts`'s `isOverdue()` already established client-side)
+since "overdue" needed to be both a plain count and, indirectly, a
+building block other future features could reuse.
+
+**Metrics computed — all derived from existing columns, nothing
+invented.** Task: total, completed, open, completion percentage
+(0 when total is 0, never a division-by-zero), overdue, a breakdown by
+board column, and a breakdown by assignee (including an explicit
+"Unassigned" bucket via `COALESCE` — deliberately included since knowing
+how much work has no owner is exactly the kind of "useful metric that
+already exists" this task asked for, not an invented one). Meeting:
+total, upcoming, past (via the new scopes). Project: total accessible
+project count, and a per-project summary (total/completed/completion %)
+that includes projects with **zero** tasks — the summary is built by
+iterating the accessible-projects list and left-joining in an aggregate
+count keyed by `project_id`, not by iterating the aggregate query's
+result rows, so a brand-new empty project still shows up as "0 of 0"
+rather than silently disappearing from the performance table.
+
+**No N+1 — three raw aggregate queries, everything else is a single
+`COUNT`/`whereHas` per metric.** `tasksByColumn()`, `tasksByAssignee()`,
+and `projectSummaries()`'s count-map are each one `GROUP BY` query
+(`DB::table('tasks')->join(...)->selectRaw(...)->groupBy(...)`) covering
+every project in scope at once — none of them loop over projects or
+tasks in PHP to build the breakdown. The six simple task/meeting counts
+(`total_tasks`, `completed_tasks`, `overdue_tasks`, and the three cloned
+meeting counts) are six independent `COUNT` queries, which is the
+simplest correct thing to do for six unrelated numbers — combining them
+into fewer queries would trade a handful of fast indexed counts for
+meaningfully harder-to-read SQL, not a real performance win at this
+data scale.
+
+**Tenant/project scope is enforced in the query itself, not filtered
+after fetching — same pattern as entry #16.** Every aggregate query
+starts from `whereIn('project_id', $scopedProjectIds)`, where
+`$scopedProjectIds` is `accessibleProjectIds` intersected with the
+optional `project_id` filter (empty intersection → empty `whereIn` →
+Laravel's documented always-false condition → zero rows through the
+normal query path, not a special-cased empty response). A workspace
+Member with zero accessible projects gets an all-zero, valid analytics
+page — verified by `test_unassigned_workspace_member_sees_empty_state_
+analytics` — not an error, matching Archive's precedent for the same
+scenario.
+
+**Date range filter is scoped to meetings only, deliberately, not to
+tasks.** The task's own wording hedges this as "date range if
+appropriate." Meetings have a real `scheduled_at` timestamp with an
+unambiguous meaning; tasks have no `completed_at` column (entry #16
+already flagged `updated_at` as an imperfect completion-time proxy), so
+applying a date range to "total tasks" or "completion percentage" would
+require picking an ambiguous cohort definition (created-in-range? due-in
+-range?) that could make those numbers mean something subtly different
+from what the stat card's label says. Task metrics always reflect the
+*current* board state; only the meeting counts respect `from`/`to`. The
+UI says so directly ("Date range applies to meetings only") rather than
+leaving it to be discovered.
+
+**No chart library added.** `package.json` has no chart/graph dependency
+today, and every visualization this task actually needs — a completion
+progress bar, a per-column bar list, a per-assignee bar list, a per-
+project mini completion bar — is expressible as a plain `width: N%` div,
+the exact technique `SeatUsageCard.vue` (Teams page) already uses in
+production. New `AppBarList.vue` (`resources/js/components/ui/`)
+generalizes that one pattern (label + proportional bar + count) so both
+breakdowns reuse it instead of duplicating the markup twice. Not
+reaching for Chart.js/ApexCharts/etc. for four bar-style visualizations
+is the "use charts only where they genuinely improve understanding, do
+not add a dependency unless necessary" instruction taken literally.
+
+**UI**: new `analytics/index.vue` — a filter bar (project select + date
+range, mirroring `archive/index.vue`'s server-side-filter pattern
+exactly: local refs, a `watch` that fires `router.get` with
+`preserveState`/`preserveScroll`, no client-side recomputation of
+anything), six `AppStatCard`s (Projects/Total tasks/Completed/Open/
+Overdue/Meetings — the Overdue card switches to an amber icon and a
+"down" trend hint when non-zero), a completion card (big percentage +
+progress bar + a compact meetings total/upcoming/past row), two
+`AppBarList` cards (by column, by assignee — colored green for
+`is_done` columns), and a project performance table via the existing
+`AppDataTable` with a mini completion bar in its own cell. New
+"Analytics" nav entry in `AppSidebar.vue`, positioned between Teams and
+Archive.
+
+**Dashboard integration — the one real placeholder, fixed; nothing
+else added.** Per the task's own "reuse analytics data where
+appropriate, do not redesign the entire dashboard" instruction, the
+*only* dashboard change is `DashboardController::onboarding()`'s
+`first_project_created` key, which was hardcoded `false` unconditionally
+— now `$workspace->projects()->exists()`, a one-line fix using data that
+already existed. Deliberately did **not** add a new analytics stat card
+to the dashboard: the dashboard is workspace-wide (every member sees the
+same team/activity data regardless of project membership), while
+analytics numbers must be scoped per-viewer's accessible projects — bolting
+a project-scoped number onto an otherwise workspace-wide page felt like
+exactly the kind of scope creep "do not redesign the entire dashboard"
+was warning against, so it was left alone beyond the one placeholder fix.
+
+**Tests**: new `tests/Feature/Analytics/AnalyticsTest.php` (14 tests) —
+task total/completed/open/completion-percentage, tasks-by-column
+breakdown and ordering, overdue count (excludes done-column and
+future-due-date tasks), tasks-by-assignee including the Unassigned
+bucket, meeting total/upcoming/past, the meeting date-range filter,
+project filter scoping every metric, an inaccessible `project_id`
+returning an empty (not leaked) result, workspace Owner/Admin seeing the
+full aggregate, a Project Member seeing only their own project's
+numbers, an unassigned workspace member getting all-zero empty-state
+analytics, cross-workspace isolation, a 404 (not 403) for a non-member
+hitting another workspace's analytics route, and the project summary
+correctly including a zero-task project. Full suite: **276 passed**
+(262 baseline + 14 new).
+
+**Not built, per the task's explicit exclusions**: no AI-generated
+analytics, no forecasting, no sprint velocity (no sprint concept exists
+anywhere in the data model — inventing one to compute "velocity" would
+have violated "do not implement sprint velocity unless the current data
+model genuinely supports sprints"), no realtime broadcasting, no
+transcription/AI summary work, no unrelated page redesigns, no code
+comments.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -1149,6 +1310,31 @@ rendering (filter bar layout, table density, pagination control) is
 unverified in a live browser, same standing caveat as entries #14/#15 —
 no browser access in this session.
 
+Full suite after entry #17 (FR20 analytics):
+
+```
+php artisan test --compact
+Tests:    276 passed (1175 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.34s (analytics/index.vue present in public/build/manifest.json)
+```
+
+Adds `tests/Feature/Analytics/AnalyticsTest.php` (14 tests) — 14 new over
+entry #16's 262 baseline. Also re-ran `ArchiveSearchTest.php` and
+`ProjectTest.php` in full after the `Workspace::accessibleProjectsFor()`/
+`Meeting::scopePast()` refactor (both stayed green, confirming the
+extraction changed nothing observable). The analytics page's visual
+rendering — stat card grid, bar-list proportions, project performance
+table — is unverified in a live browser, same standing caveat as
+entries #14/#15/#16.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -1309,25 +1495,53 @@ no browser access in this session.
   browser access in this session, same standing caveat as entries #14/
   #15's UI work. The filter bar, table density, and pagination control
   are code-reviewed and covered by backend tests, not click-tested.
+- **Analytics' date range filter only affects meetings, not task
+  metrics** — a deliberate choice (see entry #17), not a bug, but worth
+  flagging so nobody "fixes" it into applying to tasks without first
+  deciding what date field that should even mean, given tasks have no
+  `completed_at` column.
+- **"Tasks by workflow column" groups by column *name* across projects**,
+  not by a stable per-project column identity. Two different projects'
+  columns both named "In Progress" merge into one bar; a custom column
+  with a unique name gets its own bar. This matches the common case
+  (every project starts with the same three default column names) but
+  would read oddly for a workspace that renamed columns inconsistently
+  across projects — flagged as a known simplification, not fixed, since
+  a "by project + column" cross-tab was judged more detail than a
+  workspace-wide summary card needs.
+- **No caching on analytics queries**, per the task's own "do not cache
+  yet unless there's a demonstrated need" instruction. Every page load
+  re-runs the full aggregate set. Fine at current data volumes (a handful
+  of indexed `COUNT`/`GROUP BY` queries per project scope); would be the
+  first thing to add if a workspace's task/meeting volume grows large
+  enough to make the page feel slow.
+- **The analytics page has not been visually verified in a browser** — no
+  browser access in this session, same standing caveat as every other
+  UI-heavy entry in this log. The stat card grid, bar-list proportions,
+  and project performance table are code-reviewed and covered by backend
+  tests, not click-tested.
 
 ## Next recommended task
 
-Backend suite confirmed green at 262 passed as of entry #16 (FR18–FR19).
+Backend suite confirmed green at 276 passed as of entry #17 (FR20).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
-`npm run build` all pass clean. A visual browser pass is still owed for
-three separate pieces of UI work now (entry #14's Task Detail redesign,
-entry #15's notification bell, entry #16's archive page) — worth doing
-in one sitting before committing, since none of them have been
-click-tested in a running app yet.
+`npm run build` all pass clean. A visual browser pass is now owed for
+four separate pieces of UI work (entry #14's Task Detail redesign,
+entry #15's notification bell, entry #16's archive page, entry #17's
+analytics dashboard) — worth doing in one sitting before committing,
+since none of them have been click-tested in a running app yet.
 
-Back to the FR track: **FR20 (Analytics)** is now the largest remaining
-untouched block with no meetings/AI dependency — and, following entry
-#16's lead, has an obvious "derive, don't duplicate" implementation path:
-counts/aggregates over the same `tasks`/`meetings`/`board_columns` tables
-the archive already queries (completed-vs-total tasks per project,
-meetings held per month, etc.), no new domain tables needed. **FR25
-(notification preferences)** remains a small, natural follow-up directly
-on top of entry #15 — an opt-out toggle per notification type/channel
-sitting on the existing dispatch points. Save FR10–FR13
-(transcription/AI summary) for last, once there's real meeting data to
-build against.
+Back to the FR track: with FR14–FR24, FR29, and FR32 now all complete,
+the largest remaining untouched blocks are **FR25 (notification
+preferences)** — a small, natural follow-up directly on top of entry
+#15, an opt-out toggle per notification type/channel sitting on the
+existing dispatch points — and **FR26 (profile pictures)**, a
+self-contained, low-risk addition (an `avatar_url` on `User`, a file
+upload endpoint, wiring it into the already-parameterized `AppAvatar`
+component's `src` prop, which every avatar in the app already renders
+through). **FR28 (audit log)** is the largest remaining block — every
+mutating action across Workspace/Projects/Tasks/Meetings would need a
+logging hook, so it's worth scoping carefully (which actions actually
+need auditing, one shared `AuditLogAction` vs. per-module hooks) before
+starting. Save FR10–FR13 (transcription/AI summary) for last, once
+there's real meeting data to build against.

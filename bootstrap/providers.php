@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Modules\Analytics\Providers\AnalyticsServiceProvider;
 use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
@@ -19,4 +20,5 @@ return [
     MeetingsServiceProvider::class,
     AssistantServiceProvider::class,
     ArchiveServiceProvider::class,
+    AnalyticsServiceProvider::class,
 ];

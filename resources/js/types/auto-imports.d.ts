@@ -126,6 +126,9 @@ declare global {
   export type { AIContext } from '../lib/ai-suggestions'
   import('../lib/ai-suggestions')
   // @ts-ignore
+  export type { TaskColumnBreakdown, TaskAssigneeBreakdown, ProjectSummary, Analytics, AnalyticsProjectOption, AnalyticsFilters } from '../lib/analytics'
+  import('../lib/analytics')
+  // @ts-ignore
   export type { ArchiveRecordType, ArchiveRecord, ArchiveProjectOption, ArchiveAssigneeOption, ArchiveFilters, ArchivePage } from '../lib/archive'
   import('../lib/archive')
   // @ts-ignore

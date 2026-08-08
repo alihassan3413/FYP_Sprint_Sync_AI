@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Archive\Actions;
 
 use App\Models\User;
+use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
-use App\UserRole;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
@@ -23,13 +23,7 @@ final class SearchArchiveAction
      */
     public function accessibleProjects(Workspace $workspace, User $user): Collection
     {
-        $query = $workspace->projects()->orderBy('name');
-
-        if (! $workspace->userHasAtLeast($user, UserRole::ADMIN)) {
-            $query->whereHas('members', fn ($q) => $q->whereKey($user->id));
-        }
-
-        return $query->get(['id', 'name']);
+        return $workspace->accessibleProjectsFor($user)->orderBy('name')->get(['id', 'name']);
     }
 
     /**
@@ -132,10 +126,10 @@ final class SearchArchiveAction
      */
     private function pastMeetingsQuery(array $projectIds): Builder
     {
-        return DB::table('meetings')
+        return Meeting::query()
+            ->past()
             ->join('projects', 'projects.id', '=', 'meetings.project_id')
             ->whereIn('meetings.project_id', $projectIds)
-            ->whereRaw("datetime(meetings.scheduled_at, '+' || meetings.duration_minutes || ' minutes') < ?", [now()->toDateTimeString()])
             ->select([
                 'meetings.id',
                 DB::raw("'meeting' as type"),
@@ -146,6 +140,7 @@ final class SearchArchiveAction
                 DB::raw('NULL as assignee_id'),
                 DB::raw('NULL as assignee_name'),
                 'meetings.scheduled_at as occurred_at',
-            ]);
+            ])
+            ->toBase();
     }
 }

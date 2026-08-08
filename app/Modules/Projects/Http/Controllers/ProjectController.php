@@ -31,14 +31,10 @@ final class ProjectController
     {
         $user = $request->user();
 
-        $projectsQuery = $workspace->projects()->latest();
-
-        if (! $workspace->userHasAtLeast($user, UserRole::ADMIN)) {
-            $projectsQuery->whereHas('members', fn ($query) => $query->whereKey($user->id));
-        }
+        $projects = $workspace->accessibleProjectsFor($user)->latest()->get();
 
         return Inertia::render('projects/index', [
-            'projects' => $projectsQuery->get()->map(ProjectData::fromModel(...))->values(),
+            'projects' => $projects->map(ProjectData::fromModel(...))->values(),
             'canManageProjects' => $user->can('create', [Project::class, $workspace]),
         ]);
     }

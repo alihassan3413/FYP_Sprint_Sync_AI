@@ -102,6 +102,17 @@ final class Workspace extends Model
         return $this->roleFor($user)?->atLeast($minimum) ?? false;
     }
 
+    public function accessibleProjectsFor(User $user): HasMany
+    {
+        $query = $this->projects();
+
+        if (! $this->userHasAtLeast($user, UserRole::ADMIN)) {
+            $query->whereHas('members', fn (Builder $members) => $members->whereKey($user->id));
+        }
+
+        return $query;
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

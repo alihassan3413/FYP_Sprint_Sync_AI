@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Database\Factories\TaskFactory;
 use App\Modules\Workspace\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -74,6 +75,14 @@ final class Task extends Model
     public function isAssignedTo(User $user): bool
     {
         return $this->assigned_to === $user->id;
+    }
+
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', now()->toDateString())
+            ->whereHas('boardColumn', fn (Builder $column) => $column->where('is_done', false));
     }
 
     protected static function newFactory(): TaskFactory

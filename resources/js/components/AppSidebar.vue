@@ -4,7 +4,7 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Archive, BookOpen, Folder, FolderKanban, LayoutGrid, Users2 } from 'lucide-vue-next';
+import { Archive, BarChart3, BookOpen, Folder, FolderKanban, LayoutGrid, Users2 } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -24,6 +24,11 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Teams',
             href: workspaceRoute('workspace.teams.index'),
             icon: Users2,
+        },
+        {
+            title: 'Analytics',
+            href: workspaceRoute('workspace.analytics.index'),
+            icon: BarChart3,
         },
         {
             title: 'Archive',

@@ -139,7 +139,7 @@ final class DashboardController
             'workspace_created' => true,
             'first_member_invited' => $workspace->invitations()->exists(),
             'role_assigned' => $workspace->roles()->exists() || $workspace->users()->count() > 1,
-            'first_project_created' => false,
+            'first_project_created' => $workspace->projects()->exists(),
             'first_sprint_run' => false,
         ];
     }

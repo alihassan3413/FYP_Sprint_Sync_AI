@@ -1,3 +1,17 @@
+export type AnalyticsData = {
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    task_completion_percentage: number;
+    overdue_tasks: number;
+    tasks_by_column: Array<TaskColumnBreakdownData>;
+    tasks_by_assignee: Array<TaskAssigneeBreakdownData>;
+    total_meetings: number;
+    upcoming_meetings: number;
+    past_meetings: number;
+    total_projects: number;
+    projects: Array<ProjectSummaryData>;
+};
 export type ArchiveRecordData = {
     id: string;
     type: string;
@@ -44,6 +58,13 @@ export enum ProjectRole {
     MANAGER = 'manager',
     MEMBER = 'member',
 }
+export type ProjectSummaryData = {
+    id: number;
+    name: string;
+    total_tasks: number;
+    completed_tasks: number;
+    completion_percentage: number;
+};
 export type StoreMeetingData = {
     title: string;
     description?: string;
@@ -65,6 +86,16 @@ export type StoreWorkspaceRoleData = {
     name: string;
     slug: string;
     permissions?: { [key: string]: boolean } | null;
+};
+export type TaskAssigneeBreakdownData = {
+    assignee_id?: number;
+    name: string;
+    count: number;
+};
+export type TaskColumnBreakdownData = {
+    name: string;
+    is_done: boolean;
+    count: number;
 };
 export type TaskCommentData = {
     id: number;

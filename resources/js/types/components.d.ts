@@ -18,6 +18,7 @@ declare module 'vue' {
     AppAvatar: typeof import('./../components/ui/AppAvatar.vue')['default']
     AppAvatarStack: typeof import('./../components/ui/AppAvatarStack.vue')['default']
     AppBadge: typeof import('./../components/ui/AppBadge.vue')['default']
+    AppBarList: typeof import('./../components/ui/AppBarList.vue')['default']
     AppContent: typeof import('./../components/AppContent.vue')['default']
     AppDataTable: typeof import('./../components/ui/AppDataTable.vue')['default']
     AppDropDown: typeof import('./../components/ui/AppDropDown.vue')['default']
