@@ -26,6 +26,7 @@ const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
 
 const currentUserId = computed(() => page.props.auth.user.id);
+const currentUserName = computed(() => page.props.auth.user.name);
 
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [
     { title: 'Projects', href: workspaceRoute('workspace.projects.index') },
@@ -57,6 +58,14 @@ function openTaskEdit(task: Task) {
     taskModalMode.value = 'edit';
     taskModalTarget.value = task;
 }
+
+watch(
+    () => props.tasks,
+    (tasks) => {
+        if (taskModalTarget.value === null) return;
+        taskModalTarget.value = tasks.find((t) => t.id === taskModalTarget.value!.id) ?? null;
+    },
+);
 
 const isCreateColumnModalOpen = ref(false);
 const deleteColumnTarget = ref<BoardColumn | null>(null);
@@ -279,7 +288,10 @@ function onDeleted() {
         :task="taskModalTarget"
         :members="members"
         :board-columns="boardColumns"
+        :project-name="project.name"
         :can-manage="canManageTasks"
+        :current-user-id="currentUserId"
+        :current-user-name="currentUserName"
         :initial-mode="taskModalMode"
         @update:open="(value) => !value && (taskModalTarget = null)"
     />

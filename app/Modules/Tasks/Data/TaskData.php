@@ -11,6 +11,9 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 #[TypeScript]
 final class TaskData extends Data
 {
+    /**
+     * @param  array<int, TaskCommentData>  $comments
+     */
     public function __construct(
         public int $id,
         public string $title,
@@ -21,6 +24,7 @@ final class TaskData extends Data
         public int $workspace_id,
         public ?int $assigned_to,
         public ?string $assignee_name,
+        public array $comments,
         public string $created_at,
         public string $updated_at,
     ) {}
@@ -37,6 +41,11 @@ final class TaskData extends Data
             workspace_id: $task->workspace_id,
             assigned_to: $task->assigned_to,
             assignee_name: $task->assignee?->name,
+            comments: $task->comments
+                ->sortBy('created_at')
+                ->map(TaskCommentData::fromModel(...))
+                ->values()
+                ->all(),
             created_at: $task->created_at->toIso8601String(),
             updated_at: $task->updated_at->toIso8601String(),
         );

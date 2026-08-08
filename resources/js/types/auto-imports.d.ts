@@ -133,7 +133,7 @@ declare global {
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
   // @ts-ignore
-  export type { Task, TaskMember, BoardColumn } from '../lib/tasks'
+  export type { Task, TaskComment, TaskMember, BoardColumn } from '../lib/tasks'
   import('../lib/tasks')
 }
 

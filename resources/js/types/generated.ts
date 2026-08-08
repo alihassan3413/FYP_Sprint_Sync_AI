@@ -54,6 +54,14 @@ export type StoreWorkspaceRoleData = {
     slug: string;
     permissions?: { [key: string]: boolean } | null;
 };
+export type TaskCommentData = {
+    id: number;
+    body: string;
+    task_id: number;
+    user_id: number;
+    user_name: string;
+    created_at: string;
+};
 export type TaskData = {
     id: number;
     title: string;
@@ -64,6 +72,7 @@ export type TaskData = {
     workspace_id: number;
     assigned_to?: number;
     assignee_name?: string;
+    comments: Array<TaskCommentData>;
     created_at: string;
     updated_at: string;
 };

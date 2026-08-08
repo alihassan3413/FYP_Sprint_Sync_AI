@@ -64,7 +64,7 @@ final class ProjectController
                 ->map(BoardColumnData::fromModel(...))
                 ->values(),
             'tasks' => $project->tasks()
-                ->with('assignee:id,name,email')
+                ->with(['assignee:id,name,email', 'comments.user:id,name,email'])
                 ->latest()
                 ->get()
                 ->map(TaskData::fromModel(...))

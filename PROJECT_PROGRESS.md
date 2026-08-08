@@ -29,6 +29,12 @@ those existing FRs, not a newly tracked FR number on its own (no line item
 in the FYP1 report maps to it directly, as far as this session could tell
 without re-reading the source `.docx`), so the table above is unchanged.
 
+The Kanban board (FR14–FR17) also grew custom/reorderable board columns,
+a task-detail-first popup, and task comments (entries #12–#14) — none of
+this maps to a distinct FR number either; it's UX/feature depth added on
+top of the existing Tasks FRs at the user's request, beyond what FR14–FR17
+originally specified.
+
 ## Completed work log
 
 ### 1. FR01–FR35 implementation audit
@@ -460,6 +466,185 @@ changes and stayed green throughout — the Action signature changes
 parameter) were absorbed entirely by `MeetingController`, invisible to
 every test that goes through the HTTP layer.
 
+### 12. Kanban board UX — custom board columns, column reordering, task-detail-first popup
+
+Retroactive log entry: this and entry #13 cover three UX-driven turns that
+shipped without an explicit "update PROJECT_PROGRESS.md" instruction at
+the time, so they were never logged. Documented now, alongside entry #14,
+so the log stays an accurate picture of what actually exists.
+
+**Custom board columns.** `App\TaskStatus` (the fixed `todo`/`in_progress`/
+`done` enum) was removed entirely and replaced with a per-project
+`board_columns` table (`name`, `position`, `is_default`, `is_done`).
+`tasks.status` became `tasks.board_column_id` (FK), migrated with a data
+migration that backfilled every existing project with 3 default columns
+and remapped every existing task's old enum value to the matching new
+column — verified against a backed-up copy of the dev SQLite database
+before running it. Every project now gets those 3 defaults
+(To Do/In Progress/Done, `is_default = true`, "Done" also `is_done = true`)
+seeded on creation (`CreateProjectAction`, and `ProjectFactory` for tests).
+Owner/Admin/project Manager can add and delete custom columns
+(`BoardColumnPolicy`, mirrors the existing Manager-tier pattern); default
+columns can't be deleted, and a column with tasks in it can't be deleted
+until it's empty — both enforced as friendly `back()->with('error', ...)`
+responses (toast), not raw 403s, since the *role* check and the *state*
+check are different kinds of failure.
+
+**Column reordering.** Drag any column header (including defaults — only
+deletion is locked, not position) to reorder the board.
+`ReorderBoardColumnsAction` validates the submitted list is an exact
+permutation of the project's real columns (`size:N` + `distinct` +
+`Rule::in`) before writing new `position` values, so a partial or
+duplicate-laden submission is rejected outright rather than silently
+corrupting order. Frontend mirrors the same optimistic-update +
+revert-on-error pattern the task drag-and-drop already established.
+
+**Task-detail-first popup (v1).** Clicking a task card used to jump
+straight into the edit form for managers. Split into a `mode: 'view' |
+'edit'` toggle inside one modal — click-to-open always lands on a
+read-only view first, with an explicit "Edit" action for managers, mirror
+of the same pattern already used for meetings. Also added a "move to
+column" dropdown directly on each `TaskCard` (`ArrowRightLeft` icon),
+using the exact same `updateStatus` endpoint and policy as drag-and-drop,
+since dragging across many custom columns doesn't scale as the only way
+to reassign a task's stage.
+
+**Tests.** `tests/Feature/Tasks/BoardColumnTest.php` (21 tests — add/
+delete/reorder × Owner/Admin/Manager/Member/outsider, empty-column and
+default-column delete guards, cross-project and cross-workspace
+isolation, reorder payload validation). `TaskTest.php` rewritten in place
+for `board_column_id` instead of the old `status` enum. Full suite: 214
+passed at the end of this stretch of work.
+
+### 13. Task comments (chat)
+
+Also retroactive (see entry #12's note). New `task_comments` table
+(`task_id`, `user_id`, `body`), 4 levels deep in the route tree
+(`workspace → project → task → comment`), same scoped-binding pattern
+proven throughout this project. `TaskCommentPolicy`: any project member
+(or workspace Admin+) can view and post — deliberately as broad as task
+*view* access, not task *management*, since the point is two-way
+conversation between whoever's assigned and whoever assigned it, not a
+manager broadcast channel. Delete is the comment's own author, or
+workspace Admin+/project Manager (moderation).
+
+Comments are eager-loaded and nested directly onto each task
+(`task.comments`) in the existing `ProjectController::show()` response —
+no separate JSON API, since this app is 100% Inertia-based and posting a
+comment goes through the same `router.post` + page-reload pattern every
+other create action here already uses.
+
+**Tests**: `tests/Feature/Tasks/TaskCommentTest.php` (14 tests). Full
+suite: 228 passed at the end of this turn — the baseline entry #14 starts
+from, since #14 is frontend-only and doesn't change this number.
+
+### 14. Task Detail redesign + comment-refresh bug fix
+
+Two-part ask: the task detail modal from entry #12 "looked cramped and
+generic," and newly-submitted comments only appeared after a manual page
+refresh. Read this file, the current `TaskDetailModal`/`TaskCommentThread`,
+`TaskCard`, `KanbanBoard`'s existing local-state/optimistic patterns, the
+notification store, and how every other modal in this app is built before
+changing anything, per the task's own instruction.
+
+**Root cause of the refresh bug.** `show.vue` holds `taskModalTarget` as a
+plain `ref<Task | null>`, assigned once when a card is clicked. Posting a
+comment triggers a normal Inertia `back()` redirect + prop reload — which
+*does* return fresh data (the backend already eager-loads comments, see
+entry #13) — but nothing ever pointed `taskModalTarget` at the new object
+in the refreshed `tasks` array. Vue kept rendering the stale reference
+from before the reload; only closing and reopening the modal (which
+reassigns `taskModalTarget` fresh from the now-current `tasks` prop) ever
+picked up the change — which is indistinguishable from "needs a page
+refresh" to a user who doesn't know that internal detail.
+
+**Fix — re-sync the stale reference, not a manual refetch.** Added one
+watcher in `show.vue`:
+```
+watch(() => props.tasks, (tasks) => {
+    if (taskModalTarget.value === null) return;
+    taskModalTarget.value = tasks.find((t) => t.id === taskModalTarget.value!.id) ?? null;
+});
+```
+Whenever Inertia reloads `tasks` for *any* reason (posting a comment,
+someone else dragging the task, an edit save), the open modal's task
+reference gets re-pointed at the fresh object automatically. This needed
+no backend change at all — "if the backend endpoint doesn't return the
+created comment, use the smallest appropriate partial reload" turned out
+to not apply, since the existing `back()` reload already carries the new
+comment; the bug was purely a stale client-side reference.
+
+**Guarding against a second bug this fix could have caused.**
+`TaskDetailModal`'s form-reset watcher previously ran on every `task`
+prop change (`watch(() => props.task, ...)`). Once `taskModalTarget` can
+now silently refresh mid-session, that same watcher would also fire from
+a *background* refresh (e.g. posting a comment while the edit form is
+open) and wipe out whatever the user was mid-typing in the title/
+description fields. Changed the watch key to `props.task?.id` with an
+`id === previousId` guard, so form state and `mode` only reset when
+actually switching to a *different* task, never when the same task's
+data merely refreshes underneath an open modal. Read-only displays
+(the column badge, due date) still use `props.task` directly and stay
+live either way, since they have nothing to lose by re-rendering.
+
+**Immediate comment appearance.** `TaskCommentThread` now keeps its own
+`localComments` ref, resynced via `watch(() => props.comments, ...)`.
+Combined with the `show.vue` fix above, a posted comment's visible path
+is: POST succeeds → Inertia reloads `tasks` (comment already included) →
+`show.vue` re-points `taskModalTarget` → `TaskDetailModal`'s `task` prop
+updates → `TaskCommentThread`'s `comments` prop updates → its watcher
+updates `localComments` → template re-renders. No fabricated/optimistic
+placeholder comment is constructed client-side (which would need a fake
+temporary id, a guess at server-formatted timestamps, etc.) — the delay
+between "successful POST" and "visible in the thread" is exactly one
+network round trip, the same standard every other create action in this
+app already meets (creating a task, a meeting, a board column all work
+the same way — none of them render an optimistic placeholder either).
+- Composer clears via `form.reset()` in `onSuccess` (already existed).
+- Duplicate submission is prevented by the existing `form.processing`
+  guard inside `submit()`, checked before either the Send button or the
+  Enter-key handler can fire a second request — already correct, just
+  confirmed it holds under the new flow.
+- Added `onError` → `useNotificationStore().error(...)` on both post and
+  delete, matching the toast pattern `KanbanBoard.vue` already uses for
+  failed drags/reorders. This was missing entirely before.
+- After a successful post, the comment list scrolls to its own bottom
+  (`scrollTop = scrollHeight` inside `nextTick()`), not the whole page —
+  the list has its own bounded, independently-scrollable region (see
+  layout notes below), so "scroll to newest" means that region, not the
+  document.
+
+**Layout redesign.** Replaced the old split left-details/right-comments
+layout (comments were squeezed into a ~300px column) with a single
+full-width column: a custom modal header (small "TASK" eyebrow, the
+task's own title as the actual heading, status badge, and an "Edit"
+button for managers — the modal's built-in close icon covers "close," so
+no separate Close button exists in view mode at all), a task-information
+block (description, then assignee/due-date/project as a compact 3-column
+meta row), then a full-width "Discussion" section below with the
+comments feed and composer. Comments render as a vertically-stacked
+activity thread — avatar, name, timestamp, body, a bottom-border divider
+between entries — not chat bubbles, per the task's own steer, and there's
+no existing bubble-style precedent anywhere else in this app that would
+argue otherwise. Added a new `2xl` size to `AppModal` (`sm:max-w-4xl`,
+896px) — purely additive, every other modal in the app keeps using its
+existing `sm`/`md`/`lg`/`xl`. "Project" is shown from a new `projectName`
+prop threaded down from `show.vue` (the page already has it); "creator"
+was left out — `Task` has no `created_by` column, and adding one wasn't
+part of what was asked, so it wasn't invented for this pass.
+
+**What's authorization-unchanged.** No policy, request, controller, or
+migration touched — `TaskPolicy`, `TaskCommentPolicy`, `BoardColumnPolicy`
+and every route from entries #12/#13 are untouched. This was a pure
+frontend UX pass plus the one-watcher backend-adjacent fix described
+above (which is also frontend-only — no PHP file changed).
+
+**Explicit scope boundary honored.** No WebSockets/Echo/Reverb, no
+mentions, no attachments, no other page touched. Per the task's own
+instruction, no code comments were added, and neither the test suite nor
+`npm run build`/Pint were run this pass — verification below is manual,
+matching what was actually asked for.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -570,6 +755,61 @@ No JS test runner exists in this project (`package.json` only has
 build/lint/format scripts). Entry #11 touched no frontend files, so
 `npm run build` is an unaffected-regression check, not new coverage.
 
+Full suite after entry #13 (custom board columns, column reordering,
+task-detail-first popup v1, task comments — see entries #12/#13):
+
+```
+php artisan test --compact
+Tests:    228 passed (734 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+→ succeeded
+```
+
+Adds `BoardColumnTest.php` (21 tests), `TaskCommentTest.php` (14 tests),
+`TaskTest.php` rewritten for `board_column_id` (24 tests, same count as
+before, different assertions).
+
+**Entry #14 (this Task Detail redesign + comment-refresh fix) is
+frontend-only and was not run through the automated suite, per that
+task's explicit instruction not to run build/lint/tests this pass.** No
+PHP changed, so the 228-passed backend baseline above is unaffected by
+construction. This session has no browser access, so "manual verification"
+below is a code-level review (reading the final files end to end, tracing
+the prop/watch/emit chain by hand, confirming no unclosed tags or type
+mismatches) — **not** an actual click-through in a running app. The
+checklist the task asked for still needs a real pass in the browser
+before calling this done:
+
+- [ ] Open a task's detail view from the board — should land on the
+  read-only view first (title, status badge, description, assignee, due
+  date, project, discussion), never straight into the edit form.
+- [ ] Click Edit (as a manager) — form should appear in place; Cancel
+  should return to the read-only view without submitting; Save should
+  persist and return to view mode showing the updated fields.
+- [ ] Post a comment — should appear in the thread without a manual page
+  refresh, composer should clear, list should auto-scroll to the new
+  entry.
+- [ ] Rapidly press Enter/Send several times while a post is in flight —
+  only one comment should be created (`form.processing` guard should
+  hold — traced in code, not exercised live).
+- [ ] Reload the page after posting — comment should still be present.
+- [ ] As a Project Member (not Manager): can view the task and post/read
+  comments, cannot see the Edit button, can delete only their own
+  comment. As Owner/Admin: full edit access, can delete any comment.
+- [ ] Force a failed comment post (e.g. offline) — error toast should
+  appear via `useNotificationStore`, composer content should be
+  preserved, not cleared.
+
+If any of these don't hold up in the browser, flag it and it can be
+fixed directly rather than assumed correct from the code review alone.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -666,27 +906,48 @@ build/lint/format scripts). Entry #11 touched no frontend files, so
   at the *dispatch* try/catch layer for synchronous failures; a job that
   fails asynchronously after being successfully queued would currently
   only show up in Laravel's `failed_jobs` table, unmonitored.
+- **The same stale-prop-reference bug fixed for `taskModalTarget` in
+  entry #14 plausibly exists for `meetingModalTarget` and
+  `deleteTaskTarget`/`deleteMeetingTarget`/`deleteColumnTarget` too** —
+  none of those were audited or fixed this pass, since the task was
+  explicitly scoped to the task comment/detail flow. If a meeting's
+  detail modal is ever given the same kind of live-updating child data
+  (e.g. participants, or comments later), it should get the same
+  `watch(() => props.X, ...)` re-sync `show.vue` already has for tasks.
+- **Entry #14's task-detail layout has not been visually verified in a
+  browser** — see the checklist in Test results above. The redesign and
+  bug fix are code-reviewed and internally consistent, but this session
+  had no way to actually render and click through it.
+- **No custom project roles** — only the fixed `manager`/`member` pair,
+  by explicit instruction for this task. If workspaces later want the same
+  "define your own role + permissions" flexibility `WorkspaceRole` gives
+  at the workspace level, that's the natural follow-up (a
+  `project_roles`-style table), not a redesign of what shipped here.
+- **Adding project members is one-at-a-time**, no multi-select/bulk-assign
+  UI. Fine for the current member-count scale; would want a checklist-style
+  picker if workspaces grow large.
 
 ## Next recommended task
 
-The suite is 100% green (193 passed). Entries #7–#10 (Meetings, project
-membership, meeting access control, meeting lifecycle UX) are already
-committed; entry #11 (`app/Mail/Meeting*Mail.php`,
-`resources/views/emails/meeting-*.blade.php`,
-`ResolveMeetingRecipients.php`, the 3 meeting Actions,
-`MeetingController.php`, `Meeting.php`, `MeetingNotificationTest.php`) is
-the only uncommitted work as of this update — review and commit it before
-starting anything else.
+Backend suite last confirmed green at 228 passed (entry #13's baseline;
+entry #14 changed no PHP). `git status` shows board column management
+(entry #12) already committed (`2fd5023`); task comments (entry #13:
+`TaskComment*.php`, `TaskCommentController.php`, `TaskCommentPolicy.php`,
+`TaskCommentThread.vue`, `TaskCommentTest.php`) and this Task Detail
+redesign + refresh fix (entry #14: `TaskDetailModal.vue`, `AppModal.vue`,
+`show.vue`, `Task.php`/`TaskData.php`/`ProjectController.php` for the
+`comments` eager-load) are both still uncommitted as of this update.
 
-**FR18–FR19 — Archive/search**, or **FR20 — Analytics**, are the next
-largest untouched blocks with no meetings/AI dependency, so either is a
-reasonable next pick independent of FR10–FR13. If staying inside the
-notifications thread instead, **FR21–FR22 (in-app notification
-center)** is the natural next step now that FR23 proves out the
-"who gets notified" recipient logic (`ResolveMeetingRecipients` is
-reusable as-is) — an in-app feed would reuse the same trigger points
-(the three meeting Actions' `notify()` methods) rather than only emailing.
+**First**: run the manual verification checklist above in an actual
+browser — this pass had no way to do that itself — then run
+`php artisan test --compact`, `vendor/bin/pint --dirty --format agent`,
+`npm run lint:check`, and `npm run build` (all skipped this turn per
+explicit instruction) before committing entries #13 and #14.
 
-Save FR10–FR13 (transcription/AI summary) for last — it's the hardest,
-most novel piece and should come only once there's real meeting data
-(and now, real notification infrastructure) to build against.
+Then, back to the FR track: **FR18–FR19 (Archive/search)** or **FR20
+(Analytics)** remain the largest untouched blocks with no meetings/AI
+dependency. **FR21–FR22 (in-app notification center)** is a reasonable
+alternative now that FR23 proves out the "who gets notified" recipient
+pattern (`ResolveMeetingRecipients` is reusable as-is). Save FR10–FR13
+(transcription/AI summary) for last, once there's real meeting data and
+real notification infrastructure to build against.

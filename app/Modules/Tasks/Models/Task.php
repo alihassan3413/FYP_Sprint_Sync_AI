@@ -11,6 +11,7 @@ use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -63,6 +64,11 @@ final class Task extends Model
     public function boardColumn(): BelongsTo
     {
         return $this->belongsTo(BoardColumn::class);
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class);
     }
 
     public function isAssignedTo(User $user): bool

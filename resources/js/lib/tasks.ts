@@ -13,10 +13,21 @@ export interface Task {
     workspace_id: number;
     assigned_to: number | null;
     assignee_name: string | null;
+    comments: TaskComment[];
     /** ISO datetime */
     created_at: string;
     /** ISO datetime */
     updated_at: string;
+}
+
+export interface TaskComment {
+    id: number;
+    body: string;
+    task_id: number;
+    user_id: number;
+    user_name: string;
+    /** ISO datetime */
+    created_at: string;
 }
 
 export interface TaskMember {

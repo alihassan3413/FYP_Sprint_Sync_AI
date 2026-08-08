@@ -186,6 +186,8 @@ declare module 'vue' {
     TabsTrigger: typeof import('./../components/ui/tabs/TabsTrigger.vue')['default']
     TaskActionsMenu: typeof import('./../components/tasks/TaskActionsMenu.vue')['default']
     TaskCard: typeof import('./../components/tasks/TaskCard.vue')['default']
+    TaskCommentComposer: typeof import('./../components/tasks/TaskCommentComposer.vue')['default']
+    TaskCommentThread: typeof import('./../components/tasks/TaskCommentThread.vue')['default']
     TaskDetailModal: typeof import('./../components/tasks/TaskDetailModal.vue')['default']
     Textarea: typeof import('./../components/ui/textarea/Textarea.vue')['default']
     TextLink: typeof import('./../components/TextLink.vue')['default']
