@@ -1,3 +1,15 @@
+export type ArchiveRecordData = {
+    id: string;
+    type: string;
+    title: string;
+    subtitle?: string;
+    project_id: number;
+    project_name: string;
+    assignee_id?: number;
+    assignee_name?: string;
+    occurred_at: string;
+    url: string;
+};
 export type BoardColumnData = {
     id: number;
     name: string;

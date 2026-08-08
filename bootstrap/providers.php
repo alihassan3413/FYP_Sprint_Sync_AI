@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
@@ -17,4 +18,5 @@ return [
     TasksServiceProvider::class,
     MeetingsServiceProvider::class,
     AssistantServiceProvider::class,
+    ArchiveServiceProvider::class,
 ];

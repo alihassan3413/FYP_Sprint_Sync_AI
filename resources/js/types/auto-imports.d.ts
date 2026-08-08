@@ -10,6 +10,7 @@ declare global {
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
+  const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -25,6 +26,7 @@ declare global {
   const formatLastActive: typeof import('../lib/members').formatLastActive
   const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
+  const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
@@ -124,6 +126,9 @@ declare global {
   export type { AIContext } from '../lib/ai-suggestions'
   import('../lib/ai-suggestions')
   // @ts-ignore
+  export type { ArchiveRecordType, ArchiveRecord, ArchiveProjectOption, ArchiveAssigneeOption, ArchiveFilters, ArchivePage } from '../lib/archive'
+  import('../lib/archive')
+  // @ts-ignore
   export type { Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
@@ -146,6 +151,7 @@ declare module 'vue' {
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
+    readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -161,6 +167,7 @@ declare module 'vue' {
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
     readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
+    readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>

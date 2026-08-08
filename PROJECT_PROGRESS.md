@@ -7,20 +7,21 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 16 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR21, FR22, FR23, FR24, FR29, FR32 |
+| Complete | 18 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR21, FR22, FR23, FR24, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 10 | FR10–FR13, FR18–FR20, FR25, FR26, FR28 |
+| Not started | 8 | FR10–FR13, FR20, FR25, FR26, FR28 |
 
-Strict completion: **16 / 35 (45.7%)**. Weighted (Complete=1, Partial=0.5): **58.6%**.
+Strict completion: **18 / 35 (51.4%)**. Weighted (Complete=1, Partial=0.5): **64.3%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
 a complete meeting lifecycle (schedule, view details, join, edit, cancel),
-email notifications on every meeting lifecycle event, and an in-app
-notification center (meetings + task assignment/movement/comments) are all
-built and tested. Still missing: transcription + AI summary (FR10–FR13),
-archive/search (FR18–FR19), analytics (FR20), notification preferences
-(FR25), profile pictures (FR26), and audit log (FR28).
+email notifications on every meeting lifecycle event, an in-app
+notification center (meetings + task assignment/movement/comments), and a
+searchable archive of completed tasks and past meetings are all built and
+tested. Still missing: transcription + AI summary (FR10–FR13), analytics
+(FR20), notification preferences (FR25), profile pictures (FR26), and
+audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -788,6 +789,151 @@ cannot mark another user's notification as read (404), guests are
 redirected to login). Full suite: **249 passed** (up from entry #13's 228
 baseline + 21 new tests here).
 
+### 16. FR18–FR19 — Archive and search
+
+Read this file, `ProjectController::index()`/`show()`, `TaskPolicy`/
+`MeetingPolicy`, `Task`/`Meeting`/`BoardColumn` models, and the FR21–FR22
+notification center (entry #15, the most recent precedent for a
+cross-project, workspace-scoped feature) before writing anything.
+Confirmed first that no archive table, search infrastructure, or
+pagination component existed anywhere in the codebase — this is new
+ground on both the backend and frontend.
+
+**No new tables — archive state is entirely derived, per the task's own
+instruction.** A "completed task" is a task whose `board_column_id`
+points at a column with `is_done = true` (the same flag `TaskFactory::
+done()` and the Kanban board already use); a "past meeting" is one whose
+`scheduled_at + duration_minutes` has already elapsed (the same rule
+`lib/meetings.ts`'s `isPastMeeting()` already uses client-side for the
+Upcoming/Past badge from entry #10 — mirrored server-side here). Neither
+`Task` nor `Meeting` gained a column, a soft-delete, or an `archived_at`
+timestamp. This also means the archive is always consistent with the
+live board/meeting list by construction — there's no separate copy that
+could drift out of sync.
+
+**One SQL query, not two, per search.** Tasks and meetings are
+structurally different tables, but the archive needs to search, filter,
+sort, and *paginate* them together as one result set. Rather than running
+two separate paginated queries and stitching pages together in PHP (which
+breaks page-size guarantees and "keep search server-side, don't filter in
+the browser"), `SearchArchiveAction` builds two `DB::table()` query
+builders with an identical column shape (`id, type, title, subtitle,
+project_id, project_name, assignee_id, assignee_name, occurred_at`),
+combines them with `unionAll()`, wraps the union as a subquery via
+`DB::query()->fromSub()`, and applies every filter (keyword, assignee,
+date range) plus `orderByDesc('occurred_at')` and `->paginate()` on top
+of that single combined query. Laravel's paginator works transparently
+against a `fromSub()` query exactly like it would against a normal table,
+so pagination math (`total`, `last_page`, `links`) is exactly correct
+across both record types with no manual page-stitching.
+
+**SQLite-specific date arithmetic — a deliberate, documented compromise,
+not an oversight.** "Past meeting" requires comparing `scheduled_at +
+duration_minutes` (a value that doesn't exist as a column) against now.
+This app's `DB_CONNECTION` is `sqlite` everywhere it's configured
+(`.env.example`, `phpunit.xml`, no other driver referenced anywhere in
+`config/database.php`'s env override), so `pastMeetingsQuery()` uses
+`whereRaw("datetime(scheduled_at, '+' || duration_minutes || ' minutes')
+< ?", ...)` — SQLite's `datetime()` function, not portable to MySQL/
+Postgres as written. `lib/meetings.ts`'s `isPastMeeting()` solves the
+identical problem client-side with plain JS date arithmetic; this is the
+first time the same logic has needed to run inside a SQL query, so it's
+the first place this portability trade-off actually shows up. Flagged in
+Known gaps below so a future driver migration doesn't silently break the
+archive.
+
+**Recipient/visibility scoping mirrors `ProjectController::index()`
+exactly, not a new access-control model.** `SearchArchiveAction::
+accessibleProjects()` is the same rule already used to build the
+projects list: workspace Admin+ sees every project; everyone else sees
+only projects they have a `project_users` row for. This single method is
+reused three times — to scope the actual search query, to build the
+"project" filter dropdown's options, and (via its returned project ids)
+to build the "assignee" filter dropdown — so there's exactly one place
+that decides "which projects can this user search," matching "avoid
+duplicating recipient-selection logic" from entries #11/#15.
+
+**Filters cannot bypass scope, by construction rather than by a guard
+clause.** If a `project_id` filter is supplied that isn't in the caller's
+accessible set, `handle()` intersects it against `accessibleProjects`
+before building the query — the resulting id list is empty, `whereIn`
+with an empty array is Laravel's documented always-false condition, and
+the query returns zero rows through the completely normal pagination
+path (no special "403 if you try to peek" branch, no separate empty-
+result code path to keep in sync with the real one). Verified by
+`test_requesting_an_inaccessible_project_id_returns_no_results` — the
+request succeeds (200) and silently returns nothing, the same shape as
+"this project has no archived records," rather than leaking that the
+project exists via a distinguishable error.
+
+**Assignee filter options come from actual completed tasks, not the full
+member roster.** `assigneeOptions()` queries distinct assignees among the
+accessible scope's *completed* tasks only — so the dropdown never offers
+a name that would filter down to zero results, and needed no separate
+membership query.
+
+**Deep-linking a result — reused entry #15's "acceptable" precedent,
+then went one step further.** Notification links from entry #15 just
+open the project page; this task's own instruction ("clicking a result
+should navigate to the relevant accessible resource") plus the fact that
+`projects/show.vue` already tracks `taskModalTarget`/`meetingModalTarget`
+refs made a proper deep link cheap enough to justify: archive record URLs
+are `.../projects/{id}?task={taskId}` or `?meeting={meetingId}`, and a
+new `onMounted()` hook in `show.vue` reads that query param once on
+page load and opens the matching modal directly (falls back to just
+landing on the board/meetings tab if the id isn't found in the loaded
+props — e.g. a stale bookmark). No new route, no new modal — this reuses
+the exact open functions (`openTaskDetails`, `meetingModalTarget =`)
+click-to-open already calls.
+
+**Frontend — new `AppPagination.vue` (first pagination UI in this app)**
+in `resources/js/components/ui/`, alongside the other generic list-page
+primitives (`AppDataTable`, `AppListToolBar`, `AppSearchInput`,
+`AppSegmentedControl`, `AppEmptyState`) it composes with. It takes plain
+numbers (`currentPage`/`lastPage`/`total`/`from`/`to`) and emits a page
+number on click — no Inertia/paginator-shape knowledge baked in, so nothing
+stops it from being reused by a future paginated list. New
+`resources/js/pages/archive/index.vue` reuses `AppListToolBar` (search +
+the type segmented control) exactly as `projects/index.vue`/`teams/
+index.vue` already do, adds project/assignee/date-range filters into its
+`#right` slot as plain native selects/date inputs (no new form-input
+component needed for a filter bar with no validation state), and renders
+results through `AppDataTable` with custom cell slots for the type badge,
+title+subtitle, project, assignee, and date — deliberately **not**
+passing `sortable: true` on any column, since `AppDataTable`'s sort is
+client-side-only and would silently mis-sort a single page of
+server-paginated, server-sorted data.
+
+**Search is genuinely server-side, verified by construction.** Every
+filter input (`search`, `type`, `project_id`, `assignee_id`, `from`,
+`to`) is a local ref that triggers `router.get()` (debounced 350ms for
+the free-text field via `@vueuse/core`'s `watchDebounced`, immediate for
+the dropdowns/dates) back to `workspace.archive.index` with
+`preserveState`/`preserveScroll`. The component never holds the full
+archive in memory to filter client-side — `results.data` is read
+directly from Inertia props every render, the same "no local mutable
+copy that can go stale" principle entry #14 established for
+`taskModalTarget`, applied here from the start instead of as a bugfix.
+
+**Tests**: new `tests/Feature/Archive/ArchiveSearchTest.php` (13 tests) —
+completed tasks appear, past meetings appear, an in-progress task and an
+upcoming meeting are both excluded, keyword search, project filter, date
+range filter, assignee filter, an unassigned workspace member sees an
+empty archive and an empty project-filter list, a project member sees
+only their own project's records, an inaccessible `project_id` filter
+returns nothing rather than leaking existence, cross-workspace data never
+appears even when both workspaces have identically-named completed
+work, a non-member of another workspace gets a 404 (not a 403 — matches
+`EnsureWorkspaceMember`'s existing `WorkspaceException::notFound()`
+behavior, verified by reading the middleware rather than assuming),
+and pagination correctly splits 25 seeded completed tasks into a 20 +
+5 page split. Full suite: **262 passed** (249 baseline + 13 new).
+
+**Not built, per the task's explicit exclusions**: no Analytics (FR20),
+no AI/transcription work, no Elasticsearch/Meilisearch (query-builder
+`LIKE` search only — fine at this data scale, flagged below if that
+changes), no realtime updates to the archive list, no code comments.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -978,6 +1124,31 @@ the backend/data layer, since it's fully covered by automated tests. The
 bell dropdown's visual rendering itself is still unverified in a live
 browser (no browser access in this session), same caveat as entry #14.
 
+Full suite after entry #16 (FR18–FR19 archive and search):
+
+```
+php artisan test --compact
+Tests:    262 passed (997 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed (auto-fixed import order in the new test file)
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.40s (archive/index.vue present in public/build/manifest.json)
+```
+
+Adds `tests/Feature/Archive/ArchiveSearchTest.php` (13 tests) — 13 new
+over entry #15's 249 baseline. The union-query approach, the SQLite
+`datetime()` past-meeting filter, the accessible-project scoping, and the
+inaccessible-project-id-returns-empty behavior are all exercised by
+automated tests, not just code review. The archive page's visual
+rendering (filter bar layout, table density, pagination control) is
+unverified in a live browser, same standing caveat as entries #14/#15 —
+no browser access in this session.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -1106,23 +1277,57 @@ browser (no browser access in this session), same caveat as entry #14.
 - **Adding project members is one-at-a-time**, no multi-select/bulk-assign
   UI. Fine for the current member-count scale; would want a checklist-style
   picker if workspaces grow large.
+- **The archive's "past meeting" filter uses SQLite-specific raw SQL**
+  (`datetime(scheduled_at, '+' || duration_minutes || ' minutes')` in
+  `SearchArchiveAction::pastMeetingsQuery()`), matching this app's
+  exclusively-`sqlite` configuration (`.env.example`, `phpunit.xml`, no
+  other driver referenced anywhere). If the app is ever pointed at
+  MySQL/Postgres, this one `whereRaw()` call needs a driver-aware
+  rewrite (e.g. `DATE_ADD`/`+ INTERVAL`) — flagged explicitly so it isn't
+  a silent production breakage.
+- **Archive search is `LIKE '%term%'` via the query builder**, not a
+  dedicated search engine — explicitly in scope per this task's own "no
+  Elasticsearch/Meilisearch unless already present" instruction. Fine at
+  current data volumes (a `%term%` scan over a per-workspace-scoped
+  union of two tables); would need revisiting if any workspace's
+  task/meeting history grows into the tens of thousands of rows.
+- **The archive has no "type" counts on its All/Tasks/Meetings segmented
+  control** (unlike the Teams/Projects list pages' filter tabs, which
+  show counts computed from an already-in-memory dataset). Computing
+  accurate counts here would need two extra `COUNT(*)` queries scoped by
+  the *other* active filters, which felt like scope creep beyond "record
+  type" as a filter — the segmented control still fully works as a
+  filter, it just doesn't preview how many results each tab holds.
+- **Deep-linking from an archive result (`?task=`/`?meeting=` on the
+  project URL) only works if the target task/meeting is still present in
+  the project's already-loaded `tasks`/`meetings` props** — true for
+  every real case (nothing deletes tasks/meetings other than an explicit
+  user action), but if a linked record was deleted between archiving and
+  clicking, the link silently lands on the project's board/meetings tab
+  with no modal and no "not found" message, rather than an explicit error.
+- **The archive page has not been visually verified in a browser** — no
+  browser access in this session, same standing caveat as entries #14/
+  #15's UI work. The filter bar, table density, and pagination control
+  are code-reviewed and covered by backend tests, not click-tested.
 
 ## Next recommended task
 
-Backend suite confirmed green at 249 passed as of entry #15 (FR21–FR22).
+Backend suite confirmed green at 262 passed as of entry #16 (FR18–FR19).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
-`npm run build` all pass clean. Entry #14's manual-browser-verification
-checklist (Task Detail redesign) is still outstanding from a prior
-session — worth running before committing, alongside a quick live look
-at the new notification bell dropdown (entry #15), since neither has
-been visually confirmed in an actual browser yet.
+`npm run build` all pass clean. A visual browser pass is still owed for
+three separate pieces of UI work now (entry #14's Task Detail redesign,
+entry #15's notification bell, entry #16's archive page) — worth doing
+in one sitting before committing, since none of them have been
+click-tested in a running app yet.
 
-Back to the FR track: **FR18–FR19 (Archive/search)** or **FR20
-(Analytics)** remain the largest untouched blocks with no meetings/AI
-dependency, and no notification-infrastructure dependency now that entry
-#15 exists either. **FR25 (notification preferences)** is a small,
-natural follow-up directly on top of entry #15 — an opt-out toggle per
-notification type (or per channel: email vs. in-app) sitting on the
-existing `notifications`/mail dispatch points, no new domain concepts
-required. Save FR10–FR13 (transcription/AI summary) for last, once
-there's real meeting data to build against.
+Back to the FR track: **FR20 (Analytics)** is now the largest remaining
+untouched block with no meetings/AI dependency — and, following entry
+#16's lead, has an obvious "derive, don't duplicate" implementation path:
+counts/aggregates over the same `tasks`/`meetings`/`board_columns` tables
+the archive already queries (completed-vs-total tasks per project,
+meetings held per month, etc.), no new domain tables needed. **FR25
+(notification preferences)** remains a small, natural follow-up directly
+on top of entry #15 — an opt-out toggle per notification type/channel
+sitting on the existing dispatch points. Save FR10–FR13
+(transcription/AI summary) for last, once there's real meeting data to
+build against.

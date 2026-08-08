@@ -32,6 +32,7 @@ declare module 'vue' {
     AppLogoIcon: typeof import('./../components/AppLogoIcon.vue')['default']
     AppModal: typeof import('./../components/ui/AppModal.vue')['default']
     AppPageHeader: typeof import('./../components/ui/AppPageHeader.vue')['default']
+    AppPagination: typeof import('./../components/ui/AppPagination.vue')['default']
     AppPasswordInput: typeof import('./../components/ui/AppPasswordInput.vue')['default']
     AppRadioCard: typeof import('./../components/ui/AppRadioCard.vue')['default']
     AppRoleBadge: typeof import('./../components/ui/AppRoleBadge.vue')['default']

@@ -82,6 +82,23 @@ function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const taskId = params.get('task');
+    const meetingId = params.get('meeting');
+
+    if (taskId !== null) {
+        const task = props.tasks.find((t) => t.id === Number(taskId));
+        if (task) openTaskDetails(task);
+        return;
+    }
+
+    if (meetingId !== null) {
+        const meeting = props.meetings.find((m) => m.id === Number(meetingId));
+        if (meeting) meetingModalTarget.value = meeting;
+    }
+});
+
 function onDeleted() {
     router.visit(workspaceRoute('workspace.projects.index'));
 }
