@@ -7,14 +7,51 @@ namespace App\Modules\Tasks\Actions;
 use App\Models\User;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskComment;
+use App\Notifications\TaskCommentPostedNotification;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
+use Throwable;
 
 final class CreateTaskCommentAction
 {
+    public function __construct(
+        private readonly ResolveTaskRecipients $resolveTaskRecipients,
+    ) {}
+
     public function handle(Task $task, User $author, string $body): TaskComment
     {
-        return $task->comments()->create([
+        $comment = $task->comments()->create([
             'body' => $body,
             'user_id' => $author->id,
         ]);
+
+        $this->notifyComment($task, $author, $body);
+
+        return $comment;
+    }
+
+    private function notifyComment(Task $task, User $author, string $body): void
+    {
+        $recipients = $this->resolveTaskRecipients->handle($task, $author);
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        try {
+            Notification::send($recipients, new TaskCommentPostedNotification(
+                projectName: $task->project->name,
+                taskTitle: $task->title,
+                commenterName: $author->name,
+                excerpt: Str::limit($body, 80),
+                url: route('workspace.projects.show', ['workspace' => $task->project->workspace->slug, 'project' => $task->project_id]),
+            ));
+        } catch (Throwable $e) {
+            Log::error('Task comment notification dispatch failed', [
+                'task_id' => $task->id,
+                'exception' => $e,
+            ]);
+        }
     }
 }

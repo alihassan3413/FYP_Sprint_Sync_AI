@@ -25,7 +25,7 @@ final class TaskController
         Project $project,
         CreateTaskAction $action,
     ): RedirectResponse {
-        $task = $action->handle($project, $request->toDTO());
+        $task = $action->handle($project, $request->user(), $request->toDTO());
 
         return back()->with('success', "Task \"{$task->title}\" created.");
     }
@@ -37,7 +37,7 @@ final class TaskController
         Task $task,
         UpdateTaskAction $action,
     ): RedirectResponse {
-        $task = $action->handle($task, $request->toDTO());
+        $task = $action->handle($task, $request->user(), $request->toDTO());
 
         return back()->with('success', "Task \"{$task->title}\" updated.");
     }
@@ -49,7 +49,7 @@ final class TaskController
         Task $task,
         UpdateTaskStatusAction $action,
     ): RedirectResponse {
-        $action->handle($task, $request->toDTO());
+        $action->handle($task, $request->user(), $request->toDTO());
 
         return back()->with('success', 'Task status updated.');
     }

@@ -37,9 +37,25 @@ export interface WorkspaceContext {
     available: WorkspaceSummary[];
 }
 
+export interface NotificationItem {
+    id: string;
+    type: string | null;
+    title: string;
+    message: string;
+    url: string | null;
+    read_at: string | null;
+    created_at: string;
+}
+
+export interface NotificationsContext {
+    unread_count: number;
+    recent: NotificationItem[];
+}
+
 export interface SharedData extends PageProps {
     auth: Auth;
     workspace: WorkspaceContext | null;
+    notifications: NotificationsContext | null;
 }
 
 export interface User {

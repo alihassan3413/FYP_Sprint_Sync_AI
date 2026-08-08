@@ -11,10 +11,14 @@ use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
+use App\Notifications\MeetingCancelledNotification;
+use App\Notifications\MeetingScheduledNotification;
+use App\Notifications\MeetingUpdatedNotification;
 use App\ProjectRole;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 final class MeetingNotificationTest extends TestCase
@@ -38,6 +42,7 @@ final class MeetingNotificationTest extends TestCase
         parent::setUp();
 
         Mail::fake();
+        Notification::fake();
 
         $this->owner = User::factory()->create();
         $this->workspace = Workspace::factory()->ownedBy($this->owner)->create();
@@ -245,5 +250,76 @@ final class MeetingNotificationTest extends TestCase
             ->flatMap(fn ($mail) => collect($mail->to)->pluck('address'));
 
         $this->assertSame($recipients->count(), $recipients->unique()->count());
+    }
+
+    public function test_scheduling_a_meeting_creates_in_app_notifications_for_the_project_members(): void
+    {
+        $this->actingAs($this->owner)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Sprint planning',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect();
+
+        Notification::assertSentTo($this->manager, MeetingScheduledNotification::class);
+        Notification::assertSentTo($this->projectMember, MeetingScheduledNotification::class);
+        Notification::assertNotSentTo($this->unassignedMember, MeetingScheduledNotification::class);
+        Notification::assertNotSentTo($this->owner, MeetingScheduledNotification::class);
+    }
+
+    public function test_updating_a_meeting_creates_in_app_notifications(): void
+    {
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+            'title' => 'Old title',
+            'description' => null,
+            'meeting_link' => null,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->put($this->meetingRoute('workspace.projects.meetings.update', $meeting), [
+                'title' => 'New title',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect();
+
+        Notification::assertSentTo(
+            $this->projectMember,
+            MeetingUpdatedNotification::class,
+            fn ($notification) => str_contains($notification->toArray($this->projectMember)['message'], 'New title'),
+        );
+    }
+
+    public function test_cancelling_a_meeting_creates_in_app_notifications(): void
+    {
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create(['title' => 'Retro']);
+
+        $this->actingAs($this->owner)
+            ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
+            ->assertRedirect();
+
+        Notification::assertSentTo($this->manager, MeetingCancelledNotification::class);
+        Notification::assertSentTo($this->projectMember, MeetingCancelledNotification::class);
+        Notification::assertNotSentTo($this->owner, MeetingCancelledNotification::class);
+    }
+
+    public function test_meeting_notification_link_points_to_the_project(): void
+    {
+        $this->actingAs($this->owner)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Sprint planning',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect();
+
+        $expectedUrl = route('workspace.projects.show', ['workspace' => $this->workspace, 'project' => $this->project]);
+
+        Notification::assertSentTo(
+            $this->manager,
+            MeetingScheduledNotification::class,
+            fn ($notification) => $notification->toArray($this->manager)['url'] === $expectedUrl,
+        );
     }
 }

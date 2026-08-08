@@ -137,6 +137,7 @@ declare module 'vue' {
     NavigationMenuViewport: typeof import('./../components/ui/navigation-menu/NavigationMenuViewport.vue')['default']
     NavMain: typeof import('./../components/NavMain.vue')['default']
     NavUser: typeof import('./../components/NavUser.vue')['default']
+    NotificationBell: typeof import('./../components/NotificationBell.vue')['default']
     OnBoardingCheckList: typeof import('./../components/dashboard/OnBoardingCheckList.vue')['default']
     OnlineNowCard: typeof import('./../components/dashboard/OnlineNowCard.vue')['default']
     PlaceholderPattern: typeof import('./../components/PlaceholderPattern.vue')['default']

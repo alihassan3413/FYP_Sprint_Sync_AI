@@ -4,15 +4,52 @@ declare(strict_types=1);
 
 namespace App\Modules\Tasks\Actions;
 
+use App\Models\User;
 use App\Modules\Tasks\Data\UpdateTaskStatusData;
 use App\Modules\Tasks\Models\Task;
+use App\Notifications\TaskMovedNotification;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 final class UpdateTaskStatusAction
 {
-    public function handle(Task $task, UpdateTaskStatusData $data): Task
+    public function __construct(
+        private readonly ResolveTaskRecipients $resolveTaskRecipients,
+    ) {}
+
+    public function handle(Task $task, User $actor, UpdateTaskStatusData $data): Task
     {
         $task->update(['board_column_id' => $data->board_column_id]);
 
+        if ($task->wasChanged('board_column_id')) {
+            $this->notifyMove($task, $actor);
+        }
+
         return $task->refresh();
+    }
+
+    private function notifyMove(Task $task, User $actor): void
+    {
+        $recipients = $this->resolveTaskRecipients->handle($task, $actor);
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        try {
+            Notification::send($recipients, new TaskMovedNotification(
+                projectName: $task->project->name,
+                taskTitle: $task->title,
+                columnName: $task->boardColumn->name,
+                movedByName: $actor->name,
+                url: route('workspace.projects.show', ['workspace' => $task->project->workspace->slug, 'project' => $task->project_id]),
+            ));
+        } catch (Throwable $e) {
+            Log::error('Task moved notification dispatch failed', [
+                'task_id' => $task->id,
+                'exception' => $e,
+            ]);
+        }
     }
 }

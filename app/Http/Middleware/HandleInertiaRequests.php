@@ -45,6 +45,19 @@ class HandleInertiaRequests extends Middleware
 
             'workspace' => fn () => app(WorkspaceService::class)->inertiaFor($request->user()),
 
+            'notifications' => fn () => $request->user() ? [
+                'unread_count' => $request->user()->unreadNotifications()->count(),
+                'recent' => $request->user()->notifications()->latest()->limit(10)->get()->map(fn ($notification) => [
+                    'id' => $notification->id,
+                    'type' => $notification->data['type'] ?? null,
+                    'title' => $notification->data['title'] ?? '',
+                    'message' => $notification->data['message'] ?? '',
+                    'url' => $notification->data['url'] ?? null,
+                    'read_at' => $notification->read_at?->toIso8601String(),
+                    'created_at' => $notification->created_at->toIso8601String(),
+                ]),
+            ] : null,
+
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

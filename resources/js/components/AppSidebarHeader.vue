@@ -34,5 +34,9 @@ defineProps<{
                 </Breadcrumb>
             </template>
         </div>
+
+        <div class="ml-auto flex items-center">
+            <NotificationBell />
+        </div>
     </header>
 </template>

@@ -9,8 +9,10 @@ use App\Models\User;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
+use App\Notifications\MeetingScheduledNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 final class CreateMeetingAction
@@ -56,6 +58,14 @@ final class CreateMeetingAction
                     scheduledByName: $actor->name,
                 ));
             }
+
+            Notification::send($recipients, new MeetingScheduledNotification(
+                projectName: $meeting->project->name,
+                meetingTitle: $meeting->title,
+                scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                scheduledByName: $actor->name,
+                url: route('workspace.projects.show', ['workspace' => $meeting->project->workspace->slug, 'project' => $meeting->project_id]),
+            ));
         } catch (Throwable $e) {
             Log::error('Meeting scheduled notification dispatch failed', [
                 'meeting_id' => $meeting->id,

@@ -8,8 +8,10 @@ use App\Mail\MeetingUpdatedMail;
 use App\Models\User;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
+use App\Notifications\MeetingUpdatedNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 final class UpdateMeetingAction
@@ -57,6 +59,14 @@ final class UpdateMeetingAction
                     updatedByName: $actor->name,
                 ));
             }
+
+            Notification::send($recipients, new MeetingUpdatedNotification(
+                projectName: $meeting->project->name,
+                meetingTitle: $meeting->title,
+                scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                updatedByName: $actor->name,
+                url: route('workspace.projects.show', ['workspace' => $meeting->project->workspace->slug, 'project' => $meeting->project_id]),
+            ));
         } catch (Throwable $e) {
             Log::error('Meeting updated notification dispatch failed', [
                 'meeting_id' => $meeting->id,

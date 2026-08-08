@@ -7,20 +7,20 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 14 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR23, FR24, FR29, FR32 |
+| Complete | 16 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR21, FR22, FR23, FR24, FR29, FR32 |
 | Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 12 | FR10–FR13, FR18–FR22, FR25, FR26, FR28 |
+| Not started | 10 | FR10–FR13, FR18–FR20, FR25, FR26, FR28 |
 
-Strict completion: **14 / 35 (40.0%)**. Weighted (Complete=1, Partial=0.5): **52.9%**.
+Strict completion: **16 / 35 (45.7%)**. Weighted (Complete=1, Partial=0.5): **58.6%**.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
 a complete meeting lifecycle (schedule, view details, join, edit, cancel),
-and email notifications on every meeting lifecycle event are all built and
-tested. Still missing: transcription + AI summary (FR10–FR13),
-archive/search (FR18–FR19), analytics (FR20), in-app notifications +
-notification preferences (FR21–FR22, FR25), profile pictures (FR26), and
-audit log (FR28).
+email notifications on every meeting lifecycle event, and an in-app
+notification center (meetings + task assignment/movement/comments) are all
+built and tested. Still missing: transcription + AI summary (FR10–FR13),
+archive/search (FR18–FR19), analytics (FR20), notification preferences
+(FR25), profile pictures (FR26), and audit log (FR28).
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -645,6 +645,149 @@ instruction, no code comments were added, and neither the test suite nor
 `npm run build`/Pint were run this pass — verification below is manual,
 matching what was actually asked for.
 
+### 15. FR21–FR22 — In-app notification center
+
+Read this file, `ResolveMeetingRecipients`/the three Meeting actions
+(entry #11), `TaskCommentPolicy`, `Task`/`TaskComment` models, project
+membership rules, `HandleInertiaRequests`, and `AppSidebarHeader.vue`
+before writing anything, per the task's own instruction. Confirmed first
+that no notification infrastructure existed yet: `User` already had
+Laravel's `Notifiable` trait (unused), but there was no `notifications`
+table, no `Notification` classes, and no bell/feed UI anywhere.
+
+**Storage — Laravel's built-in database notifications, nothing custom.**
+Ran `php artisan make:notifications-table` for the standard `notifications`
+migration (uuid id, polymorphic `notifiable`, `type`, `data` json, `read_at`,
+timestamps) — placed at the migrations root next to `jobs`/`cache`/`users`,
+since it's core framework infrastructure, not a module concern. `User`
+already had `Notifiable`; zero model changes were needed to get
+`->notify()`, `->notifications()`, `->unreadNotifications()` working.
+
+**Six notification classes in `app/Notifications/`** (not module-scoped —
+same precedent as `app/Mail/` from entry #11: `MemberInvitationMail` lives
+outside any module because mail/notifications are a cross-cutting concern,
+not owned by one feature): `MeetingScheduledNotification`,
+`MeetingUpdatedNotification`, `MeetingCancelledNotification`,
+`TaskAssignedNotification`, `TaskMovedNotification`,
+`TaskCommentPostedNotification`. Each implements `ShouldQueue`, declares
+`via() => ['database']`, and `toArray()` returns a flat
+`{type, title, message, url}` shape — `url` is a fully-built
+`route('workspace.projects.show', ...)` string computed by the caller
+(the Action already has the project/workspace in scope), so the
+notification classes themselves stay dumb data carriers with no routing
+knowledge.
+
+**Meetings — reused FR23's recipient resolution and mail dispatch site
+exactly, per the task's own instruction to reuse FR23 semantics where
+possible.** `CreateMeetingAction`/`UpdateMeetingAction`/
+`DeleteMeetingAction` already resolved `$recipients` via
+`ResolveMeetingRecipients` and looped `Mail::to(...)->queue(...)` inside a
+try/catch; each now also calls `Notification::send($recipients, new
+Meeting*Notification(...))` inside that same try/catch, right after the
+mail loop. Same recipients, same actor-exclusion, same failure isolation
+(`Log::error` on `Throwable`, never bubbles to the HTTP response) — no new
+recipient logic for meetings at all.
+
+**Tasks — new `ResolveTaskRecipients`, deliberately narrow.** The task's
+own instruction was explicit: *"notify the task assignee and/or task
+manager/creator if that information actually exists — do not invent
+unsupported ownership fields."* `Task` has no `created_by`/manager column
+(confirmed by re-reading the model), so `ResolveTaskRecipients::handle()`
+returns **only the current assignee**, and only if they're not the actor
+— zero recipients if the task is unassigned or the actor is acting on
+their own assignment. This one class is shared by all three task-side
+triggers (assignment, move, comment), so "don't duplicate recipient-
+selection logic" holds the same way `ResolveMeetingRecipients` already
+does for meetings:
+- **Task assigned** — `CreateTaskAction` (assignee set at creation) and
+  `UpdateTaskAction` (checks `$task->wasChanged('assigned_to')` before
+  notifying, so editing other fields without touching the assignee stays
+  silent) both gained a `User $actor` parameter, mirroring how
+  `UpdateMeetingAction`/`DeleteMeetingAction` already needed the actor in
+  entry #11. `TaskController::store`/`update` now pass `$request->user()`
+  through — the only controller change this task needed.
+- **Task moved** — `UpdateTaskStatusAction` gained the same `User $actor`
+  parameter and checks `$task->wasChanged('board_column_id')`, notifying
+  the assignee with the new column's name. If the assignee is the one
+  dragging their own card (a very common case, since `TaskPolicy::
+  updateStatus` explicitly allows the assignee to move their own task),
+  `ResolveTaskRecipients` naturally excludes them — no self-notification
+  for your own drag-and-drop.
+- **Task comment posted** — `CreateTaskCommentAction` already received
+  the author; now also notifies the assignee (excluding the author,
+  satisfying "do not notify the person who wrote the comment" for free
+  since the author *is* the actor argument to `ResolveTaskRecipients`).
+  The notification's message includes a `Str::limit($body, 80)` excerpt.
+  Because recipients are always "the assignee, if any, minus the actor,"
+  **unrelated project/workspace members are structurally never notified**
+  — there's no code path that could reach them, not just a filter that
+  happens to exclude them.
+
+**In-app notification UI — reused the existing Inertia-shared-props
+pattern instead of a new JSON API**, matching entry #13's "this app is
+100% Inertia-based" precedent. `HandleInertiaRequests::share()` gained a
+`notifications` key (`{ unread_count, recent: [...] }`, latest 10),
+computed the same way the existing `workspace` prop already is — a plain
+closure re-evaluated on every request, not `Inertia::lazy()`, so the bell
+badge is correct on first paint of any page without an extra round trip.
+New `NotificationBell.vue` (top-level `resources/js/components/`,
+auto-registered like every other component in this app) renders a
+`Bell` icon with an unread-count pill in `AppSidebarHeader.vue`
+(right-aligned via a new `ml-auto` wrapper — the header previously had
+nothing on its right side at all), and a dropdown listing the 10 most
+recent items with title/message/relative-timestamp/unread-dot styling.
+
+**Read/unread actions are plain Inertia POSTs with a partial reload, not
+a new JSON endpoint.** New `NotificationController@read`/`@readAll`
+(`app/Http/Controllers/`, not module-scoped — same reasoning as
+`Settings\ProfileController`: this isn't a feature module with its own
+actions/policies/migrations, just two thin auth-gated endpoints) return
+`back()`. The frontend calls them via `router.post(..., { only:
+['notifications'] })`, which re-evaluates just the shared `notifications`
+prop instead of reloading the whole page — clicking a notification first
+awaits the mark-as-read POST's `onSuccess`, then `router.visit()`s to the
+notification's `url`, so the badge is never stale by one click. New
+`routes/notifications.php`, required from `routes/web.php` the same way
+`settings.php`/`auth.php` already are — plain `auth` middleware, no
+workspace prefix, since a notification is scoped to its owning user via
+`$request->user()->notifications()->whereKey(...)->firstOrFail()`, not to
+whatever workspace happens to be "current" in the URL.
+
+**Security — a user can only ever touch their own notification rows.**
+`NotificationController@read` looks the notification up through
+`$request->user()->notifications()` (not a bare `DatabaseNotification`
+route-model-bind), so requesting another user's notification id 404s
+before any read/write happens — verified by a dedicated test. Destination
+`url`s are always server-built `route()` calls into routes that are
+already policy-protected (`workspace.projects.show`, gated by
+`ProjectPolicy::view` + `EnsureWorkspaceMember`), so a notification link
+can never leak access beyond what the recipient could already reach by
+navigating there directly — no new authorization surface was introduced,
+only new *links* into existing protected routes.
+
+**Not built, per the task's explicit exclusions**: no WebSockets/Echo/
+broadcasting (the bell only refreshes on the next Inertia
+navigation/partial-reload, not live-push), no browser/mobile push, no
+notification preferences (still FR25), no mentions, no standalone
+notification page (the dropdown feed is the whole UI, per "don't build a
+large standalone page unless required" — FR21/FR22's own wording only
+asks for a center/feed, which the dropdown satisfies).
+
+**Tests**: extended `MeetingNotificationTest.php` with 4 new
+`Notification::fake()` cases (scheduled/updated/cancelled reach the right
+project members, actor excluded, link points at the project). New
+`tests/Feature/Tasks/TaskNotificationTest.php` (11 tests — assignment on
+create and on update, no-assignee/self-assignment send nothing,
+unchanged-assignee update sends nothing, column move notifies the
+assignee and excludes a self-move, comment notifies the assignee and
+excludes the author, unrelated project members never notified, link
+target). New `tests/Feature/Notifications/NotificationCenterTest.php`
+(6 tests — unread count via the shared prop, notification data/url/read_at
+round-trip through the shared prop, mark-one-read, mark-all-read, a user
+cannot mark another user's notification as read (404), guests are
+redirected to login). Full suite: **249 passed** (up from entry #13's 228
+baseline + 21 new tests here).
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -810,6 +953,31 @@ before calling this done:
 If any of these don't hold up in the browser, flag it and it can be
 fixed directly rather than assumed correct from the code review alone.
 
+Full suite after entry #15 (FR21–FR22 in-app notification center):
+
+```
+php artisan test --compact
+Tests:    249 passed (825 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed (auto-fixed one unused import in a new test file)
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.39s (no errors)
+```
+
+Adds 4 new cases to `MeetingNotificationTest.php`, plus new
+`TaskNotificationTest.php` (11 tests) and `NotificationCenterTest.php`
+(6 tests) — 21 new tests over entry #13's 228 baseline. Unlike entry #14,
+this pass **did** run the full verification suite per the task's own
+instruction — no outstanding manual-browser-verification checklist for
+the backend/data layer, since it's fully covered by automated tests. The
+bell dropdown's visual rendering itself is still unverified in a live
+browser (no browser access in this session), same caveat as entry #14.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -888,10 +1056,22 @@ fixed directly rather than assumed correct from the code review alone.
   experience. If the FYP report's grading rubric expects more than a
   same-tab-safe external link, that's a follow-up, not something this
   task silently expanded into.
-- **FR23 is email-only** — explicitly scoped that way ("do not build the
-  full in-app notification center yet"). There's no in-app notification
-  bell/feed (FR21–FR22) and no user-facing preference to opt out of
-  meeting emails (FR25). Both are natural follow-ups once this ships.
+- ~~FR23 is email-only~~ — FR21–FR22 (entry #15) added the in-app
+  notification bell/feed alongside the existing FR23 emails; meetings now
+  notify through both channels from the same recipient resolution. Still
+  no user-facing preference to opt out of either channel (FR25) — a
+  natural follow-up once this ships.
+- **The notification bell has no live push** — it refreshes on the next
+  Inertia navigation or on the explicit partial-reload fired by mark-
+  read/mark-all-read, not in real time while the page sits idle. Same
+  "no WebSockets/Echo/Reverb yet" boundary as everywhere else in this app
+  (see FR16-02's gap above); would need broadcasting to go live.
+- **The 10-most-recent-notifications list has no pagination or "view
+  all" page**, per the task's own "don't build a large standalone
+  notification page unless required" instruction. Older read notifications
+  simply age out of the dropdown (they're still in the database, just not
+  surfaced) — would need a dedicated index route if FR21/FR22's grading
+  expects a full history view.
 - **Mail delivery is only verified against `Mail::fake()` in tests and
   `MAIL_MAILER=log` in dev** (`.env.example`) — nobody has exercised a
   real SMTP/API provider (Postmark, SES, etc.) with these templates yet.
@@ -929,25 +1109,20 @@ fixed directly rather than assumed correct from the code review alone.
 
 ## Next recommended task
 
-Backend suite last confirmed green at 228 passed (entry #13's baseline;
-entry #14 changed no PHP). `git status` shows board column management
-(entry #12) already committed (`2fd5023`); task comments (entry #13:
-`TaskComment*.php`, `TaskCommentController.php`, `TaskCommentPolicy.php`,
-`TaskCommentThread.vue`, `TaskCommentTest.php`) and this Task Detail
-redesign + refresh fix (entry #14: `TaskDetailModal.vue`, `AppModal.vue`,
-`show.vue`, `Task.php`/`TaskData.php`/`ProjectController.php` for the
-`comments` eager-load) are both still uncommitted as of this update.
+Backend suite confirmed green at 249 passed as of entry #15 (FR21–FR22).
+`vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
+`npm run build` all pass clean. Entry #14's manual-browser-verification
+checklist (Task Detail redesign) is still outstanding from a prior
+session — worth running before committing, alongside a quick live look
+at the new notification bell dropdown (entry #15), since neither has
+been visually confirmed in an actual browser yet.
 
-**First**: run the manual verification checklist above in an actual
-browser — this pass had no way to do that itself — then run
-`php artisan test --compact`, `vendor/bin/pint --dirty --format agent`,
-`npm run lint:check`, and `npm run build` (all skipped this turn per
-explicit instruction) before committing entries #13 and #14.
-
-Then, back to the FR track: **FR18–FR19 (Archive/search)** or **FR20
+Back to the FR track: **FR18–FR19 (Archive/search)** or **FR20
 (Analytics)** remain the largest untouched blocks with no meetings/AI
-dependency. **FR21–FR22 (in-app notification center)** is a reasonable
-alternative now that FR23 proves out the "who gets notified" recipient
-pattern (`ResolveMeetingRecipients` is reusable as-is). Save FR10–FR13
-(transcription/AI summary) for last, once there's real meeting data and
-real notification infrastructure to build against.
+dependency, and no notification-infrastructure dependency now that entry
+#15 exists either. **FR25 (notification preferences)** is a small,
+natural follow-up directly on top of entry #15 — an opt-out toggle per
+notification type (or per channel: email vs. in-app) sitting on the
+existing `notifications`/mail dispatch points, no new domain concepts
+required. Save FR10–FR13 (transcription/AI summary) for last, once
+there's real meeting data to build against.
