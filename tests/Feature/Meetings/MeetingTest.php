@@ -21,6 +21,8 @@ final class MeetingTest extends TestCase
 
     private User $owner;
 
+    private User $admin;
+
     private User $member;
 
     private Project $project;
@@ -31,6 +33,8 @@ final class MeetingTest extends TestCase
 
         $this->owner = User::factory()->create();
         $this->workspace = Workspace::factory()->ownedBy($this->owner)->create();
+        $this->admin = User::factory()->create();
+        $this->workspace->users()->attach($this->admin->id, ['role' => UserRole::ADMIN->value]);
         $this->member = User::factory()->create();
         $this->workspace->users()->attach($this->member->id, ['role' => UserRole::MEMBER->value]);
         $this->project = Project::factory()->forWorkspace($this->workspace)->create();
@@ -67,6 +71,37 @@ final class MeetingTest extends TestCase
             'duration_minutes' => 45,
             'created_by' => $this->owner->id,
         ]);
+    }
+
+    public function test_an_admin_can_schedule_update_and_delete_a_meeting_without_project_membership(): void
+    {
+        $this->assertFalse($this->project->hasMember($this->admin));
+
+        $this->actingAs($this->admin)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Admin meeting',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect();
+
+        $meeting = Meeting::query()->where('title', 'Admin meeting')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->put($this->meetingRoute('workspace.projects.meetings.update', $meeting), [
+                'title' => 'Admin meeting updated',
+                'scheduled_at' => '2026-09-02 10:00:00',
+                'duration_minutes' => 45,
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('Admin meeting updated', $meeting->fresh()->title);
+
+        $this->actingAs($this->admin)
+            ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('meetings', ['id' => $meeting->id]);
     }
 
     public function test_the_authenticated_user_is_recorded_as_the_creator(): void
@@ -141,7 +176,7 @@ final class MeetingTest extends TestCase
         $this->assertDatabaseHas('meetings', ['title' => 'No link yet', 'meeting_link' => null]);
     }
 
-    public function test_a_member_cannot_schedule_a_meeting(): void
+    public function test_an_unassigned_workspace_member_cannot_schedule_a_meeting(): void
     {
         $this->actingAs($this->member)
             ->post($this->meetingRoute('workspace.projects.meetings.store'), [
@@ -176,7 +211,7 @@ final class MeetingTest extends TestCase
         $this->assertSame('https://meet.example.com/updated', $meeting->meeting_link);
     }
 
-    public function test_a_member_cannot_update_a_meeting(): void
+    public function test_an_unassigned_workspace_member_cannot_update_a_meeting(): void
     {
         $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create(['title' => 'Untouchable']);
 
@@ -203,7 +238,7 @@ final class MeetingTest extends TestCase
         $this->assertDatabaseMissing('meetings', ['id' => $meeting->id]);
     }
 
-    public function test_a_member_cannot_delete_a_meeting(): void
+    public function test_an_unassigned_workspace_member_cannot_delete_a_meeting(): void
     {
         $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
 
@@ -212,6 +247,105 @@ final class MeetingTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('meetings', ['id' => $meeting->id]);
+    }
+
+    public function test_an_unassigned_workspace_member_cannot_view_project_meetings(): void
+    {
+        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
+
+        $this->assertFalse($this->project->hasMember($this->member));
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertForbidden();
+    }
+
+    public function test_a_project_manager_can_schedule_update_and_delete_meetings_for_their_project(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Manager meeting',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect();
+
+        $meeting = Meeting::query()->where('title', 'Manager meeting')->firstOrFail();
+
+        $this->actingAs($this->member)
+            ->put($this->meetingRoute('workspace.projects.meetings.update', $meeting), [
+                'title' => 'Manager meeting updated',
+                'scheduled_at' => '2026-09-02 10:00:00',
+                'duration_minutes' => 45,
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('Manager meeting updated', $meeting->fresh()->title);
+
+        $this->actingAs($this->member)
+            ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('meetings', ['id' => $meeting->id]);
+    }
+
+    public function test_a_project_manager_of_another_project_cannot_manage_this_project_meetings(): void
+    {
+        $otherProject = Project::factory()->forWorkspace($this->workspace)->create();
+        $otherProject->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Not allowed',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_a_project_member_can_view_but_not_manage_meetings_for_their_project(): void
+    {
+        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
+        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/show')
+                ->has('meetings', 2)
+                ->where('canManageMeetings', false));
+
+        $this->actingAs($this->member)
+            ->post($this->meetingRoute('workspace.projects.meetings.store'), [
+                'title' => 'Not allowed',
+                'scheduled_at' => '2026-09-01 10:00:00',
+                'duration_minutes' => 30,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_a_project_member_of_another_project_cannot_view_this_projects_meetings(): void
+    {
+        $otherProject = Project::factory()->forWorkspace($this->workspace)->create();
+        $otherProject->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertForbidden();
+    }
+
+    public function test_the_project_show_page_reports_meeting_management_for_the_owner(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('projects/show')
+                ->where('canManageMeetings', true));
     }
 
     public function test_an_outsider_cannot_schedule_a_meeting(): void
@@ -254,31 +388,6 @@ final class MeetingTest extends TestCase
             ->assertNotFound();
 
         $this->assertDatabaseHas('meetings', ['id' => $foreignMeeting->id]);
-    }
-
-    public function test_the_project_show_page_includes_meetings_for_members_to_view(): void
-    {
-        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
-        Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
-        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
-
-        $this->actingAs($this->member)
-            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('projects/show')
-                ->has('meetings', 2)
-                ->where('canManageMeetings', false));
-    }
-
-    public function test_the_project_show_page_reports_meeting_management_for_the_owner(): void
-    {
-        $this->actingAs($this->owner)
-            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('projects/show')
-                ->where('canManageMeetings', true));
     }
 
     public function test_deleting_a_project_deletes_its_meetings(): void

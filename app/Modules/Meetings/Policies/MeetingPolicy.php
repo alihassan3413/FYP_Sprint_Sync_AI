@@ -7,32 +7,53 @@ namespace App\Modules\Meetings\Policies;
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
+use App\ProjectRole;
 use App\UserRole;
 
 final class MeetingPolicy
 {
     public function viewAny(User $user, Project $project): bool
     {
-        return $project->workspace->hasMember($user);
+        if ($project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $project->hasMember($user);
     }
 
     public function view(User $user, Meeting $meeting): bool
     {
-        return $meeting->workspace->hasMember($user);
+        if ($meeting->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $meeting->project->hasMember($user);
     }
 
     public function create(User $user, Project $project): bool
     {
-        return $project->workspace->userHasAtLeast($user, UserRole::ADMIN);
+        if ($project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 
     public function update(User $user, Meeting $meeting): bool
     {
-        return $meeting->workspace->userHasAtLeast($user, UserRole::ADMIN);
+        if ($meeting->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $meeting->project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 
     public function delete(User $user, Meeting $meeting): bool
     {
-        return $meeting->workspace->userHasAtLeast($user, UserRole::ADMIN);
+        if ($meeting->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $meeting->project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 }

@@ -21,12 +21,12 @@ meeting's full details/join flow and edit-notice (FR06–FR09), transcription
 in-app/email notifications (FR21–FR23), notification preferences (FR25),
 profile pictures (FR26), and audit log (FR28).
 
-Projects and Tasks (FR32, FR14–FR17) now also have **project-level
-membership and access control** layered underneath them — see work-log
-entry #8. This is an authorization hardening of those existing FRs, not a
-newly tracked FR number on its own (no line item in the FYP1 report maps to
-it directly, as far as this session could tell without re-reading the
-source `.docx`), so the table above is unchanged.
+Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
+**project-level membership and access control** layered underneath them —
+see work-log entries #8 and #9. This is an authorization hardening of
+those existing FRs, not a newly tracked FR number on its own (no line item
+in the FYP1 report maps to it directly, as far as this session could tell
+without re-reading the source `.docx`), so the table above is unchanged.
 
 ## Completed work log
 
@@ -253,6 +253,46 @@ project is treated the same as a total outsider to it.
   project roles — only the fixed `manager`/`member` pair exists, same
   spirit as `UserRole` before `WorkspaceRole` was added on top of it later.
 
+### 9. Meeting access control aligned to project-level membership
+
+Closed the gap flagged at the end of entry #8: `MeetingPolicy` still let
+any workspace member view/manage meetings via workspace-Admin-only checks,
+while `ProjectPolicy`/`TaskPolicy` had already moved to the
+`workspace admin-rank OR project role-rank` model. `MeetingPolicy` now
+matches `TaskPolicy` exactly:
+
+- `viewAny`/`view`: workspace Admin+ OR `project->hasMember($user)` (any
+  project role, Manager or Member).
+- `create`/`update`/`delete`: workspace Admin+ OR
+  `project->userHasAtLeast($user, ProjectRole::MANAGER)`.
+
+No route, controller, or migration changes were needed. `MeetingController`
+already authorizes purely through the policy (`StoreMeetingRequest`/
+`UpdateMeetingRequest::authorize()`, and `abort_unless(...->can('delete',
+...))` in `destroy()`), and `ProjectController::show()` already gates the
+entire page — including the `meetings` prop — behind `ProjectPolicy::view`
+before anything is rendered. Updating the policy alone was sufficient to
+make "unassigned member can't view this project's meetings" and "project
+Manager can manage this project's meetings" both true; `canManageMeetings`
+(`$user->can('create', [Meeting::class, $project])`) picks up the new rule
+automatically too.
+
+- **Tenant isolation was already correct and untouched**: the
+  `{workspace}/projects/{project}/meetings/{meeting}` scoped bindings
+  already 404 a meeting that doesn't belong to both the project and
+  workspace in the URL, independent of the policy layer — verified by the
+  existing cross-project/cross-workspace tests, kept as-is.
+- **`MeetingTest.php` expanded from 18 to 23 tests**, covering every
+  scenario this task asked for by name: Owner (existing), a new dedicated
+  Admin test proving full access *without* a `project_users` row, a
+  Project Manager bundle (create/update/delete on their assigned project,
+  plus a manager-of-a-different-project denial), a Project Member test
+  proving view-without-manage (loads the project page and sees `meetings`,
+  but a create attempt is `assertForbidden()`), an unassigned-workspace-
+  member view-denial test (`assertForbidden()` on the project show route
+  itself, since that's the only place meetings are ever surfaced), and the
+  pre-existing cross-project/cross-workspace isolation tests kept intact.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -331,11 +371,11 @@ which also updated the two `ProjectTest` cases that assumed any workspace
 member could list/view any project (now correctly scoped to project
 membership) and added dedicated coverage for the new membership rules.
 
-Full suite after entry #8:
+Full suite after entry #9:
 
 ```
 php artisan test --compact
-Tests:    176 passed (559 assertions)
+Tests:    181 passed (575 assertions)
 
 vendor/bin/pint --dirty --format agent
 → passed
@@ -344,26 +384,24 @@ npm run lint:check
 → 0 errors
 
 npm run build
-✓ built in 2.25s (no errors)
+✓ built in 2.33s (no errors)
 ```
 
 Covers: auth, email verification, password reset/update, profile update,
 dashboard, workspace tenant isolation, workspace CRUD, workspace roles,
 workspace invitations, team member management, AI assistant endpoints,
-module boundaries, Projects (25 tests, updated for project-scoped
-visibility), Tasks (26 tests, updated for project-scoped assignment),
-project membership (19 new tests in `ProjectMemberTest.php` — assign/
-change-role/remove as admin/manager/member/outsider, duplicate-assignment
-rejection, cross-project and cross-workspace isolation, non-member 404s),
-Meetings (18 tests — 1 updated: the "project show page includes meetings"
-test assumed an unassigned member could view the project, which is no
-longer true, so it now attaches that member to the project first).
+module boundaries, Projects (25 tests), Tasks (26 tests), project
+membership (19 tests in `ProjectMemberTest.php`), Meetings (23 tests —
+Owner, Admin-without-membership, Project Manager on their own project,
+Project Manager of a different project denied, Project Member view-only,
+Project Member of a different project denied, unassigned workspace
+member denied on schedule/update/delete/view, outsider 404, cross-project
+and cross-workspace isolation, project-deletion cascade).
 
 No JS test runner exists in this project (`package.json` only has
-build/lint/format scripts) — the new members UI (avatar list, role
-badges, add/change-role/remove modals) was verified by ESLint + a
-successful production build (catches type/template errors) plus manual
-code review, not by exercising it in a browser.
+build/lint/format scripts). Entry #9 touched no frontend files, so no
+new manual UI verification was needed beyond confirming lint/build stay
+clean.
 
 ## Known gaps worth flagging
 
@@ -419,31 +457,25 @@ code review, not by exercising it in a browser.
   Noted here because it's adjacent to project-level access control and
   the next person touching this area will likely wonder why those enum
   cases exist but do nothing.
-- **`MeetingPolicy` was intentionally left untouched by entry #8** — it
-  still lets any workspace member view/list meetings for any project
-  (`hasMember()`), which is now *more permissive* than `ProjectPolicy`'s
-  new rule for the project the meeting belongs to. The task that requested
-  project membership scoped it to "ProjectPolicy and TaskPolicy" only, so
-  this was left as-is rather than assumed in scope. Worth a deliberate
-  decision (not an oversight) on whether Meetings should respect project
-  membership too, since right now an unassigned member can't open a
-  project's Board tab but could still see that project's meetings if a
-  future UI exposed meetings outside the project page.
+- ~~`MeetingPolicy` was intentionally left untouched by entry #8~~ — fixed
+  in entry #9; `MeetingPolicy` now uses the same
+  `workspace admin-rank OR project role-rank` model as `ProjectPolicy`/
+  `TaskPolicy`.
+- **Meetings still has no Manager-vs-Member distinction beyond
+  create/update/delete vs. view** — unlike Tasks (which has an
+  assignee-only `updateStatus` ability), a meeting has no per-user partial
+  action, so `MeetingPolicy` only needed the two tiers Tasks already uses
+  for its non-status abilities. Flagging simply so a future FR (e.g.
+  "participants can RSVP") isn't mistaken for something already covered.
 
 ## Next recommended task
 
-The suite is 100% green again (176 passed) — the blocker noted in the
-previous version of this section is resolved, so it's safe to build
-further on top of Tasks/Projects authorization now.
+The suite is 100% green (181 passed). Entries #7 and #8 (Meetings, project
+membership) are already committed (`531cc12`, `c1da90c`); entry #9
+(`MeetingPolicy.php`, `MeetingTest.php`) is the only uncommitted work as of
+this update — review and commit it before starting anything else.
 
-**Housekeeping first**: everything in the working tree as of this entry —
-Meetings (FR05) and project membership (entry #8) — is still uncommitted.
-Both are independently green (own suites and the full suite pass), but
-review and commit them (as separate commits, given they're genuinely
-unrelated features that happened to land in the same session) before
-starting anything else, so a `git status` accident doesn't lose either.
-
-Then, **FR06–FR09 — Meeting details, join, edit, cancel**, continuing the
+**FR06–FR09 — Meeting details, join, edit, cancel**, continuing the
 meetings domain FR05 just started:
 - FR06 (view full meeting details) is nearly free — `MeetingData` already
   carries every field; it likely just needs a details view, similar to how
