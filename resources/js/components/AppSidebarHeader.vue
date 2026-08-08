@@ -10,10 +10,8 @@ defineProps<{
 
 <template>
     <header
-        class="relative flex h-16 shrink-0 items-center gap-2 px-6 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 md:px-4"
+        class="border-border flex h-16 shrink-0 items-center gap-2 border-b-2 px-6 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 md:px-4"
     >
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-
         <div class="flex items-center gap-2">
             <SidebarTrigger class="-ml-1" />
             <template v-if="breadcrumbs.length > 0">
