@@ -7,10 +7,13 @@ namespace App\Modules\Assistant\Http\Controllers;
 use App\Models\User;
 use App\Modules\Assistant\Actions\ExecuteToolCall;
 use App\Modules\Assistant\Actions\ProcessChatMessage;
+use App\Modules\Assistant\Actions\ResolveConversationWorkspace;
 use App\Modules\Assistant\Http\Requests\ConfirmActionRequest;
+use App\Modules\Assistant\Models\Conversation;
 use App\Modules\Assistant\Models\Message;
 use App\Modules\Assistant\Support\EventStream;
 use App\Modules\Assistant\Support\ToolArgumentValidator;
+use App\Modules\Assistant\Support\ToolResultEnvelope;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -23,6 +26,7 @@ final class ConfirmActionController
         ExecuteToolCall $executor,
         ProcessChatMessage $processor,
         ToolArgumentValidator $argumentValidator,
+        ResolveConversationWorkspace $workspaceResolver,
     ): StreamedResponse {
         $user = $request->user();
         $pendingMessage = $request->pendingMessage();
@@ -38,9 +42,10 @@ final class ConfirmActionController
             $processor,
             $registry,
             $user,
+            $workspaceResolver,
         ) {
             $confirmed
-                ? $this->execute($stream, $registry, $executor, $argumentValidator, $pendingMessage, $user)
+                ? $this->execute($stream, $registry, $executor, $argumentValidator, $workspaceResolver, $pendingMessage, $conversation, $user)
                 : $this->reject($stream, $pendingMessage);
 
             $events = $processor->handle(
@@ -76,7 +81,9 @@ final class ConfirmActionController
         ToolRegistry $registry,
         ExecuteToolCall $executor,
         ToolArgumentValidator $argumentValidator,
+        ResolveConversationWorkspace $workspaceResolver,
         Message $pendingMessage,
+        Conversation $conversation,
         User $user,
     ): void {
         $tool = $registry->get($pendingMessage->metadata['name'] ?? '');
@@ -95,11 +102,13 @@ final class ConfirmActionController
             return;
         }
 
-        $result = $executor->handle($tool, $args, $user);
+        $result = $executor->handle($tool, $args, $workspaceResolver->contextFor($conversation, $user));
+
+        $workspaceResolver->syncFromUser($conversation, $user);
 
         $pendingMessage->update([
             'tool_status' => ($result['success'] ?? false) ? Message::STATUS_EXECUTED : Message::STATUS_FAILED,
-            'content' => json_encode($result),
+            'content' => ToolResultEnvelope::wrap($result),
         ]);
 
         $stream->emit([

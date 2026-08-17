@@ -52,6 +52,10 @@ final class ToolArgumentValidator
                 $fieldRules[] = 'email:rfc';
             }
 
+            if (($definition['format'] ?? null) === 'date') {
+                $fieldRules[] = 'date';
+            }
+
             if (isset($definition['enum'])) {
                 $fieldRules[] = 'in:'.implode(',', $definition['enum']);
             }

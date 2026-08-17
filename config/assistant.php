@@ -40,6 +40,11 @@ return [
         'gpt-4o' => ['input' => 250.0, 'output' => 1000.0],
     ],
 
+    'retention' => [
+        'conversation_days' => (int) env('ASSISTANT_CONVERSATION_RETENTION_DAYS', 30),
+        'tool_result_days' => (int) env('ASSISTANT_TOOL_RESULT_RETENTION_DAYS', 7),
+    ],
+
     'history_depth' => (int) env('ASSISTANT_HISTORY_DEPTH', 30),
 
     'max_tool_rounds' => (int) env('ASSISTANT_MAX_TOOL_ROUNDS', 5),

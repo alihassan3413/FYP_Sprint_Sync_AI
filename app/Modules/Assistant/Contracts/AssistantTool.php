@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Contracts;
 
-use App\Models\User;
+use App\Modules\Assistant\Support\ToolContext;
 
 interface AssistantTool
 {
@@ -19,11 +19,11 @@ interface AssistantTool
 
     public function requiresConfirmation(): bool;
 
-    public function authorize(User $user): bool;
+    public function authorize(ToolContext $context): bool;
 
     /**
      * @param  array<string, mixed>  $args
      * @return array<string, mixed>
      */
-    public function execute(array $args, User $user): array;
+    public function execute(array $args, ToolContext $context): array;
 }

@@ -6,6 +6,8 @@ namespace App\Modules\Assistant\Tools;
 
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Support\ToolContext;
+use App\Modules\Assistant\Support\UntrustedText;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 
@@ -54,22 +56,21 @@ final class GetWorkspaceInfoTool implements AssistantTool
         return false;
     }
 
-    public function authorize(User $user): bool
+    public function authorize(ToolContext $context): bool
     {
-        $workspace = $user->currentWorkspace;
-
-        return $workspace !== null && $workspace->hasMember($user);
+        return $context->workspace !== null;
     }
 
     /**
      * @param  array<string, mixed>  $args
      * @return array<string, mixed>
      */
-    public function execute(array $args, User $user): array
+    public function execute(array $args, ToolContext $context): array
     {
-        $workspace = $user->currentWorkspace;
+        $workspace = $context->workspace;
+        $user = $context->user;
 
-        if ($workspace === null || ! $workspace->hasMember($user)) {
+        if ($workspace === null) {
             return ['success' => false, 'message' => 'No active workspace is selected.'];
         }
 
@@ -77,14 +78,14 @@ final class GetWorkspaceInfoTool implements AssistantTool
             'success' => true,
             'workspace' => [
                 'id' => $workspace->id,
-                'name' => $workspace->name,
-                'slug' => $workspace->slug,
+                'name' => UntrustedText::inline($workspace->name),
+                'slug' => UntrustedText::inline($workspace->slug),
                 'created_at' => $workspace->created_at?->toDateTimeString(),
             ],
             'current_user' => [
                 'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
+                'name' => UntrustedText::inline($user->name),
+                'email' => UntrustedText::inline($user->email),
                 'role' => $workspace->roleFor($user)?->value,
             ],
             'stats' => $this->stats($workspace),
@@ -131,8 +132,8 @@ final class GetWorkspaceInfoTool implements AssistantTool
             ->get()
             ->map(fn (User $member) => [
                 'id' => $member->id,
-                'name' => $member->name,
-                'email' => $member->email,
+                'name' => UntrustedText::inline($member->name),
+                'email' => UntrustedText::inline($member->email),
                 'role' => $member->pivot->role,
             ])
             ->all();
@@ -149,7 +150,7 @@ final class GetWorkspaceInfoTool implements AssistantTool
             ->get()
             ->map(fn (WorkspaceInvitation $invitation) => [
                 'id' => $invitation->id,
-                'email' => $invitation->email,
+                'email' => UntrustedText::inline($invitation->email),
                 'role' => $invitation->role->value,
                 'expires_at' => $invitation->expires_at?->toDateTimeString(),
             ])

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Tools;
 
-use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Workspace\Actions\CreateWorkspaceInvitationAction;
 use App\Modules\Workspace\Data\WorkspaceInvitationData;
 use App\UserRole;
@@ -55,20 +55,20 @@ final class InvitationTool implements AssistantTool
         return true;
     }
 
-    public function authorize(User $user): bool
+    public function authorize(ToolContext $context): bool
     {
-        $workspace = $user->currentWorkspace;
-
-        return $workspace !== null && $user->can('invite', $workspace);
+        return $context->workspace !== null
+            && $context->user->can('invite', $context->workspace);
     }
 
     /**
      * @param  array<string, mixed>  $args
      * @return array<string, mixed>
      */
-    public function execute(array $args, User $user): array
+    public function execute(array $args, ToolContext $context): array
     {
-        $workspace = $user->currentWorkspace;
+        $workspace = $context->workspace;
+        $user = $context->user;
 
         if ($workspace === null || ! $user->can('invite', $workspace)) {
             return [

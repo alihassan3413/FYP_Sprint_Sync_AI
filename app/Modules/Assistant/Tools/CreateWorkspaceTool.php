@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Tools;
 
-use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Workspace\Actions\CreateWorkspaceAction;
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
@@ -51,17 +51,18 @@ final class CreateWorkspaceTool implements AssistantTool
         return true;
     }
 
-    public function authorize(User $user): bool
+    public function authorize(ToolContext $context): bool
     {
-        return $user->exists;
+        return $context->user->exists;
     }
 
     /**
      * @param  array<string, mixed>  $args
      * @return array<string, mixed>
      */
-    public function execute(array $args, User $user): array
+    public function execute(array $args, ToolContext $context): array
     {
+        $user = $context->user;
         $name = trim((string) $args['name']);
 
         $duplicate = Workspace::query()

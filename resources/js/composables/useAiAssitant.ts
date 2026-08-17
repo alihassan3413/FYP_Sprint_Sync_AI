@@ -152,6 +152,10 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
             return `Create workspace "${args.name ?? 'untitled'}"`;
         case 'invite_user':
             return `Invite ${args.email ?? 'someone'}${args.role && args.role !== 'member' ? ` as ${args.role}` : ''}`;
+        case 'create_task':
+            return `Create task "${args.title ?? 'untitled'}"${args.assignee_email ? ` for ${args.assignee_email}` : ''}`;
+        case 'create_project':
+            return `Create project "${args.name ?? 'untitled'}"`;
         // Add more as you build tools.
         default:
             return name.replace(/_/g, ' ');
@@ -165,6 +169,12 @@ function getToolIntro(name: string): string {
 
         case 'create_workspace':
             return 'I can create this workspace for you. Please confirm first.';
+
+        case 'create_task':
+            return 'I can add this task to the project. Please confirm the details first.';
+
+        case 'create_project':
+            return 'I can create this project for you. Please confirm first.';
 
         default:
             return 'I’m ready to perform this action. Please confirm.';

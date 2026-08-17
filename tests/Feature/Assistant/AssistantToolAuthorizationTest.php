@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Assistant;
 
 use App\Models\User;
+use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
@@ -26,26 +27,25 @@ final class AssistantToolAuthorizationTest extends TestCase
 
         $member = User::factory()->create();
         $workspace->users()->attach($member->id, ['role' => UserRole::MEMBER->value]);
-        $member->forceFill(['current_workspace_id' => $workspace->id])->save();
 
         $names = array_map(
             fn ($tool) => $tool->name(),
-            app(ToolRegistry::class)->availableFor($member->refresh()),
+            app(ToolRegistry::class)->availableFor(new ToolContext($member->refresh(), $workspace)),
         );
 
         $this->assertNotContains('invite_user', $names);
         $this->assertContains('get_workspace_info', $names);
+        $this->assertContains('list_projects', $names);
     }
 
     public function test_an_admin_is_offered_the_invite_tool(): void
     {
         $owner = User::factory()->create();
         $workspace = Workspace::factory()->ownedBy($owner)->create();
-        $owner->forceFill(['current_workspace_id' => $workspace->id])->save();
 
         $names = array_map(
             fn ($tool) => $tool->name(),
-            app(ToolRegistry::class)->availableFor($owner->refresh()),
+            app(ToolRegistry::class)->availableFor(new ToolContext($owner->refresh(), $workspace)),
         );
 
         $this->assertContains('invite_user', $names);
@@ -60,20 +60,49 @@ final class AssistantToolAuthorizationTest extends TestCase
 
         $member = User::factory()->create();
         $workspace->users()->attach($member->id, ['role' => UserRole::MEMBER->value]);
-        $member->forceFill(['current_workspace_id' => $workspace->id])->save();
 
-        $result = app(InvitationTool::class)->execute(['email' => 'x@example.com'], $member->refresh());
+        $result = app(InvitationTool::class)->execute(
+            ['email' => 'x@example.com'],
+            new ToolContext($member->refresh(), $workspace),
+        );
 
         $this->assertFalse($result['success']);
         $this->assertSame('unauthorized', $result['error_code']);
         Mail::assertNothingQueued();
     }
 
-    public function test_the_workspace_info_tool_is_unavailable_without_a_current_workspace(): void
+    public function test_the_workspace_info_tool_is_unavailable_without_a_workspace_context(): void
     {
         $user = User::factory()->create();
 
-        $this->assertFalse(app(GetWorkspaceInfoTool::class)->authorize($user));
+        $this->assertFalse(app(GetWorkspaceInfoTool::class)->authorize(new ToolContext($user, null)));
+    }
+
+    public function test_the_create_workspace_tool_is_available_without_a_workspace_context(): void
+    {
+        $user = User::factory()->create();
+
+        $names = array_map(
+            fn ($tool) => $tool->name(),
+            app(ToolRegistry::class)->availableFor(new ToolContext($user, null)),
+        );
+
+        $this->assertSame(['create_workspace'], $names);
+    }
+
+    public function test_the_create_workspace_tool_works_without_an_existing_workspace(): void
+    {
+        $user = User::factory()->create();
+
+        $result = app(CreateWorkspaceTool::class)->execute(
+            ['name' => 'First Space'],
+            new ToolContext($user, null),
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('First Space', $result['workspace']['name']);
+        $this->assertDatabaseHas('workspaces', ['owner_id' => $user->id, 'name' => 'First Space']);
+        $this->assertSame($result['workspace']['id'], $user->refresh()->current_workspace_id);
     }
 
     public function test_the_create_workspace_tool_respects_the_per_owner_limit(): void
@@ -83,7 +112,10 @@ final class AssistantToolAuthorizationTest extends TestCase
         $user = User::factory()->create();
         Workspace::factory()->ownedBy($user)->create();
 
-        $result = app(CreateWorkspaceTool::class)->execute(['name' => 'Second One'], $user->refresh());
+        $result = app(CreateWorkspaceTool::class)->execute(
+            ['name' => 'Second One'],
+            new ToolContext($user->refresh(), null),
+        );
 
         $this->assertFalse($result['success']);
         $this->assertSame(1, Workspace::query()->where('owner_id', $user->id)->count());

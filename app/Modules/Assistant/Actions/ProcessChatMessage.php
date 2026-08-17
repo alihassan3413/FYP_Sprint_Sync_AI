@@ -8,9 +8,12 @@ use App\Models\User;
 use App\Modules\Assistant\Contracts\AiProvider;
 use App\Modules\Assistant\Models\Conversation;
 use App\Modules\Assistant\Models\Message;
+use App\Modules\Assistant\Support\ToolArgumentValidator;
+use App\Modules\Assistant\Support\ToolContext;
+use App\Modules\Assistant\Support\ToolResultEnvelope;
 use App\Modules\Assistant\Tools\ToolRegistry;
-use App\Modules\Workspace\Models\Workspace;
 use Generator;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 final class ProcessChatMessage
@@ -20,6 +23,8 @@ final class ProcessChatMessage
         private readonly ToolRegistry $registry,
         private readonly BuildContextPayload $contextBuilder,
         private readonly ExecuteToolCall $toolExecutor,
+        private readonly ToolArgumentValidator $argumentValidator,
+        private readonly ResolveConversationWorkspace $workspaceResolver,
     ) {}
 
     /**
@@ -120,13 +125,11 @@ final class ProcessChatMessage
             return;
         }
 
-        $workspace = $conversation->workspace_id === null
-            ? null
-            : Workspace::find($conversation->workspace_id);
+        $toolContext = $this->workspaceResolver->contextFor($conversation, $user);
 
         $context = $this->contextBuilder->handle(
             $user,
-            $workspace,
+            $toolContext->workspace,
             $pageContext,
             $depth === 0 ? $this->buildSupersededActions($conversation, $supersededIdsByName) : [],
         );
@@ -140,7 +143,7 @@ final class ProcessChatMessage
         $toolCalls = [];
         $usage = ['input_tokens' => 0, 'output_tokens' => 0];
 
-        foreach ($this->provider->streamChat($messages, $this->registry->asOpenAiSchema($user), $model) as $event) {
+        foreach ($this->provider->streamChat($messages, $this->registry->asOpenAiSchema($toolContext), $model) as $event) {
             switch ($event['type']) {
                 case 'text':
                     $assistantText .= $event['delta'];
@@ -187,7 +190,7 @@ final class ProcessChatMessage
         }
 
         foreach ($toolCalls as $toolCall) {
-            yield from $this->handleToolCall($user, $conversation, $toolCall, $supersededIdsByName);
+            yield from $this->handleToolCall($conversation, $toolContext, $toolCall, $supersededIdsByName);
         }
 
         $awaitingConfirmation = $conversation->messages()
@@ -258,8 +261,8 @@ final class ProcessChatMessage
      * @return Generator<int, array<string, mixed>>
      */
     private function handleToolCall(
-        User $user,
         Conversation $conversation,
+        ToolContext $toolContext,
         array $toolCall,
         array $supersededIdsByName = [],
     ): Generator {
@@ -267,7 +270,32 @@ final class ProcessChatMessage
         $args = json_decode($toolCall['function']['arguments'], true) ?? [];
         $tool = $this->registry->get($name);
 
-        if ($tool === null || ! $tool->authorize($user)) {
+        if ($tool === null) {
+            $this->recordToolResult($conversation, $toolCall['id'], $name, [
+                'success' => false,
+                'error' => 'That action is not available to you.',
+            ], Message::STATUS_FAILED);
+
+            yield ['type' => 'tool_failed', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+
+            return;
+        }
+
+        try {
+            $args = $this->argumentValidator->validate($tool, is_array($args) ? $args : []);
+        } catch (ValidationException $e) {
+            $this->recordToolResult($conversation, $toolCall['id'], $name, [
+                'success' => false,
+                'error_code' => 'invalid_arguments',
+                'error' => 'The arguments were invalid: '.implode(' ', array_keys($e->errors())).'.',
+            ], Message::STATUS_FAILED);
+
+            yield ['type' => 'tool_failed', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+
+            return;
+        }
+
+        if (! $tool->authorize($toolContext)) {
             $this->recordToolResult($conversation, $toolCall['id'], $name, [
                 'success' => false,
                 'error' => 'That action is not available to you.',
@@ -305,7 +333,9 @@ final class ProcessChatMessage
             return;
         }
 
-        $result = $this->toolExecutor->handle($tool, $args, $user);
+        $result = $this->toolExecutor->handle($tool, $args, $toolContext);
+
+        $this->workspaceResolver->syncFromUser($conversation, $toolContext->user);
 
         $this->recordToolResult($conversation, $toolCall['id'], $name, $result, Message::STATUS_EXECUTED);
 
@@ -332,7 +362,7 @@ final class ProcessChatMessage
             'role' => 'tool',
             'tool_call_id' => $toolCallId,
             'tool_status' => $status,
-            'content' => json_encode($result),
+            'content' => ToolResultEnvelope::wrap($result),
             'metadata' => ['name' => $name],
         ]);
     }

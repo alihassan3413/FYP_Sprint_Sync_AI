@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Assistant\Tools;
 
-use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Support\ToolContext;
 use LogicException;
 
 final class ToolRegistry
@@ -40,18 +40,18 @@ final class ToolRegistry
     /**
      * @return array<int, AssistantTool>
      */
-    public function availableFor(User $user): array
+    public function availableFor(ToolContext $context): array
     {
         return array_values(array_filter(
             $this->tools,
-            fn (AssistantTool $tool) => $tool->authorize($user),
+            fn (AssistantTool $tool) => $tool->authorize($context),
         ));
     }
 
     /**
      * @return array<int, array{type: string, function: array<string, mixed>}>
      */
-    public function asOpenAiSchema(User $user): array
+    public function asOpenAiSchema(ToolContext $context): array
     {
         return array_map(
             fn (AssistantTool $tool) => [
@@ -62,7 +62,7 @@ final class ToolRegistry
                     'parameters' => $tool->parameters(),
                 ],
             ],
-            $this->availableFor($user),
+            $this->availableFor($context),
         );
     }
 }

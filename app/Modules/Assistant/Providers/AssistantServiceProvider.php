@@ -7,9 +7,12 @@ namespace App\Modules\Assistant\Providers;
 use App\Modules\Assistant\Contracts\AiProvider;
 use App\Modules\Assistant\Drivers\OpenAiProvider;
 use App\Modules\Assistant\Exceptions\AiProviderException;
+use App\Modules\Assistant\Tools\CreateProjectTool;
+use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
+use App\Modules\Assistant\Tools\ListProjectsTool;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use App\Support\Modules\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -27,6 +30,9 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         CreateWorkspaceTool::class,
         InvitationTool::class,
         GetWorkspaceInfoTool::class,
+        ListProjectsTool::class,
+        CreateProjectTool::class,
+        CreateTaskTool::class,
     ];
 
     public function register(): void
