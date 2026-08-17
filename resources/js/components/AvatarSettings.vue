@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useForm, usePage } from '@inertiajs/vue3';
-import { Camera, ImagePlus, Loader2, Trash2 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { Camera, Check, ImagePlus, Loader2, Trash2, X } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
 import SavedIndicator from '@/components/settings/SavedIndicator.vue';
 import SettingsSection from '@/components/settings/SettingsSection.vue';
@@ -18,11 +18,15 @@ const user = computed(() => page.props.auth.user as User);
 const fileInput = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
 const localError = ref<string | null>(null);
+const pendingFile = ref<File | null>(null);
+const previewUrl = ref<string | null>(null);
 
 const uploadForm = useForm<{ avatar: File | null }>({ avatar: null });
 const removeForm = useForm({});
 
 const errorMessage = computed(() => localError.value ?? uploadForm.errors.avatar);
+const displayedAvatar = computed(() => previewUrl.value ?? user.value.avatar_url);
+const hasPendingSelection = computed(() => pendingFile.value !== null);
 
 function openFilePicker() {
     fileInput.value?.click();
@@ -34,7 +38,14 @@ function resetInput() {
     }
 }
 
-function upload(file: File) {
+function releasePreview() {
+    if (previewUrl.value !== null) {
+        URL.revokeObjectURL(previewUrl.value);
+        previewUrl.value = null;
+    }
+}
+
+function selectFile(file: File) {
     localError.value = null;
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
@@ -51,19 +62,39 @@ function upload(file: File) {
         return;
     }
 
-    uploadForm.avatar = file;
+    releasePreview();
+    pendingFile.value = file;
+    previewUrl.value = URL.createObjectURL(file);
+    uploadForm.clearErrors();
+}
+
+function confirmUpload() {
+    if (pendingFile.value === null || uploadForm.processing) {
+        return;
+    }
+
+    uploadForm.avatar = pendingFile.value;
     uploadForm.post(route('profile.avatar.update'), {
         forceFormData: true,
         preserveScroll: true,
+        onSuccess: cancelSelection,
         onFinish: resetInput,
     });
+}
+
+function cancelSelection() {
+    releasePreview();
+    pendingFile.value = null;
+    uploadForm.avatar = null;
+    localError.value = null;
+    resetInput();
 }
 
 function onFileSelected(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
 
     if (file) {
-        upload(file);
+        selectFile(file);
     }
 }
 
@@ -73,7 +104,7 @@ function onDrop(event: DragEvent) {
     const file = event.dataTransfer?.files?.[0];
 
     if (file) {
-        upload(file);
+        selectFile(file);
     }
 }
 
@@ -81,6 +112,8 @@ function removeAvatar() {
     localError.value = null;
     removeForm.delete(route('profile.avatar.destroy'), { preserveScroll: true });
 }
+
+onBeforeUnmount(releasePreview);
 </script>
 
 <template>
@@ -103,7 +136,13 @@ function removeAvatar() {
                 :aria-label="user.avatar_url ? 'Change profile photo' : 'Upload profile photo'"
                 @click="openFilePicker"
             >
-                <AppAvatar :name="user.name" :email="user.email" :src="user.avatar_url" size="2xl" />
+                <AppAvatar :name="user.name" :email="user.email" :src="displayedAvatar" size="2xl" />
+
+                <span
+                    v-if="hasPendingSelection"
+                    class="ring-primary ring-offset-background pointer-events-none absolute inset-0 rounded-full ring-2 ring-offset-2"
+                    aria-hidden="true"
+                />
 
                 <span
                     class="bg-foreground/55 text-background absolute inset-0 flex items-center justify-center rounded-full opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -118,12 +157,43 @@ function removeAvatar() {
 
             <div class="flex min-w-0 flex-1 flex-col items-center gap-3 sm:items-start">
                 <div class="space-y-1">
-                    <p class="text-foreground text-sm font-medium">Drag an image here, or pick one from your device</p>
-                    <p class="text-muted-foreground text-xs">PNG, JPG, WEBP or GIF · up to 2 MB · square works best</p>
+                    <template v-if="hasPendingSelection">
+                        <p class="text-foreground text-sm font-medium">Preview — not saved yet</p>
+                        <p class="text-muted-foreground text-xs">This is how your photo will look. Save it to make the change.</p>
+                    </template>
+                    <template v-else>
+                        <p class="text-foreground text-sm font-medium">Drag an image here, or pick one from your device</p>
+                        <p class="text-muted-foreground text-xs">PNG, JPG, WEBP or GIF · up to 2 MB · square works best</p>
+                    </template>
                 </div>
 
-                <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                <div v-if="hasPendingSelection" class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <Button type="button" size="sm" :disabled="uploadForm.processing" @click="confirmUpload">
+                        <Loader2 v-if="uploadForm.processing" class="animate-spin" />
+                        <Check v-else />
+                        {{ uploadForm.processing ? 'Saving…' : 'Save photo' }}
+                    </Button>
+
                     <Button type="button" variant="outline" size="sm" :disabled="uploadForm.processing" @click="openFilePicker">
+                        <ImagePlus />
+                        Choose another
+                    </Button>
+
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        class="text-muted-foreground"
+                        :disabled="uploadForm.processing"
+                        @click="cancelSelection"
+                    >
+                        <X />
+                        Cancel
+                    </Button>
+                </div>
+
+                <div v-else class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <Button type="button" variant="outline" size="sm" @click="openFilePicker">
                         <ImagePlus />
                         {{ user.avatar_url ? 'Replace photo' : 'Upload photo' }}
                     </Button>

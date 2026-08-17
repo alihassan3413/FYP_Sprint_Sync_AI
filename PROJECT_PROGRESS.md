@@ -10,14 +10,14 @@ rather than a work-log heading.
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 14 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR29, FR30, FR32, FR33, FR34 |
-| Partial | 15 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR26, FR28, FR31, FR35 |
+| Complete | 15 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR26, FR29, FR30, FR32, FR33, FR34 |
+| Partial | 14 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR28, FR31, FR35 |
 | Design Mismatch | 2 | FR02, FR27 |
 | Not started | 4 | FR10, FR11, FR12, FR13 |
 
-Strict completion: **14 / 35 (40.0%)**. Counting the two Design Mismatches as
-satisfied-by-design (the recommended resolution): **16 / 35 (45.7%)**.
-Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **67.1%**.
+Strict completion: **15 / 35 (42.9%)**. Counting the two Design Mismatches as
+satisfied-by-design (the recommended resolution): **17 / 35 (48.6%)**.
+Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **68.6%**.
 
 Entry #27 closed FR04-03, FR04-05, FR06-01 and FR32-05, moving FR32 to
 Complete and FR04 into the blocked-only group. Entry #28 closed FR14-04,
@@ -2118,7 +2118,7 @@ FR10–FR13, **DM** Design Mismatch.
 | FR23 Email Triggers | 01 C, 02 **B**, 03 C | Partial (blocked-only) |
 | FR24 Change Password | 01 C, 02 C, 03 C, 04 C | **Complete** |
 | FR25 Notification Preferences | 01 C, 02 C, 03 C | **Complete** |
-| FR26 Change Profile Picture | 01 C, 02 **P**, 03 C | Partial |
+| FR26 Change Profile Picture | 01 C, 02 **C**, 03 C | **Complete** |
 | FR27 Assign/Manage User Roles | 01 **DM**, 02 C, 03 C | Design Mismatch |
 | FR28 View Audit Log | 01 P, 02 C, 03 P | Partial |
 | FR29 Create Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
@@ -3108,7 +3108,88 @@ passed. `npm run lint:check` → clean. `npm run build` → built in 2.64s.
 `npx vue-tsc --noEmit` → the same two pre-existing `TS2688` `tsconfig.json`
 errors, unchanged.
 
-## Next recommended task (updated 2026-08-17, after entry #28)
+### 29. FR26-02 — preview before the avatar upload commits
+
+`AvatarSettings.vue` previously POSTed the moment a file was chosen or
+dropped, so FR26-02's "display a preview, and upload it upon confirmation"
+had no confirmation step at all. Frontend only — `AvatarController`,
+`AvatarUpdateRequest` and the routes are untouched.
+
+**Select → preview → confirm.** The former `upload()` split into
+`selectFile()` (validate, then stage) and `confirmUpload()` (post). Both
+entry points, the file input and the drop handler, now stage rather than
+send. The staged file is held in `pendingFile` with an object-URL
+`previewUrl`, and the avatar renders `previewUrl ?? user.avatar_url`, so the
+user sees the actual image in its final circular crop before committing.
+The existing client-side type and size checks still run at selection time,
+so an invalid file is rejected before it can be previewed or sent.
+
+**Object URLs are released deliberately.** `releasePreview()` revokes the
+current URL and is called when a replacement file is chosen, on cancel,
+after a successful upload (`onSuccess: cancelSelection`, at which point the
+server-rendered `avatar_url` takes over), and from `onBeforeUnmount`. A
+blob URL survives until revoked, so leaving this to the garbage collector
+would leak the image for the life of the tab.
+
+**Actions swap with state.** With nothing staged the card shows
+Replace/Upload plus Remove, as before. With a file staged it shows **Save
+photo** (spinner and "Saving…" while in flight), **Choose another**
+(re-opens the picker without discarding the card's state) and **Cancel**
+(discards and restores the saved photo). Remove is hidden while a selection
+is pending, since deleting the stored photo mid-preview would be ambiguous.
+The avatar gains a primary-coloured ring while staged, and the helper copy
+switches to "Preview — not saved yet", so an unsaved state is never mistaken
+for a saved one.
+
+**Tests.** No backend surface changed, so no new backend test would assert
+anything new; `tests/Feature/Settings/AvatarTest.php` (19 assertions across
+the settings suite) still passes untouched and continues to cover the upload,
+removal and validation rules the confirm step now feeds. The interaction
+itself is client-side and this project still has no JS test runner, so it is
+covered by ESLint, `vue-tsc` and a production build plus review — the same
+standard as every other UI-only entry in this log.
+
+**Verification**: `php artisan test --compact` → **369 passed, 2067
+assertions** (unchanged, as expected). `vendor/bin/pint --dirty --format
+agent` → passed. `npm run lint:check` → clean. `npm run build` → built in
+2.69s. `npx vue-tsc --noEmit` → the same two pre-existing `TS2688`
+`tsconfig.json` errors, unchanged.
+
+## Next recommended task (updated 2026-08-17, after entry #29)
+
+**FR28-01 — audit user account changes.**
+
+The audit log covers workspace, member, project, task, board-column and
+meeting events but records **nothing** when a user changes their own
+account. Add `AuditAction` cases and `RecordAuditLogAction` calls for the
+profile update, password change, avatar update/removal and account deletion
+paths in `app/Http/Controllers/Settings/`, following the pattern entry #20
+established everywhere else. Each is one enum case plus one call.
+
+One design question to settle first: those controllers are **not**
+workspace-scoped, while `audit_logs` rows are. Either record the change
+against the user's current workspace, or accept that account events are
+workspace-agnostic and need a nullable workspace column. The former is the
+smaller change and matches how `AuditLogPolicy` already scopes reads.
+
+Remaining unblocked order, easiest → hardest: **FR28-01** → FR20-05 →
+FR31-04 → FR05-03 → FR05-05 → FR35-01/FR35-02-widgets → FR16-02 → FR20-02.
+
+**Still decide before building:** FR02 and FR27 are Design Mismatches where
+amending the report is recommended, and FR05-03 hinges on whether external
+(non-account) meeting participants are in scope. See entry #26, Group 3.
+
+**Do not schedule** Group 2 items independently — they land with FR10–FR13.
+FR04, FR15, FR19, FR22 and FR23 contain only blocked work.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20, #22–#24 and #27–#29.
+The avatar flow is the highest-value one to click-test, since it is the only
+screen in the app with a real file-picker interaction.
+
+## Superseded next-task note (after entry #28)
 
 **FR26-02 — preview the selected image before uploading it.**
 
