@@ -31,11 +31,11 @@ across all 35 FRs, applying the rule that an FR cannot stay Complete while a
 mandatory sub-requirement is unimplemented. Nothing regressed; the earlier
 numbers were graded per-FR against work-log headings, which flattered them.
 
-**The more useful number.** Of the 16 Partials, **five (FR04, FR15, FR19,
-FR22, FR23) have no unblocked work left at all** — every remaining gap in them
-is Blocked by FR10–FR13. So **18 of 35 FRs need no further work before the AI
-pipeline**, and the realistic pre-FR10 target is the unblocked list in entry
-#26, not all 16.
+**The more useful number.** Of the 14 Partials, **six (FR04, FR15, FR19,
+FR22, FR23, FR28) have no unblocked work left at all** — every remaining gap in
+them is Blocked by FR10–FR13. So **21 of 35 FRs need no further work before the
+AI pipeline**, and the realistic pre-FR10 target is the unblocked list in entry
+#26, not all 14.
 
 Per-FR history for FR30, FR33, FR34 and FR35 (entries #21–#25) is superseded
 by the sub-requirement grading in **entry #26**, which is the authoritative
@@ -2120,7 +2120,7 @@ FR10–FR13, **DM** Design Mismatch.
 | FR25 Notification Preferences | 01 C, 02 C, 03 C | **Complete** |
 | FR26 Change Profile Picture | 01 C, 02 **C**, 03 C | **Complete** |
 | FR27 Assign/Manage User Roles | 01 **DM**, 02 C, 03 C | Design Mismatch |
-| FR28 View Audit Log | 01 P, 02 C, 03 P | Partial |
+| FR28 View Audit Log | 01 P (**B** only), 02 C, 03 P (**B** only) | Partial (blocked-only) |
 | FR29 Create Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
 | FR30 Edit Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
 | FR31 Invite Team Members | 01 C, 02 C, 03 C, 04 **NS**, 05 C, 06 C, 07 C | Partial |
@@ -3155,7 +3155,132 @@ agent` → passed. `npm run lint:check` → clean. `npm run build` → built in
 2.69s. `npx vue-tsc --noEmit` → the same two pre-existing `TS2688`
 `tsconfig.json` errors, unchanged.
 
-## Next recommended task (updated 2026-08-17, after entry #29)
+### 30. FR28-01 — user account changes are audited as global events
+
+The audit log covered workspace, member, project, task, board-column and
+meeting events but recorded nothing when a user changed their own account.
+FR28-01 names "user account changes" explicitly. Five new events close it.
+
+**No migration was needed.** `audit_logs.workspace_id` has been nullable
+since the table was created (entry #20), and the table declares **no foreign
+keys at all** — `workspace_id`, `project_id` and `user_id` are plain
+`unsignedBigInteger` columns. Deleting a user therefore cannot cascade away
+their audit rows, which is exactly the durability the account-deletion event
+needs. No FK was added, deliberately.
+
+**Global, not workspace-scoped.** New `RecordAuditLogAction::global()`
+writes `workspace_id = null` and `project_id = null`. A password, profile,
+avatar or account change belongs to the user account, not to whichever
+workspace happened to be active when it happened — attaching it to
+`current_workspace_id` would put a personal security event in one tenant's
+log and hide it from the others arbitrarily, and would leak an account event
+to every workspace admin who happens to share that workspace. The existing
+`handle()` signature is unchanged; both paths now share a private `write()`
+carrying the established try/catch + `Log::error` convention, so an audit
+failure still degrades quietly and never rolls back the mutation it
+describes.
+
+**Five events**, following the existing `noun.verb` naming:
+`account.profile_updated`, `account.password_changed`,
+`account.avatar_updated`, `account.avatar_removed`, `account.deleted`, plus
+labels and an `Account` arm on `category()` (the `match(true)` has no default
+and would otherwise throw on an unrecognised prefix). `AuditAction::
+isGlobal()` was added for callers that need to distinguish the two families.
+
+**`categories()` deliberately does not list `Account`.** That array is the
+workspace audit UI's filter list and is validated against by
+`AuditLogController`. Adding `Account` would offer a filter that always
+returns nothing, since global rows never match
+`where('workspace_id', $workspace->id)`. No workspace query, filter, policy
+or UI changed in this entry.
+
+**Recording points** are the existing successful-mutation sites, via method
+injection (`RecordAuditLogAction` as a controller method parameter — the
+convention `WorkspaceController` and friends already use):
+- `ProfileController::update` — logs **only when something actually
+  changed**. The changed set is `array_intersect` of the validated keys and
+  `$user->getDirty()`, computed after `fill()` and before `save()`, so a
+  no-op save records nothing and `email_verified_at` (nulled as a side effect
+  of an email change) never appears as a user-facing "changed field".
+- `PasswordController::update` — after `update()`.
+- `AvatarController::store` — after the file is stored and the row saved.
+- `AvatarController::destroy` — now early-returns when there is no avatar, so
+  removing an absent picture records nothing.
+- `ProfileController::destroy` — the human-readable description is captured
+  **before** `delete()`, then written after the delete succeeds. The row
+  keeps `user_id` for correlation even though the user is gone, so
+  `$log->user` resolves to `null` while the description still identifies who
+  it was.
+
+**Metadata is minimal by construction.** Profile updates store
+`['changed_fields' => ['name']]` — field *names* only, never old or new
+values. Password changes store nothing: no password, no hash, no request
+payload. Avatar events store nothing, in particular not the storage path.
+Account deletion stores nothing beyond the description. Tests assert the
+absences directly rather than trusting the implementation.
+
+**Tests**: new `tests/Feature/Audit/AccountAuditTest.php` (9) — profile
+update writes exactly one global row with only changed field names and no
+email value; a no-op save writes nothing; password change writes a global row
+whose description and metadata contain neither the new password, nor any
+`$2y$` hash, nor the word "password" in metadata; avatar upload writes a
+global row with no `avatars/` path; avatar removal writes its own row;
+removing an absent avatar writes nothing; account deletion leaves a durable
+row with the name and email preserved in the description and a now-null
+`user` relation; and two exclusion tests proving account rows never surface
+in a workspace audit list — one where the same user also performs a real
+workspace rename (the log shows the rename and only the rename), and one
+where another member's profile update leaves the workspace log empty. All
+existing audit tests (`AuditLoggingTest`, `AuditLogViewTest`) pass unchanged.
+
+**Verification**: `php artisan test --compact` → **378 passed, 2141
+assertions** (369 baseline + 9 new). `vendor/bin/pint --dirty --format
+agent` → passed (it reordered
+imports in the new test on first run; re-run clean). `npm run lint:check` →
+clean. `npm run build` → built in 2.94s. `npx vue-tsc --noEmit` → **exactly
+two errors, both the pre-existing `TS2688` `tsconfig.json` `types` entries**
+(`./resources/js/types`, `vue/tsx`) documented in entry #24 — unchanged by
+this work, and no source file is implicated. No frontend file was touched in
+this entry.
+
+**FR28 is now blocked-only**: FR28-01's remaining clause is summary
+approvals and FR28-03's is per-summary history, both Blocked by FR10–FR13.
+
+## Next recommended task (updated 2026-08-17, after entry #30)
+
+**FR20-05 — team-wide analytics for Scrum Masters and Team Leads, personal
+task analytics for Developers.**
+
+The Analytics module currently scopes purely by
+`accessibleProjectsFor()` — project membership — with no role-tier split, so
+a Developer sees the same team-wide aggregate a Scrum Master does. FR20-05
+asks for a different *shape* of analytics per role. No new tables:
+`BuildAnalyticsAction` already computes `tasks_by_assignee`, and a personal
+view is the same aggregates filtered to `assigned_to = $user->id`.
+
+One mapping decision to settle first, and it is the same one FR27 raises:
+the report's roles are Scrum Master / Developer / Team Lead, while the code
+has Owner / Admin / Member plus project Manager / Member. The natural
+reading is workspace Admin+ or project Manager → team-wide, everyone else →
+personal. Confirm that mapping before building, since it is the same
+terminology mismatch flagged in entry #26 Group 3.
+
+Remaining unblocked order, easiest → hardest: **FR20-05** → FR31-04 →
+FR05-03 → FR05-05 → FR35-01/FR35-02-widgets → FR16-02 → FR20-02.
+
+**Still decide before building:** FR02 and FR27 are Design Mismatches where
+amending the report is recommended, and FR05-03 hinges on whether external
+(non-account) meeting participants are in scope. See entry #26, Group 3.
+
+**Do not schedule** Group 2 items independently — they land with FR10–FR13.
+FR04, FR15, FR19, FR22, FR23 and FR28 contain only blocked work.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20, #22–#24 and #27–#29.
+
+## Superseded next-task note (after entry #29)
 
 **FR28-01 — audit user account changes.**
 

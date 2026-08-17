@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,16 +29,24 @@ class PasswordController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, RecordAuditLogAction $auditLogger): RedirectResponse
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $request->user()->update([
+        $user = $request->user();
+
+        $user->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        $auditLogger->global(
+            $user,
+            AuditAction::ACCOUNT_PASSWORD_CHANGED,
+            "{$user->name} changed their password.",
+        );
 
         return back();
     }

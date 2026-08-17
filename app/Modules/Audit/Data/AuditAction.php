@@ -34,6 +34,12 @@ enum AuditAction: string
     case MEETING_UPDATED = 'meeting.updated';
     case MEETING_CANCELLED = 'meeting.cancelled';
 
+    case ACCOUNT_PROFILE_UPDATED = 'account.profile_updated';
+    case ACCOUNT_PASSWORD_CHANGED = 'account.password_changed';
+    case ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated';
+    case ACCOUNT_AVATAR_REMOVED = 'account.avatar_removed';
+    case ACCOUNT_DELETED = 'account.deleted';
+
     /**
      * @return array<int, string>
      */
@@ -50,7 +56,13 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
+            str_starts_with($this->value, 'account.') => 'Account',
         };
+    }
+
+    public function isGlobal(): bool
+    {
+        return str_starts_with($this->value, 'account.');
     }
 
     /**
@@ -90,6 +102,11 @@ enum AuditAction: string
             self::MEETING_SCHEDULED => 'Meeting scheduled',
             self::MEETING_UPDATED => 'Meeting updated',
             self::MEETING_CANCELLED => 'Meeting cancelled',
+            self::ACCOUNT_PROFILE_UPDATED => 'Profile updated',
+            self::ACCOUNT_PASSWORD_CHANGED => 'Password changed',
+            self::ACCOUNT_AVATAR_UPDATED => 'Profile picture updated',
+            self::ACCOUNT_AVATAR_REMOVED => 'Profile picture removed',
+            self::ACCOUNT_DELETED => 'Account deleted',
         };
     }
 }

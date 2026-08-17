@@ -27,21 +27,50 @@ final class RecordAuditLogAction
         ?Model $subject = null,
         array $metadata = [],
     ): void {
+        $this->write($action, [
+            'workspace_id' => $workspace->id,
+            'project_id' => $project?->id,
+            'user_id' => $actor?->id,
+            'action' => $action->value,
+            'subject_type' => $subject !== null ? $subject::class : null,
+            'subject_id' => $subject?->getKey(),
+            'description' => $description,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    public function global(
+        ?User $actor,
+        AuditAction $action,
+        string $description,
+        array $metadata = [],
+    ): void {
+        $this->write($action, [
+            'workspace_id' => null,
+            'project_id' => null,
+            'user_id' => $actor?->id,
+            'action' => $action->value,
+            'subject_type' => $actor !== null ? $actor::class : null,
+            'subject_id' => $actor?->getKey(),
+            'description' => $description,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function write(AuditAction $action, array $attributes): void
+    {
         try {
-            AuditLog::create([
-                'workspace_id' => $workspace->id,
-                'project_id' => $project?->id,
-                'user_id' => $actor?->id,
-                'action' => $action->value,
-                'subject_type' => $subject !== null ? $subject::class : null,
-                'subject_id' => $subject?->getKey(),
-                'description' => $description,
-                'metadata' => $metadata,
-            ]);
+            AuditLog::create($attributes);
         } catch (Throwable $e) {
             Log::error('Audit log entry failed', [
                 'action' => $action->value,
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $attributes['workspace_id'] ?? null,
                 'exception' => $e,
             ]);
         }
