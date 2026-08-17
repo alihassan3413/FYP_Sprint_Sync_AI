@@ -58,6 +58,29 @@ final class TaskTest extends TestCase
         return route($name, $params);
     }
 
+    public function test_the_board_payload_carries_the_assignee_of_every_task(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $mine = Task::factory()->forProject($this->project)->forColumn($this->todoColumn)
+            ->assignedTo($this->member)->create(['title' => 'Mine']);
+
+        $unassigned = Task::factory()->forProject($this->project)->forColumn($this->todoColumn)
+            ->create(['title' => 'Unassigned', 'assigned_to' => null]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('tasks', 2)
+                ->where('auth.user.id', $this->member->id)
+                ->where(
+                    'tasks',
+                    fn ($tasks) => $tasks->firstWhere('id', $mine->id)['assigned_to'] === $this->member->id
+                        && $tasks->firstWhere('id', $unassigned->id)['assigned_to'] === null,
+                ));
+    }
+
     public function test_an_owner_can_create_a_task(): void
     {
         $this->actingAs($this->owner)

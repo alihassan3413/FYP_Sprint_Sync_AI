@@ -45,6 +45,17 @@ useDockContext('projects');
 const isEditModalOpen = ref(false);
 const isDeleteDialogOpen = ref(false);
 
+const taskScope = ref<'mine' | 'all'>('mine');
+
+const myTaskCount = computed(() => props.tasks.filter((task) => task.assigned_to === currentUserId.value).length);
+
+const taskScopeOptions = computed(() => [
+    { value: 'mine', label: 'My tasks', count: myTaskCount.value },
+    { value: 'all', label: 'All tasks', count: props.tasks.length },
+]);
+
+const showsEmptyPersonalBoard = computed(() => taskScope.value === 'mine' && myTaskCount.value === 0 && props.tasks.length > 0);
+
 const isCreateTaskModalOpen = ref(false);
 const taskModalTarget = ref<Task | null>(null);
 const taskModalMode = ref<'view' | 'edit'>('view');
@@ -127,13 +138,27 @@ function onDeleted() {
 
                     <!-- Board -->
                     <TabsContent value="board">
-                        <div class="mb-4 flex items-center justify-between">
-                            <p class="text-muted-foreground text-xs">{{ tasks.length }} {{ tasks.length === 1 ? 'task' : 'tasks' }}</p>
+                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <AppSegmentedControl v-if="tasks.length > 0" v-model="taskScope" :options="taskScopeOptions" />
+                            <p v-else class="text-muted-foreground text-xs">No tasks yet</p>
 
                             <Button v-if="canManageTasks" size="sm" class="gap-1.5" @click="isCreateTaskModalOpen = true">
                                 <Plus class="size-3.5" />
                                 New task
                             </Button>
+                        </div>
+
+                        <div
+                            v-if="showsEmptyPersonalBoard"
+                            class="border-border/70 bg-muted/20 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3"
+                        >
+                            <p class="text-muted-foreground text-xs">
+                                Nothing on this board is assigned to you yet.
+                                <span class="text-foreground font-medium">{{ tasks.length }}</span>
+                                {{ tasks.length === 1 ? 'task belongs' : 'tasks belong' }} to the team.
+                            </p>
+
+                            <Button variant="outline" size="sm" class="h-7 text-xs" @click="taskScope = 'all'"> View all tasks </Button>
                         </div>
 
                         <KanbanBoard
@@ -143,6 +168,7 @@ function onDeleted() {
                             :current-user-id="currentUserId"
                             :can-manage-tasks="canManageTasks"
                             :can-manage-board-columns="canManageBoardColumns"
+                            :scope="taskScope"
                             @open="openTaskDetails"
                             @edit="openTaskEdit"
                             @delete="(task) => (deleteTaskTarget = task)"

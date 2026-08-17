@@ -5,18 +5,27 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Http\Controllers;
 
 use App\Models\User;
+use App\Modules\Analytics\Actions\BuildAnalyticsAction;
+use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Workspace\Data\DashboardMeetingData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 use App\UserRole;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 final class DashboardController
 {
-    public function __invoke(Workspace $workspace): Response
+    public function __invoke(Request $request, Workspace $workspace, BuildAnalyticsAction $analytics): Response
     {
-        $user = auth()->user();
+        $user = $request->user();
+
+        $accessibleProjects = $workspace->accessibleProjectsFor($user)->orderBy('name')->get();
+        $accessibleProjectIds = $accessibleProjects->pluck('id');
+
+        $summary = $analytics->handle($accessibleProjects, []);
 
         return Inertia::render('Dashboard', [
             'user' => [
@@ -31,7 +40,54 @@ final class DashboardController
             'pendingInvitesCount' => $workspace->pendingInvitations()->count(),
             'activity' => $this->activity($workspace, $user),
             'onboarding' => $this->onboarding($workspace),
+            'upcomingMeetings' => $this->meetings($workspace, $accessibleProjectIds, false),
+            'pastMeetings' => $this->meetings($workspace, $accessibleProjectIds, true),
+            'taskProgress' => [
+                'total' => $summary->total_tasks,
+                'completed' => $summary->completed_tasks,
+                'open' => $summary->open_tasks,
+                'overdue' => $summary->overdue_tasks,
+                'completion_percentage' => $summary->task_completion_percentage,
+                'columns' => $summary->tasks_by_column,
+            ],
+            'projects' => $summary->projects,
         ]);
+    }
+
+    /**
+     * @param  Collection<int, int>  $accessibleProjectIds
+     * @return Collection<int, DashboardMeetingData>
+     */
+    private function meetings(Workspace $workspace, Collection $accessibleProjectIds, bool $past): Collection
+    {
+        if ($accessibleProjectIds->isEmpty()) {
+            return collect();
+        }
+
+        $query = Meeting::query()
+            ->with('project:id,name')
+            ->whereIn('project_id', $accessibleProjectIds)
+            ->limit((int) config('workspace.dashboard_meeting_limit'));
+
+        $meetings = $past
+            ? $query->past()->orderByDesc('scheduled_at')->get()
+            : $query->upcoming()->orderBy('scheduled_at')->get();
+
+        return $meetings->map(fn (Meeting $meeting) => DashboardMeetingData::fromModel(
+            $meeting,
+            $past,
+            $this->meetingUrl($workspace, $meeting),
+        ))->values();
+    }
+
+    private function meetingUrl(Workspace $workspace, Meeting $meeting): string
+    {
+        $base = route('workspace.projects.show', [
+            'workspace' => $workspace->slug,
+            'project' => $meeting->project_id,
+        ]);
+
+        return "{$base}?meeting={$meeting->id}";
     }
 
     /**

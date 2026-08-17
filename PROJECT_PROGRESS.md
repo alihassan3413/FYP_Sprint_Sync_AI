@@ -1,41 +1,45 @@
 # SprintSync — Project Progress
 
 Living tracker for FR implementation status, decisions, and what to build next.
-Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
+Source of truth for FR wording: **`docs/FUNCTIONAL_REQUIREMENTS.md`**, extracted
+verbatim from `SprintSync FYP1 Report-1.docx` (section 2.3.1, Tables 2.3–2.37)
+on 2026-08-17. Every FR below is now gradeable against real requirement text
+rather than a work-log heading.
 
 ## Current FR status
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 24 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR28, FR29, FR30, FR32, FR35 |
-| Partial | 7 | FR02, FR03, FR04, FR27, FR31, FR33, FR34 |
-| Not started | 4 | FR10–FR13 |
+| Complete | 14 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR29, FR30, FR32, FR33, FR34 |
+| Partial | 15 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR26, FR28, FR31, FR35 |
+| Design Mismatch | 2 | FR02, FR27 |
+| Not started | 4 | FR10, FR11, FR12, FR13 |
 
-Strict completion: **24 / 35 (68.6%)**. Weighted (Complete=1, Partial=0.5):
-**78.6%**.
+Strict completion: **14 / 35 (40.0%)**. Counting the two Design Mismatches as
+satisfied-by-design (the recommended resolution): **16 / 35 (45.7%)**.
+Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **67.1%**.
 
-**FR34** was reclassified Partial → Broken by the 2026-08-17 re-audit
-(entry #21) and returned to **Partial** the same day once entry #22 repaired
-it. Role assignment now works end to end; the one item keeping it off
-Complete is that `WorkspacePermission` toggles are still not enforced by any
-policy — an open design decision, not a defect. See entry #22.
+Entry #27 closed FR04-03, FR04-05, FR06-01 and FR32-05, moving FR32 to
+Complete and FR04 into the blocked-only group. Entry #28 closed FR14-04,
+moving FR14 to Complete (its only remaining verdict is the FR14-02 design
+mismatch, where custom board columns are a superset of the report's three
+fixed ones).
 
-**FR30** moved Partial → **Complete** in entry #23: rename, delete and member
-management are all gated, wired and now actually covered by tests (they had
-none). Caveat for whoever holds the report — member *suspend* and *transfer
-tasks on removal* do not exist and never had backends; the dead UI controls
-for both were removed rather than faked. If FR30's real wording names either,
-it drops back to Partial.
+**These counts replace entry #25's and are much lower — read why before
+reacting.** Entry #26 is the first audit graded at *sub-requirement* level
+across all 35 FRs, applying the rule that an FR cannot stay Complete while a
+mandatory sub-requirement is unimplemented. Nothing regressed; the earlier
+numbers were graded per-FR against work-log headings, which flattered them.
 
-**FR35** moved Partial → **Complete** in entry #24. The access model was
-already correct and well tested; what shipped there was making the visible UI
-and the delivered page payloads match it.
+**The more useful number.** Of the 16 Partials, **five (FR04, FR15, FR19,
+FR22, FR23) have no unblocked work left at all** — every remaining gap in them
+is Blocked by FR10–FR13. So **18 of 35 FRs need no further work before the AI
+pipeline**, and the realistic pre-FR10 target is the unblocked list in entry
+#26, not all 16.
 
-FR30 and FR35 were re-audited in the same pass and **remain Partial** — the
-table above was already correct for both. FR02, FR03, FR04, FR27, FR31 and
-FR33 could **not** be re-audited: `SprintSync FYP1 Report.docx` is not in the
-repo or anywhere on the dev machine, so their exact wording is unavailable and
-their status here is carried forward unverified from entry #1.
+Per-FR history for FR30, FR33, FR34 and FR35 (entries #21–#25) is superseded
+by the sub-requirement grading in **entry #26**, which is the authoritative
+status. FR30, FR33 and FR34 survive that grading as Complete; FR35 is Partial.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
@@ -1929,6 +1933,409 @@ starter-kit commit (`e998c49`, 4 months ago), and neither error references
 any source file. Worth fixing in a cleanup pass so the type check can be
 trusted to exit zero.
 
+### 25. Report-backed re-audit of the remaining Partial FRs
+
+`SprintSync FYP1 Report-1.docx` was located in `~/Downloads` (earlier
+recursive searches missed it; a direct `ls` found it immediately) and
+extracted with `textutil -convert txt`. FR01–FR35 are now recorded
+verbatim in `docs/FUNCTIONAL_REQUIREMENTS.md`, which replaces this file's
+header reference as the requirement source of truth. No code changed in
+this entry.
+
+**FR02 — Reset Password: Partial.** FR02-04 requires "a 6-digit one-time
+code" sent to the email address, FR02-05 a code-entry screen with a Resend
+Code hyperlink, and FR02-06 a separate Set New Password screen after
+verification. The implementation is Laravel's standard signed-token reset
+link (`PasswordResetLinkController` → `NewPasswordController`, pages
+`auth/ForgotPassword` and `auth/ResetPassword`). FR02-01, 02, 03 and 07
+are satisfied; 04, 05 and 06 are not, as written. This is a
+**report-vs-design mismatch, not a defect** — a single-use signed link is
+the stronger mechanism (no 6-digit brute-force surface, no code-reuse
+window) and is what the framework provides. Recommendation: amend the
+report to describe a link-based reset, rather than downgrade the
+implementation to an OTP. If the report must stand, the change is
+self-contained (a codes table, a verify screen, a resend endpoint) and is
+a small-to-medium feature, not an architectural one.
+
+**FR03 — Logout: Complete.** FR03-01 is satisfied by the Logout item in
+`UserMenuContent` (posts to `route('logout')`); FR03-02 by
+`AuthenticatedSessionController::destroy`, which invalidates the session
+and regenerates the token before redirecting to `/`→login; FR03-03 by
+Laravel's idle session expiry (`config/session.php` `lifetime` = 120
+minutes via `SESSION_LIFETIME`, `expire_on_close` = false). The session is
+refreshed per request, so the 120 minutes is genuinely an inactivity
+window. Previously marked Partial with no stated reason; the wording shows
+nothing is missing. There is no pre-expiry warning UI, but the report does
+not ask for one.
+
+**FR04 — View Dashboard: Partial.** FR04-02 is satisfied
+(`NotificationBell` renders the unread count in `AppSidebarHeader`).
+FR04-01 is partially satisfied — entry #24 made the *navigation*
+role-dependent, but the dashboard body itself is identical for every role.
+Three sub-requirements are absent:
+- **FR04-03** — no list of upcoming scheduled meetings. `DashboardController`
+  returns members, pending invite count, activity and onboarding only. The
+  `ComingNextCard` on the right column is a hardcoded marketing placeholder
+  ("AI sprint planning / Join the waitlist"), not meeting data.
+- **FR04-04** — pending summary reviews. Blocked by FR11–FR13.
+- **FR04-05** — no sprint task completion widget.
+FR04-03 and FR04-05 are small, self-contained additions (both read from
+data the app already stores). FR04-04 cannot be built before the summary
+pipeline exists.
+
+**FR27 — Assign and Manage User Roles: Partial.** FR27-02 and FR27-03 are
+satisfied by the policy layer plus entry #24's visibility work. FR27-01 —
+"user roles (Scrum Master, Developer, Team Lead) … assigned at the time of
+account registration" — is not met and, as written, conflicts with the
+architecture: `RegisteredUserController` takes name/email/password and a
+workspace name, and roles are **per-workspace** (`workspace_users.role`),
+assigned by invitation or by an owner, not globally at signup. The report's
+three role names do not exist anywhere in the codebase; `App\UserRole` is
+Owner/Admin/Member. This is a **report-vs-design mismatch**, and the
+current design is the correct one for a multi-tenant product — a user who
+is a Scrum Master in one workspace may be a Developer in another, which a
+registration-time global role cannot express. Recommendation: amend FR27-01
+to describe workspace-scoped role assignment. Reverting to global roles
+would be an architectural change and would break FR29–FR35.
+
+**FR31 — Invite Team Members: Partial.** Six of seven satisfied — invite
+by email (FR31-01), emailed join link (FR31-02), unique token with a 7-day
+expiry (FR31-03, `workspace.invitation_ttl_days` default 7), expired links
+rejected with a notice (FR31-05), acceptance with a default role
+(FR31-06), and revocation before expiry (FR31-07, wired into the UI in
+entry #23). **FR31-04 is missing**: there is no shareable invite link that
+*any* user can redeem. Every invitation is bound to one email address —
+`WorkspaceInvitationController::showAccept` rejects a signed-in user whose
+email differs, and a signed-out visitor can only register under the
+invited address. A generic workspace join link is a genuine feature gap of
+moderate size (a workspace-level token plus an accept path that does not
+assume a pre-known email), and it carries a real security decision: an
+open link is bearer-authority to join a tenant, so it needs its own expiry,
+revocation and probably a role cap. Not a small fix.
+
+**FR33 — Create and Manage Custom Roles: Complete.** All six satisfied
+after entry #22: create by name (FR33-01), define granular permissions from
+a predefined list (FR33-02, `WorkspacePermission` + the Role Management
+toggles), edit name or permissions (FR33-03 — this was the broken
+save/delete fixed in entry #22), delete with affected members reassigned to
+a default (FR33-04 — `DeleteWorkspaceRoleAction` nulls `workspace_role_id`,
+leaving the member on their system role, which *is* the default tier),
+per-workspace isolation (FR33-05, enforced by `workspace_id` scoping and
+covered by `test_the_same_role_name_can_exist_in_two_workspaces`), and the
+settings-page listing of roles and permissions (FR33-06).
+
+Note FR33-02's example permission list ("manage meetings, approve
+summaries, manage tasks, view analytics, manage members, manage projects")
+does not match `WorkspacePermission`'s actual cases, which cover projects,
+members, billing and integrations. The report says "e.g.", so this is not a
+compliance failure, but the catalogue is worth aligning if the permissions
+ever become authoritative.
+
+**FR34 — Assign Roles to Workspace Members: Complete.** This resolves the
+question left open by entry #22. FR34's five sub-requirements are
+*exclusively about assignment*: assign any defined role to any member
+(FR34-01), change it at any time (FR34-02), apply the change immediately
+without forcing a logout (FR34-03), prevent the Owner from removing their
+own Owner role (FR34-04), and show each member's current role in the member
+list (FR34-05). All five hold — entry #22 shipped 01, 02 and 05;
+`UpdateWorkspaceMemberRoleAction` throws `cannotChangeOwnerRole` for 04;
+and 03 is satisfied structurally, since every authorization decision reads
+the pivot per request and nothing caches roles in the session.
+
+**Custom-permission enforcement is not an FR34 requirement.** The word
+"enforce" never appears in FR34. Permission *definition* belongs to FR33
+("define granular permissions"), and permission *enforcement* belongs to
+**FR35** — FR35-02 ("only the navigation items, widgets, and action
+buttons that the authenticated user's role has permission to access"),
+FR35-03 ("as defined by their workspace role") and FR35-04 ("users whose
+role includes the corresponding permission"). FR27-02 restates the same
+idea generally. So the open item recorded in entry #22 was filed under the
+wrong FR: it is an FR35 obligation, and FR34 is done.
+
+**FR35 — Role-Based Dashboard and Visibility Control: reopened, Partial.**
+Entry #24's work stands and satisfies FR35-02's navigation and
+action-button clauses, FR35-03 (task visibility scoped to accessible
+projects), FR35-05 (workspace switcher re-rendering per workspace) and
+FR35-06 (access-denied responses). Three things the wording requires are
+absent:
+- **FR35-01** — "a distinct dashboard layout for each user based on their
+  assigned workspace role and its associated permissions". Every role
+  currently receives the same `Dashboard.vue` body.
+- **FR35-02, "widgets"** — dashboard widgets are not role-filtered.
+- **FR35-04, summary approval** — the action does not exist; blocked by
+  FR12/FR13.
+FR35-01 and the widgets clause are also where the `WorkspacePermission`
+matrix would finally become authoritative, since both are phrased in terms
+of what the role "has permission to access". That remains the open design
+decision — it was not made here, and no authorization was redesigned.
+
+**FR30 — Edit Workspace: stays Complete.** All five verified against the
+wording: edit name (FR30-01), view all members (FR30-02, the Team roster),
+remove any member (FR30-03), delete the workspace "removing all associated
+projects, tasks, meetings, and member associations" (FR30-04 — confirmed by
+reading the migrations: `projects`, `tasks`, `meetings`, `board_columns`,
+`task_comments`, `project_users`, `workspace_users`, `workspace_roles` and
+`workspace_invitations` all declare `cascadeOnDelete` up the chain to
+`workspaces`), and switching between workspaces from the navigation
+(FR30-05). The report phrases these as Workspace Owner abilities; the
+implementation also grants edit/member-management to workspace Admins,
+which is a superset and not a violation. The suspend and transfer-tasks
+capabilities noted as a caveat in entry #23 do not appear anywhere in
+FR30 — that caveat can be considered closed.
+
+### 26. Full report-backed audit, graded per sub-requirement (2026-08-17)
+
+First audit of all 35 FRs against `docs/FUNCTIONAL_REQUIREMENTS.md` at
+sub-requirement granularity. No code changed. Rule applied: an FR stays
+Complete only if every mandatory sub-requirement is implemented. Legend —
+**C** Complete, **P** Partial, **NS** Not Started, **B** Blocked by
+FR10–FR13, **DM** Design Mismatch.
+
+| FR | Sub-requirement verdicts | Status |
+|---|---|---|
+| FR01 Login | 01 C, 02 C, 03 C, 04 C, 05 C, 06 **P** | Partial |
+| FR02 Reset Password | 01 C, 02 C, 03 C, 04 **DM**, 05 **DM**, 06 **DM**, 07 C | Design Mismatch |
+| FR03 Logout | 01 C, 02 C, 03 C | **Complete** |
+| FR04 View Dashboard | 01 P, 02 C, 03 **C**, 04 **B**, 05 **C** | Partial (blocked-only) |
+| FR05 Schedule Meeting | 01 P, 02 C, 03 **DM**, 04 C, 05 **NS**, 06 C | Partial |
+| FR06 View Meeting Details | 01 **C**, 02 P, 03 **B** | Partial |
+| FR07 Join Meeting | 01 C, 02 C, 03 **DM** | **Complete** |
+| FR08 Edit Meeting | 01 C, 02 C | **Complete** |
+| FR09 Cancel Meeting | 01 C, 02 C | **Complete** |
+| FR10 Auto-Transcribe | 01–04 **NS** | Not Started |
+| FR11 Generate AI Summary | 01–05 **NS** | Not Started |
+| FR12 Review AI Summary | 01–07 **NS** | Not Started |
+| FR13 Approve and Send | 01–05 **NS** | Not Started |
+| FR14 View Task Board | 01 C, 02 **DM**, 03 C, 04 **C** | **Complete** (DM on 02) |
+| FR15 Create Task | 01 **B**, 02 C | Partial (blocked-only) |
+| FR16 Update Task Status | 01 C, 02 **NS** | Partial |
+| FR17 Edit and Delete Task | 01 C, 02 C | **Complete** |
+| FR18 View Meeting Archive | 01 C, 02 P, 03 **B** | Partial |
+| FR19 Search Meeting Archive | 01 C, 02 C, 03 **B**, 04 C | Partial (blocked-only) |
+| FR20 View Sprint Analytics | 01 C, 02 P, 03 **B**, 04 P, 05 **NS** | Partial |
+| FR21 View Notifications | 01 C, 02 C, 03 C | **Complete** |
+| FR22 In-App Triggers | 01 **B**, 02 **B**, 03 C | Partial (blocked-only) |
+| FR23 Email Triggers | 01 C, 02 **B**, 03 C | Partial (blocked-only) |
+| FR24 Change Password | 01 C, 02 C, 03 C, 04 C | **Complete** |
+| FR25 Notification Preferences | 01 C, 02 C, 03 C | **Complete** |
+| FR26 Change Profile Picture | 01 C, 02 **P**, 03 C | Partial |
+| FR27 Assign/Manage User Roles | 01 **DM**, 02 C, 03 C | Design Mismatch |
+| FR28 View Audit Log | 01 P, 02 C, 03 P | Partial |
+| FR29 Create Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
+| FR30 Edit Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
+| FR31 Invite Team Members | 01 C, 02 C, 03 C, 04 **NS**, 05 C, 06 C, 07 C | Partial |
+| FR32 Create/Manage Projects | 01 C, 02 C, 03 C, 04 C, 05 **C**, 06 C | **Complete** |
+| FR33 Custom Roles | 01 C, 02 C, 03 C, 04 C, 05 C, 06 C | **Complete** |
+| FR34 Assign Roles to Members | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
+| FR35 Role-Based Visibility | 01 **NS**, 02 P, 03 C, 04 P, 05 C, 06 C | Partial |
+
+#### Evidence for every non-Complete verdict
+
+**FR01-06** "role-based dashboard" — `RegisteredUserController` /
+`AuthenticatedSessionController` redirect to `/{workspace}/dashboard`, which
+renders the same `Dashboard.vue` body for every role. The redirect works; the
+role-distinctness is FR35-01's obligation. Resolves when FR35-01 lands — not
+separate work.
+
+**FR02-04/05/06** — `PasswordResetLinkController` + `NewPasswordController`
+implement Laravel's signed-token link (`auth/ForgotPassword`,
+`auth/ResetPassword`). No 6-digit code, no code-entry screen, no Resend Code.
+See "Report/design mismatches" below.
+
+**FR04-01** — see FR01-06. **FR04-03** — `DashboardController` returns
+members, `pendingInvitesCount`, activity and onboarding only; the right-column
+`ComingNextCard` is a hardcoded marketing placeholder ("AI sprint planning /
+Join the waitlist"), not meeting data. **FR04-04** — pending summary reviews,
+Blocked. **FR04-05** — no task-completion widget anywhere on the dashboard.
+
+**FR05-01** — meetings are reached via sidebar → Projects → project → Meetings
+tab, not "from the dashboard". **FR05-03** — `Meeting` has no participant
+relation at all (`$fillable`: title, description, scheduled_at,
+duration_minutes, meeting_link, project_id, workspace_id, created_by).
+`ResolveMeetingRecipients` returns `project->members()`. **FR05-05** — the
+record is stored, but `meeting_link` is an optional URL the creator pastes;
+nothing generates a link. Needs a conferencing-provider decision, and is
+*not* blocked by FR10–FR13.
+
+**FR06-01** — no meetings list on the dashboard (same surface as FR04-03).
+**FR06-02** — `EditMeetingModal` shows title, agenda, date/time, duration,
+join link and creator; **participants** are not shown because they are not
+modelled. **FR06-03** — only the client-side Upcoming/Past badge
+(`lib/meetings.ts::isPastMeeting`) exists; Scheduled/Completed map onto it,
+but Pending Review and Distributed are summary states — Blocked.
+
+**FR07-03** — access is denied to non-members of the project
+(`ProjectPolicy::view` gates the whole page, `MeetingPolicy::view` the
+meeting), not to "any user not listed as a participant", because no
+participant list exists. Intent satisfied by a different mechanism.
+
+**FR14-02** — entry #12 replaced the fixed To Do/In Progress/Done enum with
+per-project `board_columns`; every project is still seeded with those three
+by default, so this is a superset, not a regression. **FR14-04** — the board
+always shows every task in the project; no "my tasks" default and no toggle.
+
+**FR15-01** — auto-create tasks from a distributed summary. Blocked.
+
+**FR16-02** — "immediately reflect across all active users' dashboards".
+There is no broadcasting anywhere in the project: no Echo, Reverb or Pusher in
+`composer.json`, `package.json` or `config/`. Other tabs update on their next
+Inertia navigation. Needs realtime infrastructure.
+
+**FR18-02** — `ArchiveRecordData` carries id, type, title, subtitle,
+project, assignee and `occurred_at`. **Participant count** is absent
+(depends on the participant model); **summary status** is Blocked.
+**FR18-03** — approved summary + transcript, Blocked.
+
+**FR19-03** — `SearchArchiveAction` LIKE-searches title/subtitle only.
+Decisions, action items and blocker text do not exist yet. Blocked.
+
+**FR20-02** — `BuildAnalyticsAction` returns `task_completion_percentage` and
+`tasks_by_column`, which is the substance of the chart, but there is **no
+sprint entity anywhere in the schema**, so "for the current sprint" cannot be
+satisfied. **FR20-03** blocker frequency — Blocked. **FR20-04** — total
+meetings held is present (`total_meetings`); total action items and total
+blockers are Blocked. **FR20-05** — analytics are scoped by
+`accessibleProjectsFor()`, i.e. by project membership, **not** by role tier;
+there is no team-wide-vs-personal split.
+
+**FR22-01** summary ready for review — Blocked. **FR22-02** — a task-assigned
+in-app notification exists (`TaskAssignedNotification` via
+`ResolveTaskRecipients`), but the requirement's trigger is assignment *from a
+distributed summary*, which is Blocked.
+
+**FR23-02** approved-summary email — Blocked. FR23-01/03 are satisfied by
+`MeetingScheduledMail` / `MeetingCancelledMail`, sent to project members
+(participant mismatch noted above).
+
+**FR26-02** — `AvatarSettings.vue` uploads immediately on file selection or
+drop; there is no preview-then-confirm step. The requirement asks for a
+preview followed by upload "upon confirmation". Small, self-contained gap.
+
+**FR27-01** — `RegisteredUserController` accepts name/email/password and an
+optional workspace name; no role selection. Roles are per-workspace
+(`workspace_users.role`), and Scrum Master / Developer / Team Lead exist
+nowhere — `App\UserRole` is Owner/Admin/Member.
+
+**FR28-01** — `AuditAction` covers workspace, member, project, task
+(including `TASK_MOVED`), board-column and meeting events. **User account
+changes are not audited at all** — no case for profile update, password
+change, avatar change or account deletion (entry #20 flagged the deletion gap
+already). Summary approvals are Blocked. **FR28-03** — the log is viewable
+and filterable by project and actor, and meeting events are recorded, but
+"for any meeting or summary" is only half-reachable; per-summary history is
+Blocked.
+
+**FR31-04** — every invitation is bound to one email:
+`WorkspaceInvitationController::showAccept` rejects a signed-in user whose
+email differs, and a signed-out visitor may only register under the invited
+address. No shareable link any user can redeem.
+
+**FR32-05** — projects are listed on their own index page. The workspace
+dashboard shows no project list and no per-project task summary; the only
+mention of projects there is an onboarding checklist item.
+
+**FR35-01** — one `Dashboard.vue` body for all roles. **FR35-02** —
+navigation and action buttons are gated (entry #24); **widgets** are not.
+**FR35-04** — meeting scheduling is correctly restricted
+(`MeetingPolicy::create`); summary approval is Blocked.
+
+#### Group 1 — Unblocked missing work
+
+Everything here can be finished before FR10–FR13.
+
+| Item | Size | Note |
+|---|---|---|
+| FR26-02 preview before avatar upload | XS | one component |
+| FR28-01 audit user account changes | S | add `AuditAction` cases + `RecordAuditLogAction` calls in `Settings\*Controller` |
+| FR04-03 + FR06-01 upcoming meetings on dashboard | S | one surface, two FRs |
+| FR04-05 task completion widget | S | reuses `BuildAnalyticsAction` aggregates |
+| FR32-05 projects + task summary on dashboard | S | same controller as above |
+| FR14-04 "my tasks" default with view-all toggle | S–M | board default + filter |
+| FR20-05 team-wide vs personal analytics by role | M | needs a role-tier rule, not a new model |
+| FR31-04 shareable workspace invite link | M | security design: bearer authority to join a tenant; needs its own expiry, revocation and role cap |
+| FR05-03 participants on meetings | M–L | new domain concept; cascades to FR06-02, FR07-03, FR18-02, FR23 |
+| FR05-05 generated meeting link | M–L | needs a conferencing-provider decision |
+| FR35-01 + FR35-02 widgets: role-distinct dashboard | L | requires the `WorkspacePermission` enforcement decision first |
+| FR16-02 realtime status propagation | L | new infrastructure (Echo/Reverb) |
+| FR20-02 "current sprint" | L | no sprint entity exists |
+
+#### Group 2 — Blocked by FR10–FR13
+
+Do not schedule these independently; they land with the AI pipeline.
+
+FR04-04 · FR06-03 (Pending Review / Distributed) · FR15-01 · FR18-02
+(summary status) · FR18-03 · FR19-03 · FR20-03 · FR20-04 (action items,
+blockers) · FR22-01 · FR22-02 · FR23-02 · FR28-01 (summary approvals) ·
+FR28-03 (per-summary history) · FR35-04 (summary approval).
+
+FR15, FR19, FR22 and FR23 contain **only** blocked work — they are as
+finished as they can be until FR10–FR13 exist.
+
+#### Group 3 — Report/design mismatches
+
+No implementation recommended. In each case the current design is the safer
+engineering and the report should be amended.
+
+- **FR02-04/05/06 — OTP vs signed reset link.** A single-use signed link has
+  no 6-digit brute-force surface and no code-reuse window, and is what the
+  framework hardens for you. Amending the report is safer than building an
+  OTP path. *If the report must stand, it is a self-contained
+  small-to-medium feature — a codes table, a verify screen, a resend
+  endpoint — not an architectural change.*
+- **FR27-01 — registration-time global roles vs workspace-scoped roles.**
+  A global role cannot express a user who is a Scrum Master in one workspace
+  and a Developer in another, which is the product this now is. Reverting
+  would break FR29–FR35. Amend FR27-01 to describe workspace-scoped
+  assignment.
+- **FR05-03 / FR06-02 / FR07-03 — per-meeting participant list vs project
+  membership.** The app treats project membership as the participant list,
+  which keeps meeting access consistent with task and board access and
+  removes a whole class of "invited but can't see the project" states. The
+  open question the report forces is **external participants** — people
+  without a workspace account. If those matter, this becomes real Group 1
+  work; if not, amend the wording.
+- **FR14-02 — three fixed columns vs custom board columns.** The
+  implementation is a superset and every project still starts with To Do /
+  In Progress / Done. Amend to describe configurable columns.
+- **FR29-02 — "Workspace Owner (Scrum Master)".** Terminology only; the code
+  designates `UserRole::OWNER`. No change needed either way, but the report's
+  parenthetical should be dropped if FR27-01 is amended.
+- **FR33-02 — permission catalogue naming.** The report's examples (manage
+  meetings, approve summaries, view analytics) do not match
+  `WorkspacePermission`'s cases (projects, members, billing, integrations).
+  The report says "e.g.", so this is not a failure, but the catalogue should
+  be aligned if the permissions are ever made authoritative.
+
+### Superseded: Complete FRs with unverified sub-requirements
+
+Reading the full requirement text surfaced gaps inside FRs this tracker
+already counts Complete. They were **not** re-graded — the audit was scoped
+to FR02/03/04/27/31/33/34 plus a FR30/FR35 wording check — but they are
+recorded here so the 26 is not mistaken for a fully verified number. Most
+trace back to the unbuilt FR10–FR13 pipeline:
+
+- **FR06-03** — meeting status must be one of Scheduled / Completed /
+  Pending Review / Distributed. Only an Upcoming/Past distinction exists
+  (deliberate, per entry #10); three of the four states are summary states.
+- **FR14-02** — "three status columns: To Do, In Progress, Done". Entry #12
+  replaced the fixed enum with custom per-project columns, a superset.
+- **FR14-04** — "the user's assigned tasks by default, with an option to
+  view all" — already a known gap.
+- **FR15-01** — auto-create tasks from a distributed summary. Blocked by
+  FR11–FR13.
+- **FR18-03** / **FR19-03** — archive must expose the approved summary and
+  transcript, and search across decisions, action items and blocker text.
+  Blocked by FR10–FR13.
+- **FR20-02/03/04** — sprint-based completion chart, blocker-frequency
+  chart, and a totals widget counting action items and blockers. The
+  analytics module has no sprint concept and no blocker data.
+- **FR22-01/02** — both in-app triggers are summary-derived. Blocked.
+- **FR23-02** — summary distribution email. Blocked.
+- **FR28-01/03** — audit must cover summary approvals and be viewable
+  per meeting or summary. Blocked.
+A full report-backed sweep of all 35 is the honest next step for the
+percentage; it is a read-only audit and does not depend on any build work.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -2554,37 +2961,295 @@ browser, same standing caveat as every other UI-heavy entry in this log.
   verified in a browser** — no browser access in this session, same
   standing caveat as every other UI-heavy entry in this log.
 
-## Next recommended task (updated 2026-08-17, after entry #24)
+### 27. FR04-03, FR04-05, FR06-01, FR32-05 — the dashboard becomes real
 
-**Get the FYP1 report wording into the repo.** Six FRs — FR02, FR03, FR04,
-FR27, FR31, FR33 — are still marked Partial on the authority of entry #1
-alone and could not be re-audited, because `SprintSync FYP1 Report.docx`
-is not in the repository or anywhere on the dev machine. Every FR number
-in this file is a bare label with no text beside it. Until that wording
-exists somewhere durable, roughly a fifth of the FR table cannot be
-verified by anyone, and the completion percentage carries that caveat.
-Pasting the FR list into a tracked `docs/FR.md` is a ten-minute job that
-unblocks the largest remaining piece of uncertainty.
+Implemented the four unblocked dashboard clauses identified in entry #26.
+No new tables, no sprint entity, no policy or route changes.
 
-After that, two tracks:
+**Scoping — one predicate, fetched before any data.**
+`DashboardController::__invoke` now resolves
+`$workspace->accessibleProjectsFor($user)` once and derives everything from
+it: the meeting queries take `whereIn('project_id', $accessibleProjectIds)`,
+and the task/project aggregates are produced by handing that same
+`Collection<Project>` to `BuildAnalyticsAction::handle($accessibleProjects,
+[])`. `accessibleProjectsFor()` is therefore still the single source of
+"which projects can this user see" (entry #17's consolidation holds — the
+dashboard is now its fourth consumer alongside Projects, Archive and
+Analytics). An unassigned workspace member resolves to an empty collection
+and the meeting query short-circuits before touching the database.
 
-1. **FR34's one open decision** — make `WorkspacePermission` authoritative,
-   or accept it as a labelling layer and adjust the report wording. That
-   choice is all that stands between FR34 and Complete (see entry #22).
-   The permission matrix currently persists and is enforced by nothing.
-2. **FR10–FR13 (transcription + AI summary)** — the entire remaining
-   "not started" block and the largest, riskiest piece left. Needs a
-   scoping pass before code: this app has no audio/video capture (meetings
-   carry an external join link), so "transcription" most likely means an
-   uploaded-recording flow, but that should be read off the report rather
-   than assumed.
+**FR04-05 and FR32-05 reuse the analytics aggregates rather than
+re-querying.** `taskProgress` is a projection of `AnalyticsData`
+(`total_tasks`, `completed_tasks`, `open_tasks`, `overdue_tasks`,
+`task_completion_percentage`, `tasks_by_column`), and `projects` is its
+existing `ProjectSummaryData[]` (id, name, total/completed tasks,
+completion percentage). No aggregate SQL was written for this entry.
 
-Also worth a cleanup pass: `tsconfig.json`'s `compilerOptions.types` has
+**"Sprint" is deliberately not modelled.** FR04-05 says "sprint task
+completion widget", but no sprint entity exists anywhere in the schema and
+the task explicitly forbade adding one. The widget therefore reports
+completion across the **current accessible-project task set**, grouped by
+board column. If the architecture later gains a real sprint model, the
+widget's scope changes from "all accessible tasks" to "tasks in the active
+sprint" and nothing else about it needs to move. FR20-02 carries the same
+limitation and stays Partial for the same reason.
+
+**FR04-03 / FR06-01 — meetings, bounded.** New
+`DashboardMeetingData` (`app/Modules/Workspace/Data/`) is a deliberately
+narrow projection: id, title, project id/name, `scheduled_at`,
+`duration_minutes`, `join_url`, `is_past`, `url`. It is not `MeetingData` —
+the dashboard has no use for description, `created_by`, `workspace_id` or
+timestamps, so they are not sent. Two lists are returned, `upcomingMeetings`
+(ascending) and `pastMeetings` (descending), each capped by a new
+`workspace.dashboard_meeting_limit` config (default 5) so the dashboard
+cannot degrade into a full meeting history. Both use the existing
+`Meeting::scopeUpcoming()` / `scopePast()` rather than restating the
+duration arithmetic.
+
+`join_url` is populated **only** when `Meeting::hasValidJoinLink()` passes
+(`http://` / `https://`), so a stray `javascript:` link can never reach a
+`target="_blank"` anchor — the same server-side guard entry #11 introduced
+for mail, now applied to the dashboard. `url` deep-links to
+`workspace.projects.show?meeting={id}`, reusing the query-param modal opener
+Archive already established in entry #16, so clicking a meeting opens its
+detail modal rather than needing a new route.
+
+**Frontend.** Three new components under `components/dashboard/`:
+`TaskProgressCard` (percentage, progress bar, open/overdue counts, and a
+per-column breakdown through the existing `AppBarList`),
+`ProjectSummaryList` (name, done/open counts, mini progress bar, link to the
+project), and `UpcomingMeetingsCard` (Upcoming and Recently held sections, a
+Join button only when `join_url` is present, and a real empty state). Each
+carries its own exported prop interface, which `Dashboard.vue` imports
+instead of redeclaring shapes.
+
+**Placeholder removed.** The hardcoded `ComingNextCard` ("AI sprint
+planning / Join the waitlist") that occupied the right column is gone,
+replaced by the real meetings card. `ComingNextCard.vue` itself is left in
+place — it is a generic presentational component, not fabricated data, and
+nothing else on this page was redesigned. The onboarding checklist's "Run
+your first sprint" step still reads from `first_sprint_run`, which
+`DashboardController::onboarding()` hardcodes to `false`; it is untouched
+here because it belongs to the onboarding section, not to these four
+clauses, but it can never complete and is worth revisiting.
+
+**Tests**: new `tests/Feature/DashboardWidgetsTest.php` (15) — upcoming
+meeting with project name and join link; past/upcoming separation; an
+invalid `javascript:` link is not exposed; meetings from an inaccessible
+project are absent (with `assertDontSee` on the title); cross-workspace
+meetings never appear; the configured limit is honoured; task completion
+counts and percentage; the zero-task state; per-project summary counts;
+Admin sees every project; project Manager and project Member each see only
+their assigned project; an unassigned workspace member gets empty
+projects/meetings and a zero task total; and task progress excludes
+inaccessible projects. One assertion was wrong on first run — `MeetingFactory`
+seeds a random valid URL, so the "past meeting has no join link" case had to
+set `meeting_link` explicitly rather than rely on the factory default.
+
+**Verification**: `php artisan test --compact` → **368 passed, 2052
+assertions** (354 baseline + 14 net). `vendor/bin/pint --dirty --format
+agent` → passed. `npm run lint:check` → clean. `npm run build` → built in
+2.70s. `npx vue-tsc --noEmit` → the same two pre-existing `TS2688`
+`tsconfig.json` `types` errors as entry #24, unchanged and unrelated; no
+source file is implicated.
+
+### 28. FR14-04 — task board defaults to "my tasks"
+
+The last long-standing unblocked board gap, flagged as far back as entry #6.
+Frontend only: no route, controller, policy, migration or payload change.
+
+**Filtering lives inside `KanbanBoard`, not in the page.** The board keeps
+`localTasks` — an independent deep copy that makes drag-and-drop optimistic
+(entry #6) — and re-syncs it whenever `props.tasks` changes. Passing a
+*pre-filtered* array down from `show.vue` would have made every toggle look
+like fresh server data and thrown away that local state mid-interaction.
+Instead the board takes a `scope: 'mine' | 'all'` prop (defaulting to `all`,
+so any other caller is unaffected) and derives a `visibleTasks` computed that
+the `columns` computed then groups. `localTasks` stays the complete set, so
+toggling the view never disturbs an in-flight move, and per-column counts
+follow the filter for free.
+
+**The page owns the control.** `show.vue` holds `taskScope`, defaulting to
+`'mine'` on every load. The choice is deliberately **not persisted** —
+FR14-04 says the user's own tasks are what the board shows *by default*, and
+remembering a previous "all" selection would make that false on the second
+visit. The toggle is the existing `AppSegmentedControl` (already used by
+Archive and Teams), showing live counts for both options, and it replaces the
+redundant "N tasks" line that sat in the same header slot.
+
+**Empty-personal-board case.** Defaulting to "mine" means a user with no
+assignments would otherwise land on a board of empty columns and reasonably
+conclude the project has no work in it. When the personal set is empty but
+the project has tasks, an inline notice states how many tasks belong to the
+team and offers a one-click "View all tasks". Individual columns also read
+"Nothing assigned to you." rather than "No tasks here." while the filter is
+on, so the distinction between *filtered out* and *absent* is never
+ambiguous.
+
+**Authorization unchanged.** This is a view filter over data the viewer was
+already entitled to — `ProjectController::show` still returns the project's
+tasks scoped by `ProjectPolicy::view`, and `canDrag()` still gates dragging
+on manage-rights or assignment. Nothing was hidden from the server side and
+nothing new was exposed.
+
+**Tests.** The filter is client-side and this project has no JS test runner
+(unchanged since entry #10), so the behaviour itself is covered by ESLint,
+`vue-tsc` and a production build plus review. What *is* now guarded is the
+payload contract the filter depends on: new
+`test_the_board_payload_carries_the_assignee_of_every_task` in `TaskTest`
+asserts the project page exposes `auth.user.id` and a correct `assigned_to`
+for both an assigned and an unassigned task. If `assigned_to` were ever
+dropped from `TaskData`, the filter would silently show an empty board; this
+test fails instead.
+
+**Verification**: `php artisan test --compact` → **369 passed, 2067
+assertions** (368 baseline + 1). `vendor/bin/pint --dirty --format agent` →
+passed. `npm run lint:check` → clean. `npm run build` → built in 2.64s.
+`npx vue-tsc --noEmit` → the same two pre-existing `TS2688` `tsconfig.json`
+errors, unchanged.
+
+## Next recommended task (updated 2026-08-17, after entry #28)
+
+**FR26-02 — preview the selected image before uploading it.**
+
+Smallest remaining unblocked clause and entirely self-contained:
+`AvatarSettings.vue` currently uploads the moment a file is chosen or
+dropped, whereas FR26-02 asks for a preview followed by upload "upon
+confirmation". One component, no backend change — `AvatarController` and
+`AvatarUpdateRequest` already do exactly what is needed.
+
+After that, **FR28-01's account-change audit events** (S): add
+`AuditAction` cases and `RecordAuditLogAction` calls in the
+`Settings\*Controller` classes, following the pattern entry #20 established
+everywhere else. Profile updates, password changes, avatar changes and
+account deletion are currently audited nowhere.
+
+Remaining unblocked order, easiest → hardest: **FR26-02** → FR28-01 →
+FR20-05 → FR31-04 → FR05-03 → FR05-05 → FR35-01/FR35-02-widgets → FR16-02 →
+FR20-02.
+
+**Still decide before building:** FR02 and FR27 are Design Mismatches where
+amending the report is recommended, and FR05-03 hinges on whether external
+(non-account) meeting participants are in scope. See entry #26, Group 3.
+
+**Do not schedule** Group 2 items independently — they land with FR10–FR13.
+FR04, FR15, FR19, FR22 and FR23 contain only blocked work.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
 listed two unresolvable entries since the initial commit, so
-`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24).
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20, #22–#24, #27 and #28.
 
-A visual browser pass is still owed for the UI work in entries #14–#20 and
-now #22–#24 — none of it has been click-tested in a running app.
+## Superseded next-task note (after entry #27)
+
+**FR14-04 — default the task board to "my tasks", with a view-all toggle.**
+
+It is the largest remaining unblocked clause that needs no new decision:
+no schema change, no new authorization, no product question. The board
+already receives every task it needs in `ProjectController::show`; this is a
+default filter plus a toggle in `KanbanBoard.vue`, and it is a long-standing
+known gap (flagged as far back as entry #6).
+
+Two smaller items can be banked first if preferred: **FR26-02** (preview
+before avatar upload, XS) and **FR28-01** account-change audit events (S).
+
+Remaining unblocked order, easiest → hardest: FR26-02 → FR28-01 → **FR14-04**
+→ FR20-05 → FR31-04 → FR05-03 → FR05-05 → FR35-01/FR35-02-widgets → FR16-02
+→ FR20-02.
+
+**Still decide before building:** FR02 and FR27 are Design Mismatches where
+amending the report is recommended, and FR05-03 hinges on whether external
+(non-account) meeting participants are in scope. See entry #26, Group 3.
+
+**Do not schedule** Group 2 items independently — they land with FR10–FR13.
+FR04, FR15, FR19, FR22 and FR23 now contain only blocked work.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20, #22–#24 and now #27.
+
+## Superseded next-task note (after entry #26)
+
+**Build the workspace dashboard's real content: FR04-03 + FR06-01, then
+FR04-05 and FR32-05.**
+
+One surface closes four unblocked sub-requirements across three FRs. The
+dashboard is currently the weakest page in the app — a stat row, an
+onboarding checklist, an activity feed and a hardcoded "AI sprint planning /
+Join the waitlist" placeholder — while the report expects it to be the
+product's hub (FR04, FR06-01, FR32-05, and the navigation target of FR01-06).
+Nothing here needs new tables: upcoming meetings come from
+`Meeting::upcoming()` scoped through `Workspace::accessibleProjectsFor()`,
+the completion widget from the aggregates `BuildAnalyticsAction` already
+computes, and the project list from `accessibleProjectsFor()` plus a task
+count. It is one controller, three props, three components.
+
+**Unblocked order, easiest → hardest:**
+
+1. FR26-02 — preview before avatar upload (XS)
+2. FR28-01 — audit user account changes (S)
+3. **FR04-03 + FR06-01 — upcoming meetings on the dashboard (S)** ← next
+4. FR04-05 — sprint task completion widget (S)
+5. FR32-05 — projects + task summary on the dashboard (S)
+6. FR14-04 — "my tasks" default with a view-all toggle (S–M)
+7. FR20-05 — team-wide vs personal analytics by role (M)
+8. FR31-04 — shareable workspace invite link (M, security design)
+9. FR05-03 — meeting participants (M–L, new domain concept)
+10. FR05-05 — generated meeting link (M–L, provider decision)
+11. FR35-01 / FR35-02 widgets — role-distinct dashboard (L, needs the
+    `WorkspacePermission` enforcement decision first)
+12. FR16-02 — realtime propagation (L, new infrastructure)
+13. FR20-02 — "current sprint" (L, no sprint entity exists)
+
+**Decide before building anything for them:** FR02 and FR27 are Design
+Mismatches where amending the report is the recommended resolution, and
+FR05-03 hinges on whether external (non-account) meeting participants are in
+scope. See entry #26, Group 3.
+
+**Do not schedule** the Group 2 items independently — they land with
+FR10–FR13.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20 and #22–#24.
+
+## Superseded next-task note (after entry #25)
+
+**Implement FR04-03 and FR04-05 — the dashboard's meetings list and sprint
+task completion widget.**
+
+Rationale: of the five remaining Partial FRs, FR04 is the only one whose
+missing pieces are (a) genuinely required by the report, (b) not blocked by
+FR10–FR13, and (c) buildable from data the application already stores.
+`DashboardController` already has the workspace in scope; upcoming meetings
+come from `Meeting::upcoming()` scoped to `accessibleProjectsFor()`, and the
+completion widget from the same task/board-column counts the Analytics
+module already aggregates. It is one controller, two props, two components.
+FR04-04 stays out of scope until the summary pipeline exists.
+
+The other four Partial FRs are each blocked on something other than effort:
+
+- **FR02** and **FR27** are report-vs-design mismatches where the current
+  implementation is the better engineering (signed reset links; per-workspace
+  roles). Both need a **decision to amend the report**, not code. Do this
+  before writing anything for them.
+- **FR31-04** (open shareable invite link) is a real feature but carries a
+  security design question — an open link is bearer-authority to join a
+  tenant, needing its own expiry, revocation and role cap.
+- **FR35** needs the `WorkspacePermission` enforcement decision made first
+  (entry #25 established this obligation is FR35's, not FR34's), plus
+  FR12/FR13 for its summary-approval clause.
+
+Ordered easiest → hardest: **FR04** → FR27 (wording) → FR02 (wording, or a
+medium build) → FR31 → FR35 → FR10–FR13.
+
+Two standing items unchanged: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24); and a
+visual browser pass is still owed for entries #14–#20 and #22–#24, none of
+which has been click-tested in a running app.
 
 ## Previous next-task note (pre-entry #21)
 

@@ -4,6 +4,9 @@ import { Activity, Command, Mail, Rocket, Users } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 
+import type { DashboardProjectSummary } from '@/components/dashboard/ProjectSummaryList.vue';
+import type { TaskProgress } from '@/components/dashboard/TaskProgressCard.vue';
+import type { DashboardMeeting } from '@/components/dashboard/UpcomingMeetingsCard.vue';
 import type { ActivityEntry } from '@/lib/activity';
 import { daysSince, formatDateEyebrow, greeting } from '@/lib/activity';
 import type { Member } from '@/lib/members';
@@ -22,6 +25,10 @@ const props = defineProps<{
         first_project_created: boolean;
         first_sprint_run: boolean;
     };
+    upcomingMeetings: DashboardMeeting[];
+    pastMeetings: DashboardMeeting[];
+    taskProgress: TaskProgress;
+    projects: DashboardProjectSummary[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -150,6 +157,10 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <!-- LEFT: 2/3 width on lg -->
                 <div class="flex flex-col gap-4 lg:col-span-2">
+                    <TaskProgressCard :progress="taskProgress" />
+
+                    <ProjectSummaryList :projects="projects" />
+
                     <OnBoardingCheckList :steps="onboardingSteps" />
 
                     <!-- Activity feed -->
@@ -168,11 +179,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
 
                 <!-- RIGHT: 1/3 width on lg -->
                 <div class="flex flex-col gap-4">
-                    <ComingNextCard
-                        title="AI sprint planning"
-                        description="Once you create projects, SprintSync will draft sprint plans from your tasks and team capacity."
-                        cta-label="Join the waitlist"
-                    />
+                    <UpcomingMeetingsCard :upcoming="upcomingMeetings" :past="pastMeetings" />
 
                     <OnlineNowCard :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
 

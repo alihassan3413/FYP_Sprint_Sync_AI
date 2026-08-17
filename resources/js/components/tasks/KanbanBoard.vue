@@ -3,13 +3,19 @@ import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 import type { BoardColumn, Task } from '@/lib/tasks';
 
-const props = defineProps<{
-    tasks: Task[];
-    boardColumns: BoardColumn[];
-    currentUserId: number;
-    canManageTasks: boolean;
-    canManageBoardColumns: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        tasks: Task[];
+        boardColumns: BoardColumn[];
+        currentUserId: number;
+        canManageTasks: boolean;
+        canManageBoardColumns: boolean;
+        scope?: 'mine' | 'all';
+    }>(),
+    {
+        scope: 'all',
+    },
+);
 
 const emit = defineEmits<{
     (e: 'open', task: Task): void;
@@ -49,10 +55,14 @@ watch(
     },
 );
 
+const visibleTasks = computed(() =>
+    props.scope === 'mine' ? localTasks.value.filter((task) => task.assigned_to === props.currentUserId) : localTasks.value,
+);
+
 const columns = computed(() =>
     localColumnOrder.value.map((column) => ({
         ...column,
-        tasks: localTasks.value.filter((task) => task.board_column_id === column.id),
+        tasks: visibleTasks.value.filter((task) => task.board_column_id === column.id),
     })),
 );
 
@@ -195,10 +205,7 @@ function reorderColumns(fromIndex: number, toIndex: number) {
         <div v-for="column in columns" :key="column.id" class="flex w-72 shrink-0 flex-col gap-3">
             <div
                 class="flex items-center justify-between gap-1 rounded-md px-0.5 transition-colors"
-                :class="[
-                    canManageBoardColumns && 'cursor-grab active:cursor-grabbing',
-                    dragOverColumnHeaderId === column.id && 'bg-muted/60',
-                ]"
+                :class="[canManageBoardColumns && 'cursor-grab active:cursor-grabbing', dragOverColumnHeaderId === column.id && 'bg-muted/60']"
                 :draggable="canManageBoardColumns && !columnsPending"
                 @dragstart="(event) => onColumnDragStart(column, event)"
                 @dragend="onColumnDragEnd"
@@ -247,7 +254,9 @@ function reorderColumns(fromIndex: number, toIndex: number) {
                 />
 
                 <p v-if="column.tasks.length === 0" class="text-muted-foreground px-1 py-6 text-center text-xs">
-                    {{ dragOverColumnId === column.id ? 'Drop here' : 'No tasks here.' }}
+                    <template v-if="dragOverColumnId === column.id">Drop here</template>
+                    <template v-else-if="scope === 'mine'">Nothing assigned to you.</template>
+                    <template v-else>No tasks here.</template>
                 </p>
             </div>
         </div>

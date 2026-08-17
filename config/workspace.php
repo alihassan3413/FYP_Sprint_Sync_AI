@@ -9,5 +9,7 @@ return [
 
     'dashboard_activity_limit' => 15,
 
+    'dashboard_meeting_limit' => 5,
+
     'seat_limit' => (int) env('WORKSPACE_SEAT_LIMIT', 10),
 ];
