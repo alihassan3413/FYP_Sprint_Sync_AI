@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { formatLastActive, type Member } from '@/lib/members';
+import { formatLastActive, type Member, type WorkspaceRoleOption } from '@/lib/members';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { Activity, ListFilter, Mail, Plus, Users } from 'lucide-vue-next';
+import { Activity, Mail, Plus, Users } from 'lucide-vue-next';
 
 const props = defineProps<{
     members?: Member[];
@@ -10,7 +10,13 @@ const props = defineProps<{
     counts?: { active: number; pending: number; total: number };
     loading?: boolean;
     canManageMembers?: boolean;
+    canInviteMembers?: boolean;
+    seatLimit?: number;
+    workspaceRoles?: WorkspaceRoleOption[];
 }>();
+
+const notifications = useNotificationStore();
+const { copy, isSupported: canCopyToClipboard } = useClipboard();
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -37,7 +43,6 @@ const filterOptions = computed(() => [
     { value: 'all', label: 'All', count: allMembers.value.length },
     { value: 'active', label: 'Active', count: allMembers.value.filter((m) => m.status === 'active').length },
     { value: 'pending', label: 'Invited', count: allMembers.value.filter((m) => m.status === 'pending').length },
-    { value: 'suspended', label: 'Suspended', count: allMembers.value.filter((m) => m.status === 'suspended').length },
 ]);
 
 const filtered = computed(() => {
@@ -49,21 +54,22 @@ const filtered = computed(() => {
 
     if (search.value.trim()) {
         const q = search.value.trim().toLowerCase();
-        list = list.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q));
+        list = list.filter(
+            (m) =>
+                m.name.toLowerCase().includes(q) ||
+                m.email.toLowerCase().includes(q) ||
+                m.role.toLowerCase().includes(q) ||
+                (m.workspace_role_name?.toLowerCase().includes(q) ?? false),
+        );
     }
 
     return list;
 });
 
-const seatUsage = computed(() => {
-    const used = stats.value.total;
-    const total = 10;
-
-    return {
-        used,
-        total,
-    };
-});
+const seatUsage = computed(() => ({
+    used: stats.value.total,
+    total: props.seatLimit ?? 0,
+}));
 
 const currentUserId = computed(() => allMembers.value.find((m) => m.is_self)?.id ?? null);
 
@@ -87,31 +93,57 @@ const columns: Column<Member>[] = [
     { key: 'actions', label: '', align: 'right', width: '64px' },
 ];
 
+const pendingInvitationId = ref<number | null>(null);
+
 function onResendInvite(m: Member) {
-    // router.post(workspaceRoute('workspace.invitations.resend', m.id));
-    console.log('resend', m);
+    if (m.invitation_id === undefined || m.invitation_id === null || pendingInvitationId.value !== null) return;
+
+    pendingInvitationId.value = m.invitation_id;
+
+    router.post(
+        workspaceRoute('workspace.invitations.resend', { invitation: m.invitation_id }),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => notifications.success(`Invitation resent to ${m.email}.`),
+            onError: () => notifications.error(`Could not resend the invitation to ${m.email}.`),
+            onFinish: () => (pendingInvitationId.value = null),
+        },
+    );
 }
-function onCopyInviteLink(m: Member) {
-    // navigator.clipboard.writeText(...);
-    console.log('copy link', m);
+
+async function onCopyInviteLink(m: Member) {
+    if (!m.invite_url) return;
+
+    if (!canCopyToClipboard.value) {
+        notifications.error('Your browser blocked clipboard access.');
+
+        return;
+    }
+
+    await copy(m.invite_url);
+    notifications.success('Invite link copied.');
 }
+
 function onChangeRole(m: Member) {
     roleModalMember.value = m;
 }
 
-function onTransferTasks(m: Member) {
-    console.log('transfer tasks', m);
-}
 function onRemove(m: Member) {
     removeTarget.value = m;
 }
-function onRevokeInvite(m: Member) {
-    // router.delete(workspaceRoute('workspace.invitations.destroy', m.id));
-    console.log('revoke', m);
-}
 
-function handleClick() {
-    console.log('Invite member clicked');
+function onRevokeInvite(m: Member) {
+    if (m.invitation_id === undefined || m.invitation_id === null || pendingInvitationId.value !== null) return;
+
+    pendingInvitationId.value = m.invitation_id;
+
+    router.delete(workspaceRoute('workspace.invitations.destroy', { invitation: m.invitation_id }), {
+        preserveScroll: true,
+        onSuccess: () => notifications.success(`Invitation to ${m.email} revoked.`),
+        onError: () => notifications.error(`Could not revoke the invitation to ${m.email}.`),
+        onFinish: () => (pendingInvitationId.value = null),
+    });
 }
 </script>
 
@@ -127,7 +159,7 @@ function handleClick() {
                 description="Manage who has access to this workspace, control roles, and invite teammates."
             >
                 <template #actions>
-                    <Button as-child size="sm" class="gap-1.5" @click="handleClick">
+                    <Button v-if="canInviteMembers" as-child size="sm" class="gap-1.5">
                         <Link :href="workspaceRoute('workspace.invitations.create')">
                             <Plus class="size-3.5" />
                             Invite member
@@ -166,23 +198,14 @@ function handleClick() {
                 <SeatUsageCard :used="seatUsage.used" :total="seatUsage.total" />
             </div>
 
-            <!-- AI insight strip -->
-            <AppAiInsight title="AI workload balance" beta>
-                <span class="text-foreground font-medium">Ali</span>
-                is carrying 38% of open sprint tasks this week.
-                <button class="text-foreground font-medium underline-offset-4 hover:underline">Suggest a redistribution</button>
-            </AppAiInsight>
-
             <!-- Members table -->
             <div class="bg-card overflow-hidden rounded-xl border shadow-sm">
-                <AppListToolBar v-model:search="search" v-model:filter="filter" :filter-options="filterOptions" search-placeholder="Search members…">
-                    <template #right>
-                        <Button variant="outline" size="sm" class="gap-1.5 text-xs">
-                            <ListFilter class="size-3.5" />
-                            Filter
-                        </Button>
-                    </template>
-                </AppListToolBar>
+                <AppListToolBar
+                    v-model:search="search"
+                    v-model:filter="filter"
+                    :filter-options="filterOptions"
+                    search-placeholder="Search members…"
+                />
 
                 <AppDataTable
                     v-model:sort="sort"
@@ -196,8 +219,13 @@ function handleClick() {
                         <MemberCell :member="row" />
                     </template>
 
-                    <template #cell-role="{ value }">
-                        <AppRoleBadge :role="value" />
+                    <template #cell-role="{ row }">
+                        <div class="flex flex-col items-start gap-1">
+                            <AppRoleBadge :role="row.role" />
+                            <span v-if="row.workspace_role_name" class="text-muted-foreground text-[11px]">
+                                {{ row.workspace_role_name }}
+                            </span>
+                        </div>
                     </template>
 
                     <template #cell-status="{ value }">
@@ -217,7 +245,6 @@ function handleClick() {
                             @resend-invite="onResendInvite"
                             @copy-invite-link="onCopyInviteLink"
                             @change-role="onChangeRole"
-                            @transfer-tasks="onTransferTasks"
                             @remove="onRemove"
                             @revoke-invite="onRevokeInvite"
                         />
@@ -270,7 +297,12 @@ function handleClick() {
         </div>
     </AppLayout>
 
-    <ChangeMemberRoleModal :open="roleModalMember !== null" :member="roleModalMember" @update:open="(value) => !value && (roleModalMember = null)" />
+    <ChangeMemberRoleModal
+        :open="roleModalMember !== null"
+        :member="roleModalMember"
+        :workspace-roles="workspaceRoles ?? []"
+        @update:open="(value) => !value && (roleModalMember = null)"
+    />
 
     <RemoveMemberDialog :open="removeTarget !== null" :member="removeTarget" @update:open="(value) => !value && (removeTarget = null)" />
 </template>

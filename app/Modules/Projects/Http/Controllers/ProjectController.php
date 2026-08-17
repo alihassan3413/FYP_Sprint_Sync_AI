@@ -124,7 +124,7 @@ final class ProjectController
         Project $project,
         UpdateProjectAction $action,
     ): RedirectResponse {
-        $project = $action->handle($project, $request->toDTO());
+        $project = $action->handle($project, $request->toDTO(), $request->user());
 
         return back()->with('success', "Project \"{$project->name}\" updated.");
     }
@@ -139,7 +139,7 @@ final class ProjectController
 
         $name = $project->name;
 
-        $action->handle($project);
+        $action->handle($project, $request->user());
 
         return to_route('workspace.projects.index', ['workspace' => $workspace->slug])
             ->with('success', "Project \"{$name}\" deleted.");

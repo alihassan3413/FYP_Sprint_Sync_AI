@@ -6,6 +6,8 @@ namespace App\Modules\Meetings\Actions;
 
 use App\Mail\MeetingCancelledMail;
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Meetings\Models\Meeting;
 use App\Notifications\MeetingCancelledNotification;
 use App\Notifications\NotificationChannel;
@@ -22,15 +24,26 @@ final class DeleteMeetingAction
     public function __construct(
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly RecordAuditLogAction $auditLogger,
     ) {}
 
     public function handle(Meeting $meeting, User $actor): void
     {
         $recipients = $this->resolveMeetingRecipients->handle($meeting, $actor);
-        $projectName = $meeting->project->name;
+        $project = $meeting->project;
+        $projectName = $project->name;
         $meetingTitle = $meeting->title;
         $scheduledAt = $meeting->scheduled_at->format('F j, Y g:i A');
-        $url = route('workspace.projects.show', ['workspace' => $meeting->project->workspace->slug, 'project' => $meeting->project_id]);
+        $url = route('workspace.projects.show', ['workspace' => $project->workspace->slug, 'project' => $meeting->project_id]);
+
+        $this->auditLogger->handle(
+            $project->workspace,
+            $project,
+            $actor,
+            AuditAction::MEETING_CANCELLED,
+            "{$actor->name} cancelled \"{$meetingTitle}\".",
+            $meeting,
+        );
 
         $meeting->delete();
 

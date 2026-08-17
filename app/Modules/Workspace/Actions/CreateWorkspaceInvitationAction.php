@@ -6,6 +6,8 @@ namespace App\Modules\Workspace\Actions;
 
 use App\Mail\MemberInvitationMail;
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Workspace\Data\WorkspaceInvitationData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
@@ -15,6 +17,8 @@ use Illuminate\Support\Str;
 
 final class CreateWorkspaceInvitationAction
 {
+    public function __construct(private readonly RecordAuditLogAction $auditLogger) {}
+
     public function handle(Workspace $workspace, User $invitedBy, WorkspaceInvitationData $data): WorkspaceInvitation
     {
         $invitation = DB::transaction(fn () => WorkspaceInvitation::updateOrCreate(
@@ -30,6 +34,15 @@ final class CreateWorkspaceInvitationAction
                 'expires_at' => now()->addDays(config('workspace.invitation_ttl_days')),
             ]
         ));
+
+        $this->auditLogger->handle(
+            $workspace,
+            null,
+            $invitedBy,
+            AuditAction::MEMBER_INVITED,
+            "{$invitedBy->name} invited {$invitation->email} as {$invitation->role->label()}.",
+            $invitation,
+        );
 
         $this->dispatchMail($workspace, $invitedBy, $invitation);
 

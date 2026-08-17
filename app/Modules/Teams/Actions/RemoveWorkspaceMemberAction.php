@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Teams\Actions;
 
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Teams\Exceptions\TeamException;
 use App\Modules\Workspace\Models\Workspace;
 use App\UserRole;
@@ -12,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 final class RemoveWorkspaceMemberAction
 {
+    public function __construct(private readonly RecordAuditLogAction $auditLogger) {}
+
     public function handle(Workspace $workspace, User $member, User $actor): void
     {
         if ($member->id === $actor->id) {
@@ -31,5 +35,14 @@ final class RemoveWorkspaceMemberAction
                 ])->save();
             }
         });
+
+        $this->auditLogger->handle(
+            $workspace,
+            null,
+            $actor,
+            AuditAction::MEMBER_REMOVED,
+            "{$actor->name} removed {$member->name} from the workspace.",
+            $member,
+        );
     }
 }

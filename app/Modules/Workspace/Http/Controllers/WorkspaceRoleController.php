@@ -13,8 +13,10 @@ use App\Modules\Workspace\Http\Requests\UpdateWorkspaceRoleRequest;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceRole;
 use App\Modules\Workspace\Support\WorkspacePermission;
+use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,10 +24,24 @@ final class WorkspaceRoleController
 {
     public function index(Request $request, Workspace $workspace): Response
     {
+        $memberCounts = DB::table('workspace_users')
+            ->where('workspace_id', $workspace->id)
+            ->selectRaw('role, count(*) as total')
+            ->groupBy('role')
+            ->pluck('total', 'role');
+
         return Inertia::render('workspace/settings/RoleManagement', [
             'workspaceId' => $workspace->id,
             'availablePermissions' => WorkspacePermission::values(),
             'canManageRoles' => $request->user()->can('manageRoles', $workspace),
+            'systemRoles' => collect(UserRole::cases())
+                ->map(fn (UserRole $role) => [
+                    'value' => $role->value,
+                    'label' => $role->label(),
+                    'description' => $role->description(),
+                    'member_count' => (int) ($memberCounts[$role->value] ?? 0),
+                ])
+                ->values(),
             'roles' => $workspace->roles()
                 ->withCount('members')
                 ->orderBy('name')

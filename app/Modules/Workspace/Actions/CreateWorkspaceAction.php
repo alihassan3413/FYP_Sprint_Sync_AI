@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Actions;
 
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Workspace\Data\WorkspaceData;
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
@@ -16,7 +18,10 @@ use Illuminate\Support\Str;
 
 final class CreateWorkspaceAction
 {
-    public function __construct(private readonly WorkspaceService $service) {}
+    public function __construct(
+        private readonly WorkspaceService $service,
+        private readonly RecordAuditLogAction $auditLogger,
+    ) {}
 
     public function handle(WorkspaceData $data, User $owner): Workspace
     {
@@ -34,6 +39,15 @@ final class CreateWorkspaceAction
             $workspace->users()->attach($owner->id, ['role' => UserRole::OWNER->value]);
 
             $this->service->switchTo($owner, $workspace);
+
+            $this->auditLogger->handle(
+                $workspace,
+                null,
+                $owner,
+                AuditAction::WORKSPACE_CREATED,
+                "{$owner->name} created the workspace \"{$workspace->name}\".",
+                $workspace,
+            );
 
             return $workspace;
         });

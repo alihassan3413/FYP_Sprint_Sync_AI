@@ -8,11 +8,19 @@
 export type MemberStatus = 'active' | 'away' | 'offline' | 'pending' | 'suspended';
 export type MemberRole = 'owner' | 'admin' | 'member' | 'guest' | 'billing';
 
+export interface WorkspaceRoleOption {
+    id: number;
+    name: string;
+}
+
 export interface Member {
     id: number;
     name: string;
     email: string;
     role: MemberRole;
+    /** Custom workspace role assigned on top of the system role, if any */
+    workspace_role_id?: number | null;
+    workspace_role_name?: string | null;
     status: MemberStatus;
     /** ISO datetime — when they were last active */
     last_active_at?: string | null;
@@ -20,6 +28,10 @@ export interface Member {
     avatar_url?: string | null;
     /** True if this row is the current user */
     is_self?: boolean;
+    /** Set on pending-invitation rows only */
+    invitation_id?: number | null;
+    /** Acceptance link for a pending invitation — only sent to viewers who can invite */
+    invite_url?: string | null;
 }
 
 /**

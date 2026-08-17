@@ -25,7 +25,7 @@ final class ProjectMemberController
     ): RedirectResponse {
         $member = $request->member();
 
-        $action->handle($project, $member, $request->role());
+        $action->handle($project, $member, $request->role(), $request->user());
 
         return back()->with('success', "{$member->name} added to {$project->name}.");
     }
@@ -37,7 +37,7 @@ final class ProjectMemberController
         User $member,
         UpdateProjectMemberRoleAction $action,
     ): RedirectResponse {
-        $action->handle($project, $member, $request->role());
+        $action->handle($project, $member, $request->role(), $request->user());
 
         return back()->with('success', "{$member->name}'s project role updated.");
     }
@@ -51,7 +51,7 @@ final class ProjectMemberController
     ): RedirectResponse {
         abort_unless($request->user()->can('manageMembers', $project), 403);
 
-        $action->handle($project, $member);
+        $action->handle($project, $member, $request->user());
 
         return back()->with('success', "{$member->name} removed from {$project->name}.");
     }

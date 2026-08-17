@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Services\WorkspaceService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -45,6 +47,8 @@ class HandleInertiaRequests extends Middleware
 
             'workspace' => fn () => app(WorkspaceService::class)->inertiaFor($request->user()),
 
+            'navigation' => fn () => $this->navigationFor($request),
+
             'notifications' => fn () => $request->user() ? [
                 'unread_count' => $request->user()->unreadNotifications()->count(),
                 'recent' => $request->user()->notifications()->latest()->limit(10)->get()->map(fn ($notification) => [
@@ -65,5 +69,40 @@ class HandleInertiaRequests extends Middleware
                 'warning' => $request->session()->get('warning'),
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, bool>|null
+     */
+    private function navigationFor(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return null;
+        }
+
+        $workspace = app(WorkspaceService::class)->currentFor($user);
+
+        if ($workspace === null) {
+            return null;
+        }
+
+        $hasAccessibleProjects = $workspace->accessibleProjectsFor($user)->exists();
+        $canViewAuditLog = $user->can('viewAny', [AuditLog::class, $workspace]);
+
+        return [
+            'projects' => $hasAccessibleProjects || $user->can('create', [Project::class, $workspace]),
+            'team' => true,
+            'analytics' => $hasAccessibleProjects,
+            'archive' => $hasAccessibleProjects,
+            'audit' => $canViewAuditLog,
+            'workspaceSettings' => $canViewAuditLog
+                || $user->can('update', $workspace)
+                || $user->can('delete', $workspace)
+                || $user->can('manageMembers', $workspace)
+                || $user->can('manageRoles', $workspace)
+                || $user->can('invite', $workspace),
+        ];
     }
 }

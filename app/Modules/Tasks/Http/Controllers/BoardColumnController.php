@@ -23,7 +23,7 @@ final class BoardColumnController
         Project $project,
         CreateBoardColumnAction $action,
     ): RedirectResponse {
-        $column = $action->handle($project, $request->string('name')->trim()->toString());
+        $column = $action->handle($project, $request->string('name')->trim()->toString(), $request->user());
 
         return back()->with('success', "Column \"{$column->name}\" added.");
     }
@@ -34,7 +34,7 @@ final class BoardColumnController
         Project $project,
         ReorderBoardColumnsAction $action,
     ): RedirectResponse {
-        $action->handle($project, $request->orderedColumnIds());
+        $action->handle($project, $request->orderedColumnIds(), $request->user());
 
         return back()->with('success', 'Columns reordered.');
     }
@@ -58,7 +58,7 @@ final class BoardColumnController
 
         $name = $boardColumn->name;
 
-        $action->handle($boardColumn);
+        $action->handle($boardColumn, $request->user());
 
         return back()->with('success', "Column \"{$name}\" deleted.");
     }

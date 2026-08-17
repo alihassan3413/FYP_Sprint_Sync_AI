@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Http\Controllers;
 
+use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Workspace\Actions\CreateWorkspaceAction;
 use App\Modules\Workspace\Actions\DeleteWorkspaceAction;
 use App\Modules\Workspace\Actions\UpdateWorkspaceAction;
@@ -20,7 +21,7 @@ final class WorkspaceController
 {
     public function __construct(private readonly WorkspaceService $service) {}
 
-    public function edit(Workspace $workspace): Response
+    public function edit(Request $request, Workspace $workspace): Response
     {
         return Inertia::render('workspace/settings/index', [
             'workspaceProfile' => [
@@ -29,6 +30,11 @@ final class WorkspaceController
                 'slug' => $workspace->slug,
                 'created_at' => $workspace->created_at->toIso8601String(),
             ],
+            'canViewAuditLog' => $request->user()->can('viewAny', [AuditLog::class, $workspace]),
+            'canUpdateWorkspace' => $request->user()->can('update', $workspace),
+            'canDeleteWorkspace' => $request->user()->can('delete', $workspace),
+            'canManageMembers' => $request->user()->can('manageMembers', $workspace),
+            'canInviteMembers' => $request->user()->can('invite', $workspace),
         ]);
     }
 
@@ -50,7 +56,7 @@ final class WorkspaceController
 
     public function update(UpdateWorkspaceRequest $request, Workspace $workspace, UpdateWorkspaceAction $action): RedirectResponse
     {
-        $workspace = $action->handle($workspace, $request->toDTO());
+        $workspace = $action->handle($workspace, $request->toDTO(), $request->user());
 
         return to_route('workspace.settings', ['workspace' => $workspace->slug])
             ->with('success', 'Workspace updated.');
@@ -64,10 +70,15 @@ final class WorkspaceController
 
         $action->handle($workspace, $request->user());
 
-        $fallback = $request->user()->fresh()->currentWorkspace;
+        $user = $request->user()->fresh();
+        $fallback = $this->service->currentFor($user) ?? $user->workspaces()->first();
 
         if ($fallback === null) {
             return to_route('login')->with('success', "Workspace \"{$name}\" deleted.");
+        }
+
+        if ($user->current_workspace_id !== $fallback->id) {
+            $this->service->switchTo($user, $fallback);
         }
 
         return to_route('dashboard', ['workspace' => $fallback->slug])

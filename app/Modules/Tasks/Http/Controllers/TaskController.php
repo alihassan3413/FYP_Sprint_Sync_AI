@@ -65,7 +65,7 @@ final class TaskController
 
         $title = $task->title;
 
-        $action->handle($task);
+        $action->handle($task, $request->user());
 
         return back()->with('success', "Task \"{$title}\" deleted.");
     }

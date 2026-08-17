@@ -8,4 +8,6 @@ return [
     'max_per_owner' => (int) env('WORKSPACE_MAX_PER_OWNER', 10),
 
     'dashboard_activity_limit' => 15,
+
+    'seat_limit' => (int) env('WORKSPACE_SEAT_LIMIT', 10),
 ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 use App\Modules\Analytics\Providers\AnalyticsServiceProvider;
 use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
+use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
 use App\Modules\Tasks\Providers\TasksServiceProvider;
@@ -21,4 +22,5 @@ return [
     AssistantServiceProvider::class,
     ArchiveServiceProvider::class,
     AnalyticsServiceProvider::class,
+    AuditServiceProvider::class,
 ];

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Actions;
 
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Tasks\Data\UpdateTaskStatusData;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Notifications\NotificationChannel;
 use App\Notifications\NotificationPreferenceGate;
@@ -20,13 +23,28 @@ final class UpdateTaskStatusAction
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly RecordAuditLogAction $auditLogger,
     ) {}
 
     public function handle(Task $task, User $actor, UpdateTaskStatusData $data): Task
     {
+        $previousColumnId = $task->board_column_id;
+
         $task->update(['board_column_id' => $data->board_column_id]);
 
         if ($task->wasChanged('board_column_id')) {
+            $previousColumnName = BoardColumn::query()->whereKey($previousColumnId)->value('name') ?? 'Unknown';
+            $newColumnName = $task->boardColumn->name;
+
+            $this->auditLogger->handle(
+                $task->project->workspace,
+                $task->project,
+                $actor,
+                AuditAction::TASK_MOVED,
+                "{$actor->name} moved \"{$task->title}\" from {$previousColumnName} to {$newColumnName}.",
+                $task,
+            );
+
             $this->notifyMove($task, $actor);
         }
 

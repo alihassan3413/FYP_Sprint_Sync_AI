@@ -10,6 +10,7 @@ use App\Modules\Teams\Actions\UpdateWorkspaceMemberRoleAction;
 use App\Modules\Teams\Http\Requests\UpdateTeamMemberRequest;
 use App\Modules\Teams\Services\TeamRoster;
 use App\Modules\Workspace\Models\Workspace;
+use App\Modules\Workspace\Models\WorkspaceRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,16 @@ final class TeamMemberController
         return Inertia::render('teams/index', [
             'members' => $this->roster->forWorkspace($workspace, $request->user()),
             'canManageMembers' => $request->user()->can('manageMembers', $workspace),
+            'canInviteMembers' => $request->user()->can('invite', $workspace),
+            'seatLimit' => (int) config('workspace.seat_limit'),
+            'workspaceRoles' => $workspace->roles()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (WorkspaceRole $role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ])
+                ->values(),
         ]);
     }
 
@@ -33,7 +44,7 @@ final class TeamMemberController
         User $user,
         UpdateWorkspaceMemberRoleAction $action,
     ): RedirectResponse {
-        $action->handle($workspace, $user, $request->role(), $request->customRole());
+        $action->handle($workspace, $user, $request->role(), $request->customRole(), $request->user());
 
         return back()->with('success', "{$user->name}'s role updated.");
     }

@@ -27,6 +27,57 @@ final class WorkspaceRoleTest extends TestCase
         $this->workspace = Workspace::factory()->ownedBy($this->owner)->create();
     }
 
+    public function test_the_index_page_reports_real_system_role_counts_and_the_manage_flag(): void
+    {
+        $admin = User::factory()->create();
+        $member = User::factory()->create();
+
+        $this->workspace->users()->attach($admin->id, ['role' => UserRole::ADMIN->value]);
+        $this->workspace->users()->attach($member->id, ['role' => UserRole::MEMBER->value]);
+
+        WorkspaceRole::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.roles.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('workspace/settings/RoleManagement')
+                ->where('canManageRoles', true)
+                ->has('roles', 1)
+                ->has('systemRoles', 3)
+                ->where('systemRoles.0.value', UserRole::OWNER->value)
+                ->where('systemRoles.0.member_count', 1)
+                ->where('systemRoles.1.value', UserRole::ADMIN->value)
+                ->where('systemRoles.1.member_count', 1)
+                ->where('systemRoles.2.value', UserRole::MEMBER->value)
+                ->where('systemRoles.2.member_count', 1));
+    }
+
+    public function test_a_plain_member_cannot_manage_roles(): void
+    {
+        $member = User::factory()->create();
+        $this->workspace->users()->attach($member->id, ['role' => UserRole::MEMBER->value]);
+
+        $role = WorkspaceRole::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $this->actingAs($member)
+            ->get(route('workspace.roles.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('canManageRoles', false));
+
+        $this->actingAs($member)
+            ->post(route('workspace.roles.store', $this->workspace), ['name' => 'Sneaky'])
+            ->assertForbidden();
+
+        $this->actingAs($member)
+            ->put(route('workspace.roles.update', [$this->workspace, $role]), ['name' => 'Sneaky'])
+            ->assertForbidden();
+
+        $this->actingAs($member)
+            ->delete(route('workspace.roles.destroy', [$this->workspace, $role]))
+            ->assertForbidden();
+    }
+
     public function test_an_admin_can_create_a_role_with_permissions(): void
     {
         $this->actingAs($this->owner)

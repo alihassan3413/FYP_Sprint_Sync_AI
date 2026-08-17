@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Teams;
 
+use App\Mail\MemberInvitationMail;
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
+use App\Modules\Workspace\Models\WorkspaceInvitation;
+use App\Modules\Workspace\Models\WorkspaceRole;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 final class TeamMemberTest extends TestCase
@@ -39,6 +43,147 @@ final class TeamMemberTest extends TestCase
                 ->component('teams/index')
                 ->has('members', 2)
                 ->where('canManageMembers', true));
+    }
+
+    public function test_the_roster_exposes_invite_links_only_to_viewers_who_can_invite(): void
+    {
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.teams.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canInviteMembers', true)
+                ->where('members.2.invitation_id', $invitation->id)
+                ->where('members.2.invite_url', route('workspace.invitations.accept', ['token' => $invitation->token])));
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.teams.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canInviteMembers', false)
+                ->where('members.2.invite_url', null));
+    }
+
+    public function test_a_member_cannot_read_an_invitation_token_from_the_roster_payload(): void
+    {
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+        ]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.teams.index', $this->workspace))
+            ->assertOk()
+            ->assertDontSee($invitation->token);
+    }
+
+    public function test_an_admin_can_resend_and_revoke_an_invitation_from_the_roster(): void
+    {
+        Mail::fake();
+
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+        ]);
+
+        $originalToken = $invitation->token;
+
+        $this->actingAs($this->owner)
+            ->post(route('workspace.invitations.resend', [$this->workspace, $invitation]))
+            ->assertRedirect();
+
+        $this->assertNotSame($originalToken, $invitation->fresh()->token);
+        Mail::assertQueued(MemberInvitationMail::class);
+
+        $this->actingAs($this->owner)
+            ->delete(route('workspace.invitations.destroy', [$this->workspace, $invitation]))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('workspace_invitations', ['id' => $invitation->id]);
+    }
+
+    public function test_a_member_cannot_resend_or_revoke_an_invitation(): void
+    {
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+        ]);
+
+        $this->actingAs($this->member)
+            ->post(route('workspace.invitations.resend', [$this->workspace, $invitation]))
+            ->assertForbidden();
+
+        $this->actingAs($this->member)
+            ->delete(route('workspace.invitations.destroy', [$this->workspace, $invitation]))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('workspace_invitations', ['id' => $invitation->id]);
+    }
+
+    public function test_an_admin_can_assign_a_custom_workspace_role_to_a_member(): void
+    {
+        $role = WorkspaceRole::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $this->actingAs($this->owner)
+            ->patch(route('workspace.members.update', [$this->workspace, $this->member]), [
+                'role' => UserRole::MEMBER->value,
+                'workspace_role_id' => $role->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('workspace_users', [
+            'user_id' => $this->member->id,
+            'workspace_id' => $this->workspace->id,
+            'role' => UserRole::MEMBER->value,
+            'workspace_role_id' => $role->id,
+        ]);
+    }
+
+    public function test_a_custom_role_from_another_workspace_cannot_be_assigned(): void
+    {
+        $other = Workspace::factory()->ownedBy(User::factory()->create())->create();
+        $role = WorkspaceRole::factory()->create(['workspace_id' => $other->id]);
+
+        $this->actingAs($this->owner)
+            ->patch(route('workspace.members.update', [$this->workspace, $this->member]), [
+                'role' => UserRole::MEMBER->value,
+                'workspace_role_id' => $role->id,
+            ])
+            ->assertSessionHasErrors('workspace_role_id');
+
+        $this->assertDatabaseHas('workspace_users', [
+            'user_id' => $this->member->id,
+            'workspace_id' => $this->workspace->id,
+            'workspace_role_id' => null,
+        ]);
+    }
+
+    public function test_the_roster_exposes_the_assigned_custom_role_and_the_available_roles(): void
+    {
+        $role = WorkspaceRole::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Frontend Dev',
+        ]);
+
+        $this->owner->forceFill(['name' => 'Aaron Owner'])->save();
+        $this->member->forceFill(['name' => 'Zoe Member'])->save();
+
+        $this->workspace->users()->updateExistingPivot($this->member->id, ['workspace_role_id' => $role->id]);
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.teams.index', $this->workspace))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('workspaceRoles', 1)
+                ->where('workspaceRoles.0.name', 'Frontend Dev')
+                ->has('members', 2)
+                ->where('members.1.workspace_role_id', $role->id)
+                ->where('members.1.workspace_role_name', 'Frontend Dev')
+                ->where('members.0.workspace_role_name', null));
     }
 
     public function test_an_admin_can_promote_a_member(): void

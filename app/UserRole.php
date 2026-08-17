@@ -44,4 +44,13 @@ enum UserRole: string
     {
         return ucfirst($this->value);
     }
+
+    public function description(): string
+    {
+        return match ($this) {
+            self::OWNER => 'Full access. Cannot be removed or reassigned.',
+            self::ADMIN => 'Manage members, roles, projects and workspace settings.',
+            self::MEMBER => 'Access the projects they are assigned to.',
+        };
+    }
 }

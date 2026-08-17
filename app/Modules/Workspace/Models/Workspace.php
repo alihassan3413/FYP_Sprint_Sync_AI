@@ -113,6 +113,11 @@ final class Workspace extends Model
         return $query;
     }
 
+    public function managedProjectsFor(User $user): HasMany
+    {
+        return $this->projects()->whereHas('managers', fn (Builder $managers) => $managers->whereKey($user->id));
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

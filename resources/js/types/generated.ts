@@ -24,6 +24,41 @@ export type ArchiveRecordData = {
     occurred_at: string;
     url: string;
 };
+export enum AuditAction {
+    WORKSPACE_CREATED = 'workspace.created',
+    WORKSPACE_RENAMED = 'workspace.renamed',
+    WORKSPACE_DELETED = 'workspace.deleted',
+    MEMBER_INVITED = 'member.invited',
+    MEMBER_REMOVED = 'member.removed',
+    MEMBER_ROLE_CHANGED = 'member.role_changed',
+    PROJECT_CREATED = 'project.created',
+    PROJECT_UPDATED = 'project.updated',
+    PROJECT_DELETED = 'project.deleted',
+    PROJECT_MEMBER_ADDED = 'project.member_added',
+    PROJECT_MEMBER_REMOVED = 'project.member_removed',
+    PROJECT_MEMBER_ROLE_CHANGED = 'project.member_role_changed',
+    TASK_CREATED = 'task.created',
+    TASK_UPDATED = 'task.updated',
+    TASK_DELETED = 'task.deleted',
+    TASK_MOVED = 'task.moved',
+    TASK_ASSIGNED = 'task.assigned',
+    BOARD_COLUMN_CREATED = 'board_column.created',
+    BOARD_COLUMN_DELETED = 'board_column.deleted',
+    BOARD_COLUMN_REORDERED = 'board_column.reordered',
+    MEETING_SCHEDULED = 'meeting.scheduled',
+    MEETING_UPDATED = 'meeting.updated',
+    MEETING_CANCELLED = 'meeting.cancelled',
+}
+export type AuditLogEntryData = {
+    id: number;
+    actor_name?: string;
+    actor_avatar_url?: string;
+    action_label: string;
+    category: string;
+    description: string;
+    project_name?: string;
+    created_at: string;
+};
 export type BoardColumnData = {
     id: number;
     name: string;
@@ -46,6 +81,18 @@ export type MeetingData = {
     created_at: string;
     updated_at: string;
 };
+export enum NotificationChannel {
+    IN_APP = 'in_app',
+    EMAIL = 'email',
+}
+export enum NotificationType {
+    MEETING_SCHEDULED = 'meeting_scheduled',
+    MEETING_UPDATED = 'meeting_updated',
+    MEETING_CANCELLED = 'meeting_cancelled',
+    TASK_ASSIGNED = 'task_assigned',
+    TASK_MOVED = 'task_moved',
+    TASK_COMMENT = 'task_comment',
+}
 export type ProjectData = {
     id: number;
     name: string;

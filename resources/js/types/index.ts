@@ -52,10 +52,20 @@ export interface NotificationsContext {
     recent: NotificationItem[];
 }
 
+export interface NavigationContext {
+    projects: boolean;
+    team: boolean;
+    analytics: boolean;
+    archive: boolean;
+    audit: boolean;
+    workspaceSettings: boolean;
+}
+
 export interface SharedData extends PageProps {
     auth: Auth;
     workspace: WorkspaceContext | null;
     notifications: NotificationsContext | null;
+    navigation: NavigationContext | null;
 }
 
 export interface User {

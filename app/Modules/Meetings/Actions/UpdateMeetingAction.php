@@ -6,6 +6,8 @@ namespace App\Modules\Meetings\Actions;
 
 use App\Mail\MeetingUpdatedMail;
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Notifications\MeetingUpdatedNotification;
@@ -24,6 +26,7 @@ final class UpdateMeetingAction
     public function __construct(
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly RecordAuditLogAction $auditLogger,
     ) {}
 
     public function handle(Meeting $meeting, User $actor, StoreMeetingData $data): Meeting
@@ -37,6 +40,16 @@ final class UpdateMeetingAction
         ]);
 
         if ($meeting->wasChanged(self::NOTIFIABLE_FIELDS)) {
+            $this->auditLogger->handle(
+                $meeting->project->workspace,
+                $meeting->project,
+                $actor,
+                AuditAction::MEETING_UPDATED,
+                "{$actor->name} updated \"{$meeting->title}\".",
+                $meeting,
+                ['changed_fields' => array_keys($meeting->getChanges())],
+            );
+
             $this->notify($meeting, $actor);
         }
 

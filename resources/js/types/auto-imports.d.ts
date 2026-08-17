@@ -11,6 +11,7 @@ declare global {
   const Link: typeof import('@inertiajs/vue3').Link
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
+  const categoryBadgeVariant: typeof import('../lib/audit').categoryBadgeVariant
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -20,6 +21,7 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const effectScope: typeof import('vue').effectScope
+  const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
   const formatDuration: typeof import('../lib/meetings').formatDuration
@@ -132,10 +134,13 @@ declare global {
   export type { ArchiveRecordType, ArchiveRecord, ArchiveProjectOption, ArchiveAssigneeOption, ArchiveFilters, ArchivePage } from '../lib/archive'
   import('../lib/archive')
   // @ts-ignore
+  export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
+  import('../lib/audit')
+  // @ts-ignore
   export type { Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
-  export type { MemberStatus, MemberRole, Member } from '../lib/members'
+  export type { MemberStatus, MemberRole, WorkspaceRoleOption, Member } from '../lib/members'
   import('../lib/members')
   // @ts-ignore
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
@@ -155,6 +160,7 @@ declare module 'vue' {
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
+    readonly categoryBadgeVariant: UnwrapRef<typeof import('../lib/audit')['categoryBadgeVariant']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -164,6 +170,7 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
     readonly formatDuration: UnwrapRef<typeof import('../lib/meetings')['formatDuration']>

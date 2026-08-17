@@ -14,6 +14,7 @@ const workspace = computed(() => page.props.workspace ?? null);
 const current = computed(() => workspace.value?.current ?? null);
 
 const available = computed<WorkspaceSummary[]>(() => workspace.value?.available ?? []);
+const canAccessWorkspaceSettings = computed(() => page.props.navigation?.workspaceSettings === true);
 const isCollapsed = computed(() => state.value === 'collapsed');
 const isCreateWorkspaceOpen = ref(false);
 const switchingId = ref<number | null>(null);

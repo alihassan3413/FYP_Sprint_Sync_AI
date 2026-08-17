@@ -7,11 +7,31 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 21 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR29, FR32 |
-| Partial | 9 | FR02, FR03, FR04, FR27, FR30, FR31, FR33, FR34, FR35 |
-| Not started | 5 | FR10–FR13, FR28 |
+| Complete | 23 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR28, FR29, FR30, FR32 |
+| Partial | 8 | FR02, FR03, FR04, FR27, FR31, FR33, FR34, FR35 |
+| Not started | 4 | FR10–FR13 |
 
-Strict completion: **21 / 35 (60.0%)**. Weighted (Complete=1, Partial=0.5): **72.9%**.
+Strict completion: **23 / 35 (65.7%)**. Weighted (Complete=1, Partial=0.5):
+**77.1%**.
+
+**FR34** was reclassified Partial → Broken by the 2026-08-17 re-audit
+(entry #21) and returned to **Partial** the same day once entry #22 repaired
+it. Role assignment now works end to end; the one item keeping it off
+Complete is that `WorkspacePermission` toggles are still not enforced by any
+policy — an open design decision, not a defect. See entry #22.
+
+**FR30** moved Partial → **Complete** in entry #23: rename, delete and member
+management are all gated, wired and now actually covered by tests (they had
+none). Caveat for whoever holds the report — member *suspend* and *transfer
+tasks on removal* do not exist and never had backends; the dead UI controls
+for both were removed rather than faked. If FR30's real wording names either,
+it drops back to Partial.
+
+FR30 and FR35 were re-audited in the same pass and **remain Partial** — the
+table above was already correct for both. FR02, FR03, FR04, FR27, FR31 and
+FR33 could **not** be re-audited: `SprintSync FYP1 Report.docx` is not in the
+repo or anywhere on the dev machine, so their exact wording is unavailable and
+their status here is carried forward unverified from entry #1.
 
 The codebase is a real multi-tenant workspace product now: auth, workspaces,
 invitations, custom roles, team management, projects, a task/Kanban board,
@@ -20,8 +40,9 @@ email notifications on every meeting lifecycle event, an in-app
 notification center (meetings + task assignment/movement/comments) with
 per-user, per-type/channel notification preferences, a searchable archive
 of completed tasks and past meetings, a workspace/project analytics
-dashboard, and user profile pictures are all built and tested. Still
-missing: transcription + AI summary (FR10–FR13) and audit log (FR28).
+dashboard, user profile pictures, and a workspace/project audit log are all
+built and tested. Only transcription + AI summary (FR10–FR13) remains
+untouched.
 
 Projects, Tasks, and Meetings (FR32, FR14–FR17, FR05) now also have
 **project-level membership and access control** layered underneath them —
@@ -1340,6 +1361,468 @@ library, no external image hosting, no S3-specific logic (the app has no
 S3 credentials configured — `public` local disk matches "based on
 existing app conventions"), no Audit Log or AI work, no code comments.
 
+### 20. FR28 — Audit log
+
+A persistent, queryable record of who did what across every module —
+Workspace, Teams, Projects, Tasks, Meetings — built as a new
+`App\Modules\Audit` module rather than bolted onto the existing "activity"
+feed (`DashboardController::activity()`, entry #6's ad-hoc `workspace.
+created`/`member.joined`/`member.invited` timeline), which is a live,
+un-persisted, workspace-home-page-only query with no storage, no
+filtering, and no authorization tier beyond "workspace member" — a
+fundamentally different feature from a durable audit trail with
+project-scoped visibility rules.
+
+**Storage — `audit_logs`**: `workspace_id`, `project_id` (nullable),
+`user_id` (nullable), `action`, `subject_type`/`subject_id`
+(polymorphic-style, mirroring the existing `notifications` table's
+`notifiable_type`/`notifiable_id` convention), a pre-rendered
+`description`, a `metadata` JSON column, and `created_at` only (no
+`updated_at` — `const UPDATED_AT = null;` on the model — an audit row is
+immutable by definition, so a silently-unused `updated_at` column would
+misrepresent that). **Deliberately no foreign-key constraints** on
+`workspace_id`/`project_id`/`user_id`/`subject_id` — this is the direct
+answer to "deleted where technically possible to preserve safely":
+`DeleteWorkspaceAction`, `DeleteProjectAction`, `DeleteTaskAction`, and
+account deletion (`ProfileController::destroy`) all hard-delete rows, and
+a `cascadeOnDelete()` FK would silently erase the very audit history
+those deletions are supposed to be recorded in. Eloquent `belongsTo`
+relations still exist on `AuditLog` for convenience eager-loading
+(`user`, `project`, `workspace`) — Eloquent relations don't require a
+DB-level constraint to function, only a column-name convention.
+
+**Pre-rendered `description`, not template+params re-rendered at read
+time**: every write call composes its own final sentence
+(`"{$actor->name} moved \"{$task->title}\" from {$old} to {$new}."`) using
+values it already has in scope, the same convention every `Notification`
+class in `app/Notifications` already uses for its stored `message`
+string. This is what keeps a description legible forever regardless of
+whether the referenced task/project/user still exists — the task's title
+at the moment of the move is baked into the sentence, not looked up live
+from a `subject_id` that might 404. `metadata` carries only small
+structural facts (`changed_fields`, `ordered_column_ids`) for potential
+future programmatic use — never full free-text field values (a task's
+`description`/comment body is never copied into `metadata`), satisfying
+"do not store unnecessary sensitive information" without needing a
+denylist.
+
+**One reusable logger, ~21 call sites, never a raw `AuditLog::create()`
+outside it**: `App\Modules\Audit\Actions\RecordAuditLogAction::handle()`
+takes `(Workspace, ?Project, ?User $actor, AuditAction, string
+$description, ?Model $subject, array $metadata)` and is injected into
+every domain Action that mutates something worth auditing —
+`Create/Update/DeleteWorkspaceAction`, `CreateWorkspaceInvitationAction`,
+`Remove/UpdateWorkspaceMemberRoleAction` (Teams),
+`Create/Update/DeleteProjectAction` +
+`Add/Remove/UpdateProjectMemberRoleAction` (Projects),
+`Create/Update/UpdateStatus/DeleteTaskAction` +
+`Create/Delete/ReorderBoardColumnAction` (Tasks), and
+`Create/Update/DeleteMeetingAction` (Meetings). It wraps its own write in
+`try/catch (Throwable)` and only `Log::error()`s on failure — mirroring
+the exact pattern every `notify()` method in Meetings/Tasks Actions
+already uses — so a broken audit write can never fail the actual
+mutation, per the task's explicit "audit failure should not corrupt the
+primary business action" instruction. Several Actions
+(`UpdateWorkspaceMemberRoleAction`, `UpdateProjectAction`,
+`DeleteProjectAction`, `Add/Remove/UpdateProjectMemberRoleAction`,
+`DeleteTaskAction`, `Create/Delete/ReorderBoardColumnAction`) didn't
+previously receive an actor at all and needed a new `User $actor`
+parameter threaded through from their controllers — a mechanical but
+necessary change, verified safe by grepping the test suite first for any
+direct (non-HTTP) instantiation of these Actions (found none — every
+existing test exercises them through routes, so the new required
+parameter couldn't silently break a call site).
+
+**Independent of the notification recipients-empty early return.** Every
+Meetings Action already had a `notify()` step that returns early when
+`ResolveMeetingRecipients` finds nobody to tell (e.g. a solo-member
+project, or everyone having disabled that channel per FR25). The audit
+call was placed in `handle()`, before/independent of `notify()` — so
+"a meeting was scheduled" is recorded even when zero people get notified
+about it. Getting this wrong would have made the audit trail silently
+incomplete for exactly the workspaces where FR25 preferences matter most.
+
+**`task.assigned` is deliberately a separate action from `task.created`
+and `task.updated`**, matching the task's own explicit event list.
+Creating a task with an initial assignee logs both `task.created` and
+`task.assigned`; editing a task's title/description/due-date logs
+`task.updated`; changing only the assignee logs `task.assigned` alone —
+verified by a dedicated test that a title-only edit never produces a
+stray `task.assigned` row and an assignee-only change never produces a
+stray `task.updated` row.
+
+**Authorization — chained, never project-role-alone**:
+`AuditLogPolicy::viewAny(User, Workspace)` grants access if the user is
+Workspace Owner/Admin (sees everything, including workspace-level
+entries with `project_id = null` — invitations, role changes, workspace
+renames/deletion) **or** manages at least one project
+(`Workspace::managedProjectsFor()`, a new method built the same way as
+entry #17/#20's `accessibleProjectsFor()` but scoped to `Project::
+managers()` instead of `members()` — reusing existing infra rather than
+duplicating the membership check). A Project Manager's query is then
+further restricted in `SearchAuditLogAction` to `project_id IN (their
+managed project ids)` only — they never see workspace-level entries, even
+though `viewAny` let them through the door. A plain Project Member or an
+unrelated workspace Member gets a `403` (they passed
+`EnsureWorkspaceMember`, so they're a real member, just not one with
+audit privilege). A non-member of the workspace gets Laravel's own
+`404` via the existing `EnsureWorkspaceMember` middleware, before the
+controller or policy ever runs. This is the same three-tier chain
+(workspace access → project access → feature visibility) already
+established for Analytics/Archive, with one addition: Analytics/Archive
+grant every workspace member *some* view (scoped to their own projects);
+Audit Log is the first feature in this app where a workspace member can
+be shown nothing at all.
+
+**UI**: a new "Audit Log" card in the Workspace Settings hub
+(`workspace/settings/index.vue`), shown only when `canViewAuditLog` is
+true — not a main-sidebar entry like Analytics/Archive, since those are
+"scoped for everyone," while this feature should not visibly advertise
+its own existence to members who aren't allowed to see it. `audit/
+index.vue` follows Archive's exact filter-bar-plus-`AppDataTable`-plus-
+`AppPagination` shape: category (one of the 5 fixed buckets, not all 23
+raw action strings — kept the filter dropdown scannable), actor, project
+(hidden entirely for a Project Manager, since they only ever see their
+own managed projects anyway), and a date range, all server-side via
+`router.get(..., {preserveState, preserveScroll, replace})`. The
+`AuditLogEntryData` DTO sent to the frontend never includes `subject_type`,
+`subject_id`, or raw `metadata` — only `description` (already a finished
+sentence), an `action_label`, and a `category` — so "do not expose raw
+model class names or raw JSON to normal users" is enforced structurally
+by what the payload contains, not by frontend discipline.
+
+**Module-boundary lesson (new, worth remembering)**: this codebase has a
+pre-existing `tests/Unit/ModuleBoundaryTest.php` that enforces modules
+may only import each other's `Contracts`, `Data`, `Models`, `Actions`,
+`Policies`, or `Exceptions` — a class sitting bare at a module's root
+(no subfolder) is invisible to that check's public-surface allowlist.
+The first draft of `AuditAction` lived at `App\Modules\Audit\AuditAction`
+and broke this test the moment any other module imported it (21 import
+sites at once). Moved to `App\Modules\Audit\Data\AuditAction` — fixed
+with a namespace-only change since enums have no other module-boundary
+implications. Lesson for any future module enum meant for cross-module
+use: put it in `Data/` from the start.
+
+**Tests**: `tests/Feature/Audit/AuditLoggingTest.php` (9 tests, write
+side) — task create/update/move/assign/delete each produce the right
+`AuditAction`, an assignee-only change never also logs `task.updated`
+and vice versa, the exact `"{actor} moved \"{title}\" from {old} to
+{new}."` message shape, meeting scheduled/updated/cancelled, project
+create/update/delete, project member added/removed/role-changed
+(matching the task's own "Zafar assigned Ahmed as Project Manager"
+example almost verbatim), workspace member removed/role-changed, correct
+`workspace_id`/`project_id`/`user_id` on every row, and metadata proven
+to never contain a task's free-text description even when only that
+field changed underneath an unrelated edit.
+`tests/Feature/Audit/AuditLogViewTest.php` (10 tests, read side) —
+Owner sees all 3 seeded entries including the workspace-level one,
+Project Manager sees exactly the 1 entry scoped to their managed
+project, a plain project member and a member with no managed projects
+are both `403`, a non-member of the workspace is `404`, a second
+workspace's audit rows never appear (cross-workspace isolation),
+filtering by category/project/actor/date range each correctly narrows
+the result set. Full suite: **317 passed** (298 baseline + 9 + 10 new).
+
+### 21. Re-audit of the Partial FRs (2026-08-17) — no code changed
+
+Re-audited the nine FRs the table listed as Partial against the actual
+working tree, not against this log's own prior claims. Full suite re-run
+first as a baseline: **317 passed, 1423 assertions, 0 failures**.
+
+**Blocking limitation, recorded so it isn't rediscovered later.** The
+source of truth this file names in its own header — `SprintSync FYP1
+Report.docx` — is **not in the repository and not anywhere on the dev
+machine** (verified by a filesystem-wide `find` for `*SprintSync*FYP*`
+and for every `.docx`/`.pdf` under the usual document folders; also not
+in git history, and no FR wording exists in `README.md`, `AGENTS.md`,
+`CLAUDE.md`, `docs/MODULE_GUIDE.md`, or `.cursor`/`.claude`). Only three
+FRs could therefore be graded against a known requirement — FR30, FR34
+and FR35, whose scope was supplied directly in the audit request. FR02,
+FR03, FR04, FR27, FR31 and FR33 were **not** re-graded, because every FR
+number in this file is a bare label with no accompanying text; guessing
+their scope would produce a status that looks authoritative and isn't.
+Their entries are carried forward from entry #1 marked unverified.
+
+**FR30 — workspace rename / delete / member management: remains Partial.**
+Rename and delete are genuinely complete end to end (`WorkspaceController::
+update`/`destroy`, `UpdateWorkspaceRequest` with slug uniqueness +
+`WorkspaceSlug`, `DeleteWorkspaceAction` with a last-workspace guard, a
+`current_workspace_id` re-point for every affected user, and an audit-log
+write, plus `RenameWorkspaceModal` and a type-the-name-to-confirm
+`DeleteWorkspaceDialog`). Member management is complete on the Team page
+(`workspace.members.update`/`destroy`, owner-immutability and
+self-removal guards, audit writes, 8 passing tests). What is missing:
+- **No test at all covers `workspace.update` or `workspace.destroy`** —
+  the only related test is `test_outsider_cannot_view_workspace_settings`.
+  Rename, delete, the only-workspace guard, and the non-Owner denial are
+  all unproven.
+- **`WorkspaceController::edit` performs no authorization** beyond
+  `EnsureWorkspaceMember`, and the settings page ships `canViewAuditLog`
+  as its *only* permission prop. A plain Member sees, and can click,
+  both "Rename workspace" and Danger Zone → "Delete workspace"; the
+  request then 403s. Same "policy exists but the page doesn't consult it"
+  shape as the `ProjectController::show` gap found in entry #8.
+- The settings hub's **Members and Invitations cards are still badged
+  "Soon"** even though both features work elsewhere in the app.
+- On the Team page, **`onResendInvite`, `onRevokeInvite`,
+  `onCopyInviteLink` and `onTransferTasks` are `console.log` stubs.**
+  `workspace.invitations.resend`/`destroy` exist and are authorized; only
+  the wiring is absent. Note the roster emits `id` as
+  `"invitation-{id}"` and carries the real id separately as
+  `invitation_id`, so wiring these must use `invitation_id`.
+- Seat usage is hardcoded to `total = 10`; the roster's `status` is
+  hardcoded `'active'`/`'pending'` while the filter bar offers a
+  **"Suspended" tab for a state nothing can produce**; `AppAiInsight` on
+  that page renders a fabricated statistic about a named user.
+
+**FR34 — role assignment UI: reclassified Partial → Broken.**
+The backend is sound (`WorkspaceRoleController`, both FormRequests
+authorizing via `manageRoles`/`WorkspaceRolePolicy`, unknown-permission
+rejection, name-collision and reserved-name rules, 8 passing tests). The
+UI is not:
+- **`RoleManagement.vue` calls `workspaceRoute('workspace.roles.update',
+  selectedRole.value.id)` and the same for `destroy`** — a bare number
+  where a params object is required. `workspaceRoute()` does
+  `{...params, workspace}`; spreading a number yields `{}`, so the
+  required `{role}` segment is dropped and Ziggy v2 throws. **Save
+  changes and Delete role do not work.** This is the exact bug class of
+  fixes #2 and #4, and was already listed under Known gaps as unfixed —
+  confirmed still unfixed.
+- **`customRoles` is a local `ref` seeded once from `props.roles` and
+  never re-synced**, so creating, saving or deleting a role does not
+  update the list (same stale-prop-reference class as entry #14).
+- **The controller passes `canManageRoles`; the component never declares
+  or uses it**, and the page itself has no authorization check — a plain
+  Member can open Role Management and sees New role / Save / Delete.
+- The page renders **four hardcoded "System roles" with fabricated
+  member counts** (Owner 1, Admin 3, Member 12, Viewer 5) — including a
+  **`viewer` role that does not exist in `App\UserRole`** — plus a
+  hardcoded Developer/Designer fallback for `props.roles`.
+- **No UI assigns a custom role to a member.** `UpdateTeamMemberRequest`
+  accepts and validates `workspace_role_id` and
+  `UpdateWorkspaceMemberRoleAction` persists it, but
+  `ChangeMemberRoleModal` submits only `{ role }`, and `TeamRoster`
+  never returns the custom role, so it could not be displayed either.
+  Custom roles can be created but never actually worn by anyone.
+- **`WorkspacePermission` is decorative.** `WorkspaceRole::grants()` is
+  called from nothing but tests, and no policy anywhere consults a
+  custom role's permission map — the toggles persist and are then
+  ignored by every authorization decision in the app.
+
+**FR35 — project membership & access rules: remains Partial.**
+The access model itself is complete and well covered: `project_users` +
+`App\ProjectRole`, `ProjectPolicy`/`TaskPolicy`/`MeetingPolicy` all on
+the `workspace admin-rank OR project role-rank` model, `ProjectMember
+Controller` with 19 passing tests, `Workspace::accessibleProjectsFor()`
+as the single visibility predicate reused by Projects, Archive and
+Analytics, and `AuditLogPolicy` correctly admitting project Managers.
+Archive and Analytics scope their data per viewer; Audit is policy-gated
+and hidden from the settings hub when not permitted. What is missing is
+the **UI shell**, not the rules:
+- **`AppSidebar` is a static list with no permission gating** — every
+  workspace member sees Dashboard, Projects, Teams, Analytics, Archive.
+  Analytics/Archive are safe (they scope to zero rows for an unassigned
+  member) but present as empty pages rather than being hidden.
+- The **"Workspace settings" entry in `WorkspaceSwitcher` is ungated**,
+  which is what exposes the FR30 problem above.
+- **`ProjectController::show` sends `workspaceMembers` — the whole
+  workspace roster's id/name/email — to every viewer**, including a
+  plain project Member who cannot manage members. The Add-member modal
+  is UI-gated on `canManageProjectMembers`, but the payload is not.
+- The sidebar footer still links to the Laravel starter-kit GitHub and
+  docs.
+
+### 22. FR34 — role assignment UI repaired (Broken → Partial)
+
+Fixed every defect entry #21 listed for FR34 except permission
+enforcement, which is deliberately left open (see the end of this entry).
+No policy, migration or route changed — the backend was already correct;
+this was a UI-layer repair plus two read-side additions.
+
+**The dead buttons.** `RoleManagement.vue` now calls
+`workspaceRoute('workspace.roles.update', { role: role.id })` — a params
+object, not a bare number — so the `{role}` segment survives and Ziggy
+resolves. Delete moved into a new `DeleteWorkspaceRoleDialog.vue`
+(`workspace/popups/`, mirroring `DeleteWorkspaceDialog`) which builds the
+same params object. Deleting a role unassigns every member holding it
+(`DeleteWorkspaceRoleAction`), so it now requires a confirmation step and
+the dialog states how many members are affected and that they keep their
+workspace access — previously this was a one-click, unconfirmed action.
+
+**The stale list.** `customRoles` (a `ref` seeded once from props) is gone;
+the list is a `computed` over `props.roles`, so create/save/delete are
+reflected immediately after Inertia reloads. Selection is tracked by id
+with a `watch` that re-points to the first role when the selected one
+disappears. `CreateWorkspaceRoleModal` now emits the slug it submitted, and
+the page selects the newly created role once it appears in the refreshed
+props — so "Create & configure" actually lands on the new role. The edit
+form is an Inertia `useForm`, reset only when the *selected role id*
+changes (entry #14's lesson), so a background prop refresh cannot wipe
+in-progress edits; `onSuccess: () => form.defaults()` clears the dirty
+state after a save.
+
+**The fabricated data.** The four hardcoded "System roles" — including a
+`viewer` role that does not exist in `App\UserRole` — and their invented
+member counts are deleted, as is the hardcoded Developer/Designer
+fallback for `props.roles`. `WorkspaceRoleController::index` now sends a
+`systemRoles` prop built from `UserRole::cases()` with real counts from a
+single grouped query over `workspace_users`. Role copy moved to a new
+`UserRole::description()` so it lives next to `label()` rather than in the
+template.
+
+**The silent no-op nobody had noticed.** The edit panel offered an
+editable "Identifier / Slug" input, but `UpdateWorkspaceRoleRequest`
+never accepted `slug` — it reuses `$this->role()->slug`. Typing in that
+field did nothing. It is now rendered as read-only text with a note that
+the identifier is fixed at creation.
+
+**Permission gating.** The controller already sent `canManageRoles` and
+the component ignored it. It is now declared and honored: New role, Save,
+Delete and Toggle-all are hidden for non-admins, and the permission
+switches render disabled. Viewing the page stays open to any workspace
+member, matching `WorkspaceRolePolicy::view` (`hasMember`) — the page is a
+read of workspace structure, and every mutating route was already
+authorized server-side. The permission checkboxes were also swapped for
+the shared `AppSwitch`, and the permission list is now filtered against
+the `availablePermissions` prop so the UI cannot drift from
+`WorkspacePermission`.
+
+**Custom roles can now actually be worn.** This was the FR's headline gap:
+roles could be created but never assigned. Three additions closed it —
+`TeamRoster` returns `workspace_role_id` and `workspace_role_name` per
+member (resolved from one `pluck('name', 'id')` over the workspace's
+roles, `null` for pending invitations); `TeamMemberController::index`
+sends a `workspaceRoles` list; and `ChangeMemberRoleModal` gained a custom
+role picker that submits `workspace_role_id` alongside `role`. The Team
+page's role column renders the custom role under the system badge, and
+the search box matches on it. `UpdateTeamMemberRequest` and
+`UpdateWorkspaceMemberRoleAction` needed no change — they already
+validated the id against the workspace and persisted it; nothing had ever
+sent the field.
+
+**Tests**: 5 new, all passing. `WorkspaceRoleTest` gained
+`test_the_index_page_reports_real_system_role_counts_and_the_manage_flag`
+and `test_a_plain_member_cannot_manage_roles` (index exposes
+`canManageRoles: false`, and store/update/destroy are each `403`).
+`TeamMemberTest` gained
+`test_an_admin_can_assign_a_custom_workspace_role_to_a_member`,
+`test_a_custom_role_from_another_workspace_cannot_be_assigned` (asserts
+the validation error *and* that the pivot is untouched), and
+`test_the_roster_exposes_the_assigned_custom_role_and_the_available_roles`.
+Full suite: **322 passed** (317 baseline + 5). Pint, ESLint and
+`vue-tsc --noEmit` all clean.
+
+**Deliberately not done — the open decision.** `WorkspacePermission` is
+still enforced by nothing: `WorkspaceRole::grants()` is called only from
+tests, and every policy still authorizes on `UserRole` rank plus project
+membership. Making the permission matrix authoritative is a genuine
+redesign — every policy would need a precedence rule for system rank
+versus custom-role permission — and it is not obviously what the FR asks
+for. Until that is decided, the permissions panel carries an inline note
+saying permissions are recorded for team structure while access is
+enforced by the system role and project membership, so the page no longer
+implies an enforcement that does not exist. Resolving this one way or the
+other is what moves FR34 from Partial to Complete.
+
+### 23. FR30 — workspace rename / delete / member management completed
+
+Closed every defect entry #21 listed for FR30. Writing the missing tests
+first turned up a real bug and one wrong assumption about existing
+behaviour, both described below.
+
+**The missing tests — and the bug they found.** `workspace.update` and
+`workspace.destroy` had *zero* coverage. New
+`tests/Feature/Workspace/WorkspaceSettingsTest.php` (13 tests) covers
+rename, slug uniqueness against another workspace, keeping your own slug,
+delete with a remaining workspace, the current-workspace re-point for
+affected members, the only-workspace guard, and per-role denials for
+Admin and Member on both routes.
+
+The delete test failed on first run: after deleting a workspace the owner
+was redirected to **`login`**, not to a remaining workspace.
+`WorkspaceController::destroy` resolved its fallback purely from
+`$user->currentWorkspace`, and `DeleteWorkspaceAction` only re-points
+users whose `current_workspace_id` *equalled the deleted workspace* — so
+anyone whose current workspace was already `null` fell through to the
+"you have nowhere to go" branch and got bounced to the login page while
+still authenticated and still owning other workspaces. That is the same
+bug class as fixes #2 and #4. `destroy` now falls back to
+`WorkspaceService::currentFor($user) ?? $user->workspaces()->first()` and
+persists the switch via `switchTo()` before redirecting, so the user
+always lands on a workspace they actually belong to.
+
+The only-workspace guard also behaves differently than assumed: it throws
+`WorkspaceException::cannotDeleteOnlyWorkspace()` (an `AppException`,
+422), which `ErrorResponseBuilder` turns into a `back()->with('error')`
+toast for Inertia requests and a plain 422 otherwise. Both paths are now
+asserted rather than guessed at.
+
+**Permission gating on the settings hub.** `WorkspaceController::edit`
+shipped `canViewAuditLog` as its only permission prop, so a plain Member
+saw and could click "Rename workspace" and "Delete workspace" and got a
+403 for their trouble. It now also sends `canUpdateWorkspace`,
+`canDeleteWorkspace`, `canManageMembers` and `canInviteMembers`, and the
+page renders the Profile, Invitations and Danger Zone cards — and their
+modals — only for viewers who hold the matching ability. The page itself
+stays open to any workspace member deliberately:
+`AuditLogPolicy::viewAny` admits project Managers who are not workspace
+admins, so gating the whole route to Admin+ would lock them out of the
+audit log they are explicitly permitted to see.
+
+**Members and Invitations are no longer "Soon".** Both features have
+worked for a long time; only the hub had not caught up. Members now links
+to the Team page (label and description adapt to whether the viewer can
+manage or only view), and Invitations links to the invite form for
+viewers who can invite.
+
+**The Team page's four dead menu items.** `onResendInvite`,
+`onRevokeInvite`, `onCopyInviteLink` and `onTransferTasks` were
+`console.log` stubs. Resend and revoke now call the existing
+`workspace.invitations.resend`/`destroy` routes using `invitation_id` —
+*not* the row's `id`, which is the string `"invitation-{id}"` — with
+success/error toasts through the existing notification store and a
+`pendingInvitationId` guard against double submission.
+
+*Copy invite link* needed a decision rather than wiring. Building the
+link requires the invitation token, and `WorkspaceInvitationController::
+showAccept` lets a logged-out visitor with no existing account register
+under the invited email — so a leaked token is a real way into the
+workspace. The roster payload goes to every viewer of the Team page, not
+just the admins who see the actions menu, so naively adding the token
+would have handed it to plain members too. `TeamRoster` now computes
+`$viewer->can('invite', $workspace)` once and emits `invite_url` only for
+viewers who could have issued that invitation anyway; everyone else gets
+`null`, and `MemberActionsMenu` hides the item when it is absent. Two
+tests lock this down, including an `assertDontSee($invitation->token)`
+for a plain member.
+
+*Transfer tasks* was removed. There is no task-reassignment feature
+anywhere in this codebase, and inventing one was well outside FR30 —
+shipping a button that silently does nothing is worse than not offering
+it.
+
+**Other fabrications removed from the Team page.** The "Suspended" filter
+tab counted a status nothing can produce (`TeamRoster` only ever emits
+`active`/`pending`, and no suspend feature exists). The `AppAiInsight`
+strip displayed an invented statistic about a named user as if it were
+real analytics. A "Filter" button in the toolbar had no handler at all.
+All three are gone. Seat usage no longer hardcodes `total = 10` in the
+component — it comes from a new `workspace.seat_limit` config value
+(`WORKSPACE_SEAT_LIMIT`, default 10) passed as a `seatLimit` prop, so the
+number has one source. Nothing enforces that limit yet; it is a display
+figure, and billing remains a "Coming later" card. The "Invite member"
+button is now gated on `canInviteMembers`.
+
+**Tests**: 18 new (13 in `WorkspaceSettingsTest`, 5 added to
+`TeamMemberTest` for invite-link exposure, token non-disclosure, and
+resend/revoke for both an admin and a denied member). Full suite:
+**340 passed** (322 baseline + 18). Pint, ESLint and `vue-tsc --noEmit`
+all clean.
+
+**Not done, deliberately**: member suspend and transfer-tasks-on-removal
+have no backend and were not invented; the seat limit is displayed but
+not enforced.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -1418,6 +1901,23 @@ existing app conventions"), no Audit Log or AI work, no code comments.
   first accessor touch (here, `avatar_url`, evaluated on every request
   because `auth.user` is shared) throws. See entry #19 for the concrete
   break/fix.
+- **`tests/Unit/ModuleBoundaryTest.php` is a real, enforced architectural
+  contract in this codebase**, not just a convention documented in
+  prose: modules may only import each other's `Contracts`/`Data`/
+  `Models`/`Actions`/`Policies`/`Exceptions`; anything else (a class at a
+  module's root, `Services`, `Http`, `Support`) is private. See entry
+  #20's module-boundary lesson — `AuditAction` had to move from the
+  module root into `Data/` the moment other modules needed to import it.
+  Worth checking this test before adding any new module-root class that
+  other modules will reference.
+- **Audit logging deliberately omits foreign-key constraints** on every
+  reference column (`workspace_id`, `project_id`, `user_id`,
+  `subject_id`) so that deleting a workspace/project/task/user can never
+  cascade-delete the audit history describing that very deletion — see
+  entry #20. This is a different trade-off than every other table in
+  this app (which all use `constrained()`), made deliberately for this
+  one immutable-log use case; not a pattern to copy elsewhere without
+  the same reasoning applying.
 
 ## Test results
 
@@ -1666,6 +2166,36 @@ browser pass since this is the first entry to add a real `<input
 type="file">` interaction, which is harder to fully trust from code
 review alone than a read-only display.
 
+Full suite after entry #20 (FR28 audit log):
+
+```
+php artisan test --compact
+Tests:    317 passed (1423 assertions)
+
+vendor/bin/pint --dirty --format agent
+→ passed
+
+npm run lint:check
+→ 0 errors
+
+npm run build
+✓ built in 2.49s (audit/index.vue present in public/build/manifest.json)
+```
+
+Adds `tests/Feature/Audit/AuditLoggingTest.php` (9 tests) and
+`tests/Feature/Audit/AuditLogViewTest.php` (10 tests) — 19 new over
+entry #19's 298 baseline. Also re-ran the full Workspace, Teams,
+Projects, Tasks, and Meetings suites (192 tests total) after threading a
+new `User $actor` parameter through 11 Actions that previously lacked
+one — all green, confirming every controller call site was updated
+consistently and no existing behavior regressed.
+`tests/Unit/ModuleBoundaryTest.php` — a pre-existing architectural
+contract this session hadn't touched before — caught a real placement
+mistake (`AuditAction` at the module root instead of inside `Data/`)
+immediately on the first full-suite run; fixed and reverified. The audit
+log settings-hub card and index page are unverified in a live
+browser, same standing caveat as every other UI-heavy entry in this log.
+
 ## Known gaps worth flagging
 
 - `resources/js/pages/workspace/settings/RoleManagement.vue` calls
@@ -1896,27 +2426,53 @@ review alone than a read-only display.
   the other pending browser-verification items, since it's the first
   entry with a real file-picker/upload-progress interaction rather than
   a read-only display.
+- **Audit logging covers the events explicitly listed in the FR28 task**,
+  not every mutation in the app — custom workspace role CRUD
+  (`Create/Update/DeleteWorkspaceRoleAction`), workspace invitation
+  resend/revoke, task comment create/delete, and account deletion
+  (`ProfileController::destroy`) are not audited, since none were in the
+  requirement's explicit event list. Adding any of them later is a small,
+  additive change: one `RecordAuditLogAction` call plus a new
+  `AuditAction` case, following the exact pattern entry #20 already
+  established everywhere else.
+- **Board column rename isn't audited** because it doesn't exist as a
+  feature yet — there is no `UpdateBoardColumnAction` in this codebase
+  (columns can only be created, deleted, and reordered after creation).
+  If rename is ever added, it needs its own `board_column.renamed`
+  `AuditAction` case alongside it.
+- **No export/PDF and no realtime streaming**, per the task's own explicit
+  exclusions. The page is a standard server-paginated, filtered table —
+  same shape as Archive (entry #16) — with no download or live-tail
+  capability.
+- **The audit settings-hub card and index page have not been visually
+  verified in a browser** — no browser access in this session, same
+  standing caveat as every other UI-heavy entry in this log.
 
 ## Next recommended task
 
-Backend suite confirmed green at 298 passed as of entry #19 (FR26).
+Backend suite confirmed green at 317 passed as of entry #20 (FR28).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and
-`npm run build` all pass clean. A visual browser pass is now owed for six
-separate pieces of UI work (entry #14's Task Detail redesign, entry #15's
-notification bell, entry #16's archive page, entry #17's analytics
-dashboard, entry #18's notification preferences settings page, entry
-#19's avatar upload) — worth doing in one sitting before committing,
-since none of them have been click-tested in a running app yet. The
-avatar upload flow (real `<input type="file">`, upload progress, replace,
-remove) is the highest-value one to check first, since a file-picker
-interaction is the hardest of the six to fully trust from code review
-alone.
+`npm run build` all pass clean. A visual browser pass is now owed for
+seven separate pieces of UI work (entry #14's Task Detail redesign,
+entry #15's notification bell, entry #16's archive page, entry #17's
+analytics dashboard, entry #18's notification preferences settings page,
+entry #19's avatar upload, entry #20's audit log page) — worth doing in
+one sitting before committing, since none of them have been click-tested
+in a running app yet. The avatar upload flow (real `<input
+type="file">`, upload progress, replace, remove) is still the
+highest-value one to check first, since a file-picker interaction is
+harder to fully trust from code review alone than a read-only display
+like the audit log table.
 
-Back to the FR track: with FR14–FR26, FR29, and FR32 now all complete,
-**FR28 (audit log)** is the only remaining untouched block: every
-mutating action across Workspace/Projects/Tasks/Meetings would need a
-logging hook, so it's worth scoping carefully (which actions actually
-need auditing, one shared `AuditLogAction` vs. per-module hooks) before
-starting. Save FR10–FR13 (transcription/AI summary) for last, once
-there's real meeting data to build against — at that point FR28 and
-FR10–FR13 are the entire remaining "not started" list.
+Back to the FR track: with FR14–FR26, FR28, FR29, and FR32 now all
+complete, **FR10–FR13 (transcription + AI summary) are the entire
+remaining "not started" list** — the last untouched block in the FYP1
+report. This is the largest and riskiest remaining piece: it needs a
+transcription provider decision (upload-based vs. live), storage for
+transcripts/summaries, and an AI summarization call, on top of the
+existing meeting infrastructure (FR05–FR09, complete since entry #10).
+Worth scoping in a dedicated planning pass before writing code — what
+"transcription" means given this app has no audio/video capture
+infrastructure today (meetings are scheduled with an external join
+link, not hosted in-app), and whether the FYP1 report's wording expects
+an uploaded-recording flow or something else entirely.

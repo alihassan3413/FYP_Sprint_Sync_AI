@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Actions;
 
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
@@ -21,6 +23,7 @@ final class CreateTaskAction
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly RecordAuditLogAction $auditLogger,
     ) {}
 
     public function handle(Project $project, User $creator, StoreTaskData $data): Task
@@ -38,6 +41,26 @@ final class CreateTaskAction
             'board_column_id' => $defaultColumnId,
             'workspace_id' => $project->workspace_id,
         ]);
+
+        $this->auditLogger->handle(
+            $project->workspace,
+            $project,
+            $creator,
+            AuditAction::TASK_CREATED,
+            "{$creator->name} created \"{$task->title}\".",
+            $task,
+        );
+
+        if ($task->assigned_to !== null) {
+            $this->auditLogger->handle(
+                $project->workspace,
+                $project,
+                $creator,
+                AuditAction::TASK_ASSIGNED,
+                "{$creator->name} assigned \"{$task->title}\" to {$task->assignee->name}.",
+                $task,
+            );
+        }
 
         $this->notifyAssignment($task, $project, $creator);
 

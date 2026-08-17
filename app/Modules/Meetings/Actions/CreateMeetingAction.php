@@ -6,6 +6,8 @@ namespace App\Modules\Meetings\Actions;
 
 use App\Mail\MeetingScheduledMail;
 use App\Models\User;
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
@@ -23,6 +25,7 @@ final class CreateMeetingAction
     public function __construct(
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly RecordAuditLogAction $auditLogger,
     ) {}
 
     public function handle(Project $project, User $creator, StoreMeetingData $data): Meeting
@@ -36,6 +39,15 @@ final class CreateMeetingAction
             'workspace_id' => $project->workspace_id,
             'created_by' => $creator->id,
         ]);
+
+        $this->auditLogger->handle(
+            $project->workspace,
+            $project,
+            $creator,
+            AuditAction::MEETING_SCHEDULED,
+            "{$creator->name} scheduled \"{$meeting->title}\".",
+            $meeting,
+        );
 
         $this->notify($meeting, $creator);
 

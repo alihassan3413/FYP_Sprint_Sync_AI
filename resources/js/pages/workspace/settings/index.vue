@@ -2,7 +2,7 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ShieldCheck, Users } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
 
 const props = defineProps<{
     workspaceProfile: {
@@ -11,6 +11,11 @@ const props = defineProps<{
         slug: string;
         created_at: string;
     };
+    canViewAuditLog: boolean;
+    canUpdateWorkspace: boolean;
+    canDeleteWorkspace: boolean;
+    canManageMembers: boolean;
+    canInviteMembers: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -47,7 +52,7 @@ interface SettingsCard {
     danger?: boolean;
 }
 
-const settings: SettingsCard[] = [
+const settings = computed<SettingsCard[]>(() => [
     {
         key: 'roles',
         icon: ShieldCheck,
@@ -61,34 +66,68 @@ const settings: SettingsCard[] = [
         },
         highlighted: true,
     },
-    {
-        key: 'profile',
-        icon: Building2,
-        title: 'Workspace Profile',
-        description: 'Update your workspace name and URL identifier.',
-        badge: 'available',
-        badgeLabel: 'Available',
-        action: {
-            label: 'Rename workspace',
-            onClick: () => (isRenameModalOpen.value = true),
-        },
-    },
+    ...(props.canViewAuditLog
+        ? [
+              {
+                  key: 'audit-log',
+                  icon: ScrollText,
+                  title: 'Audit Log',
+                  description: 'Review a chronological record of administrative and project activity across the workspace.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'View audit log',
+                      href: workspaceRoute('workspace.audit.index'),
+                  },
+              },
+          ]
+        : []),
+    ...(props.canUpdateWorkspace
+        ? [
+              {
+                  key: 'profile',
+                  icon: Building2,
+                  title: 'Workspace Profile',
+                  description: 'Update your workspace name and URL identifier.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Rename workspace',
+                      onClick: () => (isRenameModalOpen.value = true),
+                  },
+              },
+          ]
+        : []),
     {
         key: 'members',
         icon: Users,
         title: 'Members',
-        description: 'View and manage all current members of your workspace, update their roles and status.',
-        badge: 'soon',
-        badgeLabel: 'Soon',
+        description: props.canManageMembers
+            ? 'View every member of this workspace, change their roles, and remove access.'
+            : 'See who belongs to this workspace.',
+        badge: 'available',
+        badgeLabel: 'Available',
+        action: {
+            label: props.canManageMembers ? 'Manage members' : 'View members',
+            href: workspaceRoute('workspace.teams.index'),
+        },
     },
-    {
-        key: 'invitations',
-        icon: Mail,
-        title: 'Invitations',
-        description: 'Send and manage pending invitations. Control who can join and under what role.',
-        badge: 'soon',
-        badgeLabel: 'Soon',
-    },
+    ...(props.canInviteMembers
+        ? [
+              {
+                  key: 'invitations',
+                  icon: Mail,
+                  title: 'Invitations',
+                  description: 'Invite new teammates by email and manage invitations that are still pending.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Invite a teammate',
+                      href: workspaceRoute('workspace.invitations.create'),
+                  },
+              },
+          ]
+        : []),
     {
         key: 'billing',
         icon: CreditCard,
@@ -113,20 +152,24 @@ const settings: SettingsCard[] = [
         badge: 'later',
         badgeLabel: 'Coming later',
     },
-    {
-        key: 'danger',
-        icon: AlertTriangle,
-        title: 'Danger Zone',
-        description: 'Permanently delete this workspace and all associated data. This action cannot be undone.',
-        badge: 'available',
-        badgeLabel: 'Available',
-        danger: true,
-        action: {
-            label: 'Delete workspace',
-            onClick: () => (isDeleteDialogOpen.value = true),
-        },
-    },
-];
+    ...(props.canDeleteWorkspace
+        ? [
+              {
+                  key: 'danger',
+                  icon: AlertTriangle,
+                  title: 'Danger Zone',
+                  description: 'Permanently delete this workspace and all associated data. This action cannot be undone.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  danger: true,
+                  action: {
+                      label: 'Delete workspace',
+                      onClick: () => (isDeleteDialogOpen.value = true),
+                  },
+              },
+          ]
+        : []),
+]);
 
 const badgeClasses: Record<BadgeVariant, string> = {
     available: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
@@ -265,7 +308,7 @@ const badgeClasses: Record<BadgeVariant, string> = {
         </div>
     </AppLayout>
 
-    <RenameWorkspaceModal v-model:open="isRenameModalOpen" :workspace="props.workspaceProfile" />
+    <RenameWorkspaceModal v-if="canUpdateWorkspace" v-model:open="isRenameModalOpen" :workspace="props.workspaceProfile" />
 
-    <DeleteWorkspaceDialog v-model:open="isDeleteDialogOpen" :workspace="props.workspaceProfile" />
+    <DeleteWorkspaceDialog v-if="canDeleteWorkspace" v-model:open="isDeleteDialogOpen" :workspace="props.workspaceProfile" />
 </template>

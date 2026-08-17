@@ -5,7 +5,7 @@ defineProps<{ open: boolean }>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
-    created: [];
+    created: [slug: string];
 }>();
 
 const form = useForm({
@@ -34,11 +34,13 @@ const canSubmit = computed(() => {
 function submit() {
     if (!canSubmit.value) return;
 
+    const submittedSlug = form.slug.trim();
+
     form.post(workspaceRoute('workspace.roles.store'), {
         preserveScroll: true,
 
         onSuccess: () => {
-            emit('created');
+            emit('created', submittedSlug);
             reset();
             emit('update:open', false);
         },
