@@ -326,4 +326,85 @@ final class ProjectMemberTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('canManageProjectMembers', true));
     }
+
+    public function test_a_plain_project_member_does_not_receive_the_workspace_roster(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canManageProjectMembers', false)
+                ->where('canManageTasks', false)
+                ->where('canDeleteProject', false)
+                ->has('workspaceMembers', 0)
+                ->has('members', 0))
+            ->assertDontSee($this->admin->email);
+    }
+
+    public function test_a_project_manager_still_receives_the_assignee_picker_roster(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canManageTasks', true)
+                ->has('members', 3));
+    }
+
+    public function test_a_project_manager_still_receives_the_workspace_roster(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canManageProjectMembers', true)
+                ->has('workspaceMembers', 3));
+    }
+
+    public function test_a_project_manager_cannot_see_the_delete_project_affordance(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MANAGER->value]);
+
+        $this->actingAs($this->member)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canManageProjects', true)
+                ->where('canDeleteProject', false));
+
+        $this->actingAs($this->member)
+            ->delete(route('workspace.projects.destroy', [$this->workspace, $this->project]))
+            ->assertForbidden();
+    }
+
+    public function test_an_admin_still_receives_the_full_project_payload(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canManageProjectMembers', true)
+                ->where('canManageProjects', true)
+                ->where('canDeleteProject', true)
+                ->has('workspaceMembers', 3));
+    }
+
+    public function test_the_workspace_roster_never_crosses_workspace_boundaries(): void
+    {
+        $other = Workspace::factory()->ownedBy(User::factory()->create())->create();
+        $stranger = User::factory()->create();
+        $other->users()->attach($stranger->id, ['role' => UserRole::MEMBER->value]);
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.projects.show', [$this->workspace, $this->project]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('workspaceMembers', 3))
+            ->assertDontSee($stranger->email);
+    }
 }

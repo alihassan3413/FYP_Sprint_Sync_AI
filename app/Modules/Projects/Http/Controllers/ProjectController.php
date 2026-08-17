@@ -46,13 +46,16 @@ final class ProjectController
         abort_unless($user->can('view', $project), 403);
 
         $projectMemberIds = $project->members()->pluck('users.id');
+        $canManageProjectMembers = $user->can('manageMembers', $project);
+        $canManageTasks = $user->can('create', [Task::class, $project]);
 
         return Inertia::render('projects/show', [
             'project' => ProjectData::fromModel($project),
             'canManageProjects' => $user->can('update', $project),
-            'canManageTasks' => $user->can('create', [Task::class, $project]),
+            'canDeleteProject' => $user->can('delete', $project),
+            'canManageTasks' => $canManageTasks,
             'canManageMeetings' => $user->can('create', [Meeting::class, $project]),
-            'canManageProjectMembers' => $user->can('manageMembers', $project),
+            'canManageProjectMembers' => $canManageProjectMembers,
             'canManageBoardColumns' => $user->can('create', [BoardColumn::class, $project]),
             'boardColumns' => $project->boardColumns()
                 ->orderBy('position')
@@ -71,18 +74,20 @@ final class ProjectController
                 ->get()
                 ->map(MeetingData::fromModel(...))
                 ->values(),
-            'members' => $workspace->users()
-                ->select('users.id', 'users.name', 'users.email', 'workspace_users.role as workspace_role')
-                ->get()
-                ->filter(fn (User $member) => in_array($member->workspace_role, [UserRole::OWNER->value, UserRole::ADMIN->value], true)
-                    || $projectMemberIds->contains($member->id))
-                ->map(fn (User $member) => [
-                    'id' => $member->id,
-                    'name' => $member->name,
-                    'email' => $member->email,
-                ])
-                ->sortBy('name')
-                ->values(),
+            'members' => $canManageTasks
+                ? $workspace->users()
+                    ->select('users.id', 'users.name', 'users.email', 'workspace_users.role as workspace_role')
+                    ->get()
+                    ->filter(fn (User $member) => in_array($member->workspace_role, [UserRole::OWNER->value, UserRole::ADMIN->value], true)
+                        || $projectMemberIds->contains($member->id))
+                    ->map(fn (User $member) => [
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'email' => $member->email,
+                    ])
+                    ->sortBy('name')
+                    ->values()
+                : collect(),
             'projectMembers' => $project->members()
                 ->select('users.id', 'users.name', 'users.email')
                 ->orderBy('users.name')
@@ -94,16 +99,18 @@ final class ProjectController
                     'role' => $member->pivot->role,
                 ])
                 ->values(),
-            'workspaceMembers' => $workspace->users()
-                ->select('users.id', 'users.name', 'users.email')
-                ->orderBy('users.name')
-                ->get()
-                ->map(fn (User $member) => [
-                    'id' => $member->id,
-                    'name' => $member->name,
-                    'email' => $member->email,
-                ])
-                ->values(),
+            'workspaceMembers' => $canManageProjectMembers
+                ? $workspace->users()
+                    ->select('users.id', 'users.name', 'users.email')
+                    ->orderBy('users.name')
+                    ->get()
+                    ->map(fn (User $member) => [
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'email' => $member->email,
+                    ])
+                    ->values()
+                : collect(),
         ]);
     }
 

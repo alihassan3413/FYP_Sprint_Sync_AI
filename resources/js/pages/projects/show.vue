@@ -10,6 +10,7 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 const props = defineProps<{
     project: Project;
     canManageProjects: boolean;
+    canDeleteProject: boolean;
     canManageTasks: boolean;
     canManageMeetings: boolean;
     canManageProjectMembers: boolean;
@@ -267,7 +268,7 @@ function onDeleted() {
                             </div>
 
                             <div
-                                v-if="canManageProjects"
+                                v-if="canDeleteProject"
                                 class="rounded-xl border border-red-200 bg-red-50/40 p-5 dark:border-red-900/40 dark:bg-red-950/10"
                             >
                                 <div class="mb-1 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
@@ -289,11 +290,18 @@ function onDeleted() {
         </div>
     </AppLayout>
 
-    <EditProjectModal :open="isEditModalOpen" :project="project" @update:open="(value) => (isEditModalOpen = value)" />
+    <EditProjectModal v-if="canManageProjects" :open="isEditModalOpen" :project="project" @update:open="(value) => (isEditModalOpen = value)" />
 
-    <DeleteProjectDialog :open="isDeleteDialogOpen" :project="project" @update:open="(value) => (isDeleteDialogOpen = value)" @deleted="onDeleted" />
+    <DeleteProjectDialog
+        v-if="canDeleteProject"
+        :open="isDeleteDialogOpen"
+        :project="project"
+        @update:open="(value) => (isDeleteDialogOpen = value)"
+        @deleted="onDeleted"
+    />
 
     <CreateTaskModal
+        v-if="canManageTasks"
         :open="isCreateTaskModalOpen"
         :project-id="project.id"
         :members="members"
@@ -313,22 +321,34 @@ function onDeleted() {
         @update:open="(value) => !value && (taskModalTarget = null)"
     />
 
-    <DeleteTaskDialog :open="deleteTaskTarget !== null" :task="deleteTaskTarget" @update:open="(value) => !value && (deleteTaskTarget = null)" />
+    <DeleteTaskDialog
+        v-if="canManageTasks"
+        :open="deleteTaskTarget !== null"
+        :task="deleteTaskTarget"
+        @update:open="(value) => !value && (deleteTaskTarget = null)"
+    />
 
     <CreateBoardColumnModal
+        v-if="canManageBoardColumns"
         :open="isCreateColumnModalOpen"
         :project-id="project.id"
         @update:open="(value) => (isCreateColumnModalOpen = value)"
     />
 
     <DeleteBoardColumnDialog
+        v-if="canManageBoardColumns"
         :open="deleteColumnTarget !== null"
         :column="deleteColumnTarget"
         :project-id="project.id"
         @update:open="(value) => !value && (deleteColumnTarget = null)"
     />
 
-    <CreateMeetingModal :open="isCreateMeetingModalOpen" :project-id="project.id" @update:open="(value) => (isCreateMeetingModalOpen = value)" />
+    <CreateMeetingModal
+        v-if="canManageMeetings"
+        :open="isCreateMeetingModalOpen"
+        :project-id="project.id"
+        @update:open="(value) => (isCreateMeetingModalOpen = value)"
+    />
 
     <EditMeetingModal
         :open="meetingModalTarget !== null"
@@ -338,30 +358,33 @@ function onDeleted() {
     />
 
     <DeleteMeetingDialog
+        v-if="canManageMeetings"
         :open="deleteMeetingTarget !== null"
         :meeting="deleteMeetingTarget"
         @update:open="(value) => !value && (deleteMeetingTarget = null)"
     />
 
-    <AddProjectMemberModal
-        :open="isAddMemberModalOpen"
-        :project-id="project.id"
-        :workspace-members="workspaceMembers"
-        :project-members="projectMembers"
-        @update:open="(value) => (isAddMemberModalOpen = value)"
-    />
+    <template v-if="canManageProjectMembers">
+        <AddProjectMemberModal
+            :open="isAddMemberModalOpen"
+            :project-id="project.id"
+            :workspace-members="workspaceMembers"
+            :project-members="projectMembers"
+            @update:open="(value) => (isAddMemberModalOpen = value)"
+        />
 
-    <ChangeProjectMemberRoleModal
-        :open="roleModalTarget !== null"
-        :project-id="project.id"
-        :member="roleModalTarget"
-        @update:open="(value) => !value && (roleModalTarget = null)"
-    />
+        <ChangeProjectMemberRoleModal
+            :open="roleModalTarget !== null"
+            :project-id="project.id"
+            :member="roleModalTarget"
+            @update:open="(value) => !value && (roleModalTarget = null)"
+        />
 
-    <RemoveProjectMemberDialog
-        :open="removeMemberTarget !== null"
-        :project-id="project.id"
-        :member="removeMemberTarget"
-        @update:open="(value) => !value && (removeMemberTarget = null)"
-    />
+        <RemoveProjectMemberDialog
+            :open="removeMemberTarget !== null"
+            :project-id="project.id"
+            :member="removeMemberTarget"
+            @update:open="(value) => !value && (removeMemberTarget = null)"
+        />
+    </template>
 </template>

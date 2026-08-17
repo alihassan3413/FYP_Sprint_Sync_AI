@@ -7,12 +7,12 @@ Source of truth for FR wording: `SprintSync FYP1 Report.docx` (FR01–FR35).
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 23 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR28, FR29, FR30, FR32 |
-| Partial | 8 | FR02, FR03, FR04, FR27, FR31, FR33, FR34, FR35 |
+| Complete | 24 | FR01, FR05, FR06, FR07, FR08, FR09, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR28, FR29, FR30, FR32, FR35 |
+| Partial | 7 | FR02, FR03, FR04, FR27, FR31, FR33, FR34 |
 | Not started | 4 | FR10–FR13 |
 
-Strict completion: **23 / 35 (65.7%)**. Weighted (Complete=1, Partial=0.5):
-**77.1%**.
+Strict completion: **24 / 35 (68.6%)**. Weighted (Complete=1, Partial=0.5):
+**78.6%**.
 
 **FR34** was reclassified Partial → Broken by the 2026-08-17 re-audit
 (entry #21) and returned to **Partial** the same day once entry #22 repaired
@@ -26,6 +26,10 @@ none). Caveat for whoever holds the report — member *suspend* and *transfer
 tasks on removal* do not exist and never had backends; the dead UI controls
 for both were removed rather than faked. If FR30's real wording names either,
 it drops back to Partial.
+
+**FR35** moved Partial → **Complete** in entry #24. The access model was
+already correct and well tested; what shipped there was making the visible UI
+and the delivered page payloads match it.
 
 FR30 and FR35 were re-audited in the same pass and **remain Partial** — the
 table above was already correct for both. FR02, FR03, FR04, FR27, FR31 and
@@ -1823,6 +1827,108 @@ all clean.
 have no backend and were not invented; the seat limit is displayed but
 not enforced.
 
+### 24. FR35 — role/project-based visibility and access cleanup
+
+Entry #21 found FR35's *rules* complete and well covered (project_users,
+the three policies on the `workspace admin-rank OR project role-rank`
+model, `accessibleProjectsFor()`, `AuditLogPolicy`) but the *UI shell* and
+*page payloads* ignoring them. This entry closes that gap. No policy,
+migration or route changed, and `WorkspacePermission` was deliberately not
+touched.
+
+**Navigation booleans are derived server-side, once.** The sidebar renders
+on every page, so the flags belong in `HandleInertiaRequests::share()`
+alongside the existing `workspace` and `notifications` keys rather than in
+a per-page prop. New `navigation` key (a closure, so partial reloads that
+don't ask for it skip the queries; `null` for guests and for users with no
+current workspace):
+
+- `projects` — has at least one accessible project **or** can create them
+  (`accessibleProjectsFor()->exists() || can('create', [Project, ws])`).
+  An Admin with an empty workspace still sees the entry, which is the
+  point: they are the one who would create the first project.
+- `analytics` / `archive` — `accessibleProjectsFor()->exists()`. Both
+  pages already scope their data per viewer, so an unassigned member got a
+  correct-but-empty page; per the task's "do not show links just because
+  the backend safely returns an empty page", the link is now hidden
+  instead.
+- `audit` — `can('viewAny', [AuditLog, ws])`, so project Managers keep it.
+- `team` — always true for a workspace member. `TeamMemberController::
+  index` has never gated the roster beyond membership and
+  `WorkspacePolicy::view` is `hasMember`, so hiding it would have been a
+  policy change, not a visibility fix.
+- `workspaceSettings` — true if **any** settings ability holds: audit
+  view, update, delete, manageMembers, manageRoles, or invite. Audit is
+  checked first precisely so a project Manager who is not a workspace
+  Admin still reaches the one section they are entitled to.
+
+Every flag calls the existing policy or `Workspace::accessibleProjectsFor()`
+— no authorization logic is restated in the middleware and none moved into
+Vue. `AppSidebar` builds its item list from the flags, and
+`WorkspaceSwitcher` gates its "Workspace settings" entry on
+`navigation.workspaceSettings`.
+
+**Audit was deliberately not added to the sidebar.** The task asks that
+Audit "only appear when `AuditLogPolicy::viewAny` allows it"; it has never
+been a sidebar entry, and the do-not list rules out adding navigation
+items. It stays reachable from the settings hub, which already gates it on
+the same ability. The `navigation.audit` flag is still emitted — it feeds
+`workspaceSettings` and makes the rule directly testable.
+
+**Payload hardening on `ProjectController::show`.** Two lists leaked past
+their audience:
+
+- `workspaceMembers` — every workspace user's id/name/email — went to any
+  project viewer, though only the Add-member modal consumes it. Now sent
+  only when `manageMembers` passes, empty otherwise.
+- `members` — the assignee-picker source (project members ∪ workspace
+  admins) — went to viewers who cannot touch tasks. `TaskDetailModal` uses
+  it for exactly one thing, `AssigneePicker` inside the edit form, so it is
+  now sent only when `can('create', [Task, project])`. Project Managers and
+  Admins are unaffected and assignee selection still works for everyone
+  allowed to create or edit tasks; a plain project Member gets an empty
+  list and never sees the picker.
+
+Both keep their prop names and array shape, so the frontend contract is
+unchanged and no page needed redesigning.
+
+**A real permission mismatch found on the project page.** The Danger Zone
+("Delete project") was gated on `canManageProjects`, which is
+`can('update', $project)` — true for a project **Manager**. But
+`ProjectPolicy::delete` is workspace-Admin-only. Every project Manager was
+shown a Delete button that 403s. Added a `canDeleteProject` prop from
+`can('delete', $project)` and gated the Danger Zone on it. The other
+controls audited on that page — edit details, member management, task
+create/edit/delete, board columns, meeting create/edit/delete — were
+already gated on the matching ability and were left alone; their modals
+are now additionally wrapped in `v-if` guards so they cannot be mounted by
+a viewer without the ability rather than relying on a 403 at submit time.
+
+**Tests**: 14 new. New
+`tests/Feature/Workspace/NavigationVisibilityTest.php` (8) covers Owner,
+Admin-with-no-projects, project Manager, plain project Member, unassigned
+workspace member, audit visibility asserted against the actual
+`workspace.audit.index` response before *and* after a role change,
+cross-workspace isolation (a project in another workspace must not light
+up this workspace's nav), and `navigation` being `null` for a guest.
+`ProjectMemberTest` gained 6: plain member receives neither roster,
+Manager receives both, Manager sees `canDeleteProject: false` and is
+actually forbidden from deleting, Admin still receives the full payload,
+and the roster never crosses a workspace boundary.
+
+**Verification**: `php artisan test --compact` → **354 passed, 1844
+assertions**, 0 failures (340 baseline + 14). `vendor/bin/pint --dirty
+--format agent` → passed. `npm run lint:check` → clean. `npm run build` →
+built in 2.73s, no errors. `npx vue-tsc --noEmit` reports exactly two
+`TS2688` errors, both **pre-existing and unrelated to this work**: they
+come from `tsconfig.json`'s `compilerOptions.types` array, which lists
+`"vue/tsx"` and `"./resources/js/types"` — the latter is a directory whose
+entry point is `index.ts`, not a `.d.ts`, so it cannot resolve as a type
+library. `tsconfig.json` has not been modified since the initial
+starter-kit commit (`e998c49`, 4 months ago), and neither error references
+any source file. Worth fixing in a cleanup pass so the type check can be
+trusted to exit zero.
+
 ## Key architectural decisions
 
 - **Tasks is its own module**, not nested inside Projects — mirrors how
@@ -2448,7 +2554,39 @@ browser, same standing caveat as every other UI-heavy entry in this log.
   verified in a browser** — no browser access in this session, same
   standing caveat as every other UI-heavy entry in this log.
 
-## Next recommended task
+## Next recommended task (updated 2026-08-17, after entry #24)
+
+**Get the FYP1 report wording into the repo.** Six FRs — FR02, FR03, FR04,
+FR27, FR31, FR33 — are still marked Partial on the authority of entry #1
+alone and could not be re-audited, because `SprintSync FYP1 Report.docx`
+is not in the repository or anywhere on the dev machine. Every FR number
+in this file is a bare label with no text beside it. Until that wording
+exists somewhere durable, roughly a fifth of the FR table cannot be
+verified by anyone, and the completion percentage carries that caveat.
+Pasting the FR list into a tracked `docs/FR.md` is a ten-minute job that
+unblocks the largest remaining piece of uncertainty.
+
+After that, two tracks:
+
+1. **FR34's one open decision** — make `WorkspacePermission` authoritative,
+   or accept it as a labelling layer and adjust the report wording. That
+   choice is all that stands between FR34 and Complete (see entry #22).
+   The permission matrix currently persists and is enforced by nothing.
+2. **FR10–FR13 (transcription + AI summary)** — the entire remaining
+   "not started" block and the largest, riskiest piece left. Needs a
+   scoping pass before code: this app has no audio/video capture (meetings
+   carry an external join link), so "transcription" most likely means an
+   uploaded-recording flow, but that should be read off the report rather
+   than assumed.
+
+Also worth a cleanup pass: `tsconfig.json`'s `compilerOptions.types` has
+listed two unresolvable entries since the initial commit, so
+`vue-tsc --noEmit` exits non-zero even on a clean tree (entry #24).
+
+A visual browser pass is still owed for the UI work in entries #14–#20 and
+now #22–#24 — none of it has been click-tested in a running app.
+
+## Previous next-task note (pre-entry #21)
 
 Backend suite confirmed green at 317 passed as of entry #20 (FR28).
 `vendor/bin/pint --dirty --format agent`, `npm run lint:check`, and

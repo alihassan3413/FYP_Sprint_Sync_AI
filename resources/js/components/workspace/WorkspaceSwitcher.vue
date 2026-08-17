@@ -116,7 +116,7 @@ function openCreateWorkspaceModal() {
                 <span>New workspace</span>
             </DropdownMenuItem>
 
-            <DropdownMenuItem as-child class="cursor-pointer gap-2">
+            <DropdownMenuItem v-if="canAccessWorkspaceSettings" as-child class="cursor-pointer gap-2">
                 <Link :href="workspaceRoute('workspace.settings')">
                     <Settings class="size-4" />
                     <span>Workspace settings</span>
