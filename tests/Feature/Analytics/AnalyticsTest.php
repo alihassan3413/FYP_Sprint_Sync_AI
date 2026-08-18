@@ -185,18 +185,21 @@ final class AnalyticsTest extends TestCase
                 ->where('analytics.total_projects', 2));
     }
 
-    public function test_project_member_only_sees_their_own_project_data(): void
+    public function test_project_member_only_sees_their_own_assigned_tasks_in_their_own_project(): void
     {
         $otherProject = Project::factory()->forWorkspace($this->workspace)->create(['name' => 'Zeus']);
         $otherDone = BoardColumn::query()->where('project_id', $otherProject->id)->where('name', 'Done')->firstOrFail();
 
+        Task::factory()->forProject($this->project)->forColumn($this->doneColumn)
+            ->assignedTo($this->projectMember)->count(1)->create();
         Task::factory()->forProject($this->project)->forColumn($this->doneColumn)->count(2)->create();
         Task::factory()->forProject($otherProject)->forColumn($otherDone)->count(9)->create();
 
         $this->actingAs($this->projectMember)
             ->get($this->analyticsRoute())
             ->assertInertia(fn ($page) => $page
-                ->where('analytics.total_tasks', 2)
+                ->where('analytics.scope', 'personal')
+                ->where('analytics.total_tasks', 1)
                 ->where('analytics.total_projects', 1));
     }
 

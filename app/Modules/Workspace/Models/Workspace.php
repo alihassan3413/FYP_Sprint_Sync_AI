@@ -71,6 +71,16 @@ final class Workspace extends Model
         return $this->hasMany(WorkspaceInvitation::class);
     }
 
+    public function inviteLinks(): HasMany
+    {
+        return $this->hasMany(WorkspaceInviteLink::class);
+    }
+
+    public function activeInviteLink(): ?WorkspaceInviteLink
+    {
+        return $this->inviteLinks()->active()->latest('id')->first();
+    }
+
     public function pendingInvitations(): HasMany
     {
         return $this->invitations()

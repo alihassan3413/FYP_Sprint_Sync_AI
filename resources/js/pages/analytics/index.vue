@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, FolderKanban, ListTodo, Users } from 'lucide-vue-next';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, FolderKanban, ListTodo, User, Users } from 'lucide-vue-next';
 
 import AppDataTable, { type Column } from '@/components/ui/AppDataTable.vue';
-import type { Analytics, AnalyticsFilters, AnalyticsProjectOption, ProjectSummary } from '@/lib/analytics';
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { Analytics, AnalyticsFilters, AnalyticsProjectOption, ProjectSummary } from '@/lib/analytics';
 import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
@@ -52,6 +52,8 @@ const columnBars = computed(() =>
 
 const assigneeBars = computed(() => props.analytics.tasks_by_assignee.map((a) => ({ label: a.name, count: a.count })));
 
+const isPersonalScope = computed(() => props.analytics.scope === 'personal');
+
 const projectColumns: Column<ProjectSummary>[] = [
     { key: 'name', label: 'Project' },
     { key: 'total_tasks', label: 'Tasks', align: 'right', width: '90px' },
@@ -65,9 +67,26 @@ const projectColumns: Column<ProjectSummary>[] = [
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
-            <AppPageHeader eyebrow="Workspace" title="Analytics" description="How work is progressing across every project you can access." />
+            <AppPageHeader
+                eyebrow="Workspace"
+                title="Analytics"
+                :description="
+                    isPersonalScope
+                        ? 'How your own assigned work is progressing across the projects you belong to.'
+                        : 'How work is progressing across every project you can access.'
+                "
+            >
+                <template #actions>
+                    <span
+                        class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                    >
+                        <component :is="isPersonalScope ? User : Users" class="size-3" />
+                        {{ isPersonalScope ? 'My analytics' : 'Team analytics' }}
+                    </span>
+                </template>
+            </AppPageHeader>
 
-            <div class="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center">
+            <div class="bg-card flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center">
                 <select
                     v-model="projectId"
                     class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
@@ -97,7 +116,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                 <button
                     v-if="hasActiveFilters"
                     type="button"
-                    class="text-muted-foreground hover:text-foreground sm:ml-auto text-xs font-medium transition-colors"
+                    class="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors sm:ml-auto"
                     @click="clearFilters"
                 >
                     Clear filters
@@ -141,25 +160,30 @@ const projectColumns: Column<ProjectSummary>[] = [
 
                     <div class="mt-4 flex items-baseline gap-2">
                         <span class="text-3xl font-semibold tracking-tight tabular-nums">{{ analytics.task_completion_percentage }}%</span>
-                        <span class="text-muted-foreground text-xs tabular-nums"> {{ analytics.completed_tasks }} of {{ analytics.total_tasks }} </span>
+                        <span class="text-muted-foreground text-xs tabular-nums">
+                            {{ analytics.completed_tasks }} of {{ analytics.total_tasks }}
+                        </span>
                     </div>
 
                     <div class="bg-muted mt-3 h-2 w-full overflow-hidden rounded-full">
-                        <div class="h-full rounded-full bg-emerald-500 transition-all" :style="{ width: `${analytics.task_completion_percentage}%` }" />
+                        <div
+                            class="h-full rounded-full bg-emerald-500 transition-all"
+                            :style="{ width: `${analytics.task_completion_percentage}%` }"
+                        />
                     </div>
 
                     <div class="mt-6 grid grid-cols-3 gap-2 border-t pt-4 text-center">
                         <div>
                             <p class="text-lg font-semibold tabular-nums">{{ analytics.total_meetings }}</p>
-                            <p class="text-muted-foreground text-[11px] uppercase tracking-wide">Meetings</p>
+                            <p class="text-muted-foreground text-[11px] tracking-wide uppercase">Meetings</p>
                         </div>
                         <div>
                             <p class="text-lg font-semibold tabular-nums">{{ analytics.upcoming_meetings }}</p>
-                            <p class="text-muted-foreground text-[11px] uppercase tracking-wide">Upcoming</p>
+                            <p class="text-muted-foreground text-[11px] tracking-wide uppercase">Upcoming</p>
                         </div>
                         <div>
                             <p class="text-lg font-semibold tabular-nums">{{ analytics.past_meetings }}</p>
-                            <p class="text-muted-foreground text-[11px] uppercase tracking-wide">Past</p>
+                            <p class="text-muted-foreground text-[11px] tracking-wide uppercase">Past</p>
                         </div>
                     </div>
                 </div>
@@ -171,7 +195,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                     </div>
                 </div>
 
-                <div class="bg-card rounded-xl border p-5 shadow-sm lg:col-span-1">
+                <div v-if="!isPersonalScope" class="bg-card rounded-xl border p-5 shadow-sm lg:col-span-1">
                     <div class="flex items-center gap-1.5">
                         <Users class="text-muted-foreground size-3.5" />
                         <h3 class="text-[15px] font-semibold tracking-tight">Tasks by assignee</h3>

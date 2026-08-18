@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Workspace\Http\Controllers\DashboardController;
 use App\Modules\Workspace\Http\Controllers\WorkspaceController;
 use App\Modules\Workspace\Http\Controllers\WorkspaceInvitationController;
+use App\Modules\Workspace\Http\Controllers\WorkspaceInviteLinkController;
 use App\Modules\Workspace\Http\Controllers\WorkspaceRoleController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,14 @@ Route::prefix('invitations')
         Route::post('accept/{token}', [WorkspaceInvitationController::class, 'accept'])->name('accept.store');
     });
 
+Route::prefix('join')
+    ->name('workspace.join.')
+    ->middleware('throttle:invitation-accept')
+    ->group(function () {
+        Route::get('{token}', [WorkspaceInviteLinkController::class, 'show'])->name('show');
+        Route::post('{token}', [WorkspaceInviteLinkController::class, 'join'])->name('store');
+    });
+
 TenantRoute::group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
@@ -42,6 +51,13 @@ TenantRoute::group(function () {
                 ->middleware('throttle:invitation-send')
                 ->name('resend');
             Route::delete('{invitation}', [WorkspaceInvitationController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('invite-link')->name('invite-link.')->group(function () {
+            Route::post('/', [WorkspaceInviteLinkController::class, 'store'])
+                ->middleware('throttle:invitation-send')
+                ->name('store');
+            Route::delete('/', [WorkspaceInviteLinkController::class, 'destroy'])->name('destroy');
         });
 
         Route::prefix('roles')->name('roles.')->group(function () {

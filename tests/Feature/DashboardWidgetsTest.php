@@ -261,11 +261,17 @@ final class DashboardWidgetsTest extends TestCase
             ->assertDontSee('Private meeting');
     }
 
-    public function test_task_progress_excludes_tasks_from_inaccessible_projects(): void
+    public function test_task_progress_excludes_inaccessible_projects_and_other_peoples_tasks(): void
     {
         $member = $this->memberOf(UserRole::MEMBER);
         $assigned = Project::factory()->forWorkspace($this->workspace)->create();
         $assigned->members()->attach($member->id, ['role' => ProjectRole::MEMBER->value]);
+
+        Task::factory()->count(1)
+            ->forProject($assigned)
+            ->forColumn($assigned->boardColumns()->where('is_done', false)->firstOrFail())
+            ->assignedTo($member)
+            ->create();
 
         Task::factory()->count(2)
             ->forProject($assigned)
@@ -279,6 +285,8 @@ final class DashboardWidgetsTest extends TestCase
 
         $this->actingAs($member)
             ->get(route('dashboard', $this->workspace))
-            ->assertInertia(fn ($page) => $page->where('taskProgress.total', 2));
+            ->assertInertia(fn ($page) => $page
+                ->where('scope', 'personal')
+                ->where('taskProgress.total', 1));
     }
 }

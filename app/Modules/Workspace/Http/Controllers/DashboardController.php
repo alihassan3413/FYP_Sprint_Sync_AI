@@ -6,7 +6,9 @@ namespace App\Modules\Workspace\Http\Controllers;
 
 use App\Models\User;
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
+use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Data\DashboardMeetingData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
@@ -18,14 +20,18 @@ use Inertia\Response;
 
 final class DashboardController
 {
-    public function __invoke(Request $request, Workspace $workspace, BuildAnalyticsAction $analytics): Response
-    {
+    public function __invoke(
+        Request $request,
+        Workspace $workspace,
+        BuildAnalyticsAction $analytics,
+        ResolveAnalyticsScope $resolveScope,
+    ): Response {
         $user = $request->user();
 
-        $accessibleProjects = $workspace->accessibleProjectsFor($user)->orderBy('name')->get();
-        $accessibleProjectIds = $accessibleProjects->pluck('id');
+        $scope = $resolveScope->handle($workspace, $user);
+        $accessibleProjectIds = $scope->accessibleProjects->pluck('id');
 
-        $summary = $analytics->handle($accessibleProjects, []);
+        $summary = $analytics->handle($scope, []);
 
         return Inertia::render('Dashboard', [
             'user' => [
@@ -51,6 +57,12 @@ final class DashboardController
                 'columns' => $summary->tasks_by_column,
             ],
             'projects' => $summary->projects,
+            'scope' => $summary->scope,
+            'capabilities' => [
+                'canInviteMembers' => $user->can('invite', $workspace),
+                'canCreateProjects' => $user->can('create', [Project::class, $workspace]),
+                'canManageWorkspace' => $user->can('update', $workspace),
+            ],
         ]);
     }
 

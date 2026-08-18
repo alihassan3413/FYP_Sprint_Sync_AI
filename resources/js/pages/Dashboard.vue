@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, Command, Mail, Rocket, Users } from 'lucide-vue-next';
+import { Activity, AlertTriangle, CheckCircle2, FolderKanban, ListTodo, Mail, Plus, Rocket, Users } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -29,7 +29,15 @@ const props = defineProps<{
     pastMeetings: DashboardMeeting[];
     taskProgress: TaskProgress;
     projects: DashboardProjectSummary[];
+    scope: 'team' | 'personal';
+    capabilities: {
+        canInviteMembers: boolean;
+        canCreateProjects: boolean;
+        canManageWorkspace: boolean;
+    };
 }>();
+
+const isPersonalScope = computed(() => props.scope === 'personal');
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -118,20 +126,45 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    class="border-border bg-card hover:bg-muted/40 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors"
-                >
-                    <Command class="size-3.5" />
-                    Quick actions
-                    <kbd class="border-border bg-background text-muted-foreground ml-1 rounded border px-1.5 py-0.5 font-mono text-[10px]"> ⌘K </kbd>
-                </button>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <span
+                        class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                    >
+                        <component :is="isPersonalScope ? ListTodo : Users" class="size-3" />
+                        {{ isPersonalScope ? 'My dashboard' : 'Team dashboard' }}
+                    </span>
+
+                    <Button v-if="capabilities.canInviteMembers" as-child size="sm" class="gap-1.5">
+                        <Link :href="workspaceRoute('workspace.invitations.create')">
+                            <Plus class="size-3.5" />
+                            Invite teammate
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <!-- =========================================================== -->
             <!-- Stat cards — every number is real, no fake data               -->
             <!-- =========================================================== -->
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div v-if="isPersonalScope" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <AppStatCard label="My tasks" :value="taskProgress.total" :hint="taskProgress.total === 1 ? 'assigned' : 'assigned'">
+                    <template #icon><ListTodo class="size-3.5" /></template>
+                </AppStatCard>
+
+                <AppStatCard label="Completed" :value="taskProgress.completed" :hint="`${taskProgress.completion_percentage}% done`">
+                    <template #icon><CheckCircle2 class="size-3.5 text-emerald-500" /></template>
+                </AppStatCard>
+
+                <AppStatCard label="Overdue" :value="taskProgress.overdue" :hint="taskProgress.overdue === 1 ? 'task' : 'tasks'">
+                    <template #icon><AlertTriangle class="size-3.5 text-amber-500" /></template>
+                </AppStatCard>
+
+                <AppStatCard label="Projects" :value="projects.length" :hint="projects.length === 1 ? 'assigned' : 'assigned'">
+                    <template #icon><FolderKanban class="size-3.5" /></template>
+                </AppStatCard>
+            </div>
+
+            <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <AppStatCard label="Team" :value="teamMembers.length" :hint="teamMembers.length === 1 ? 'member' : 'members'">
                     <template #icon><Users class="size-3.5" /></template>
                 </AppStatCard>
@@ -161,7 +194,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
 
                     <ProjectSummaryList :projects="projects" />
 
-                    <OnBoardingCheckList :steps="onboardingSteps" />
+                    <OnBoardingCheckList v-if="capabilities.canManageWorkspace" :steps="onboardingSteps" />
 
                     <!-- Activity feed -->
                     <div class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
@@ -184,7 +217,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     <OnlineNowCard :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
 
                     <!-- Tip card — small, only shows when relevant -->
-                    <div v-if="!allDone" class="bg-muted/20 rounded-xl border border-dashed p-4 text-xs">
+                    <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-xl border border-dashed p-4 text-xs">
                         <p class="text-foreground font-medium">💡 Pro tip</p>
                         <p class="text-muted-foreground mt-1 leading-relaxed">
                             Press

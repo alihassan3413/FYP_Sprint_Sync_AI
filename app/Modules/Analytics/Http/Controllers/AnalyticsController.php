@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Analytics\Http\Controllers;
 
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
+use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,8 +13,12 @@ use Inertia\Response;
 
 final class AnalyticsController
 {
-    public function index(Request $request, Workspace $workspace, BuildAnalyticsAction $action): Response
-    {
+    public function index(
+        Request $request,
+        Workspace $workspace,
+        BuildAnalyticsAction $action,
+        ResolveAnalyticsScope $resolveScope,
+    ): Response {
         $user = $request->user();
 
         $filters = $request->validate([
@@ -22,10 +27,11 @@ final class AnalyticsController
             'to' => ['nullable', 'date'],
         ]);
 
-        $accessibleProjects = $workspace->accessibleProjectsFor($user)->orderBy('name')->get(['id', 'name']);
+        $scope = $resolveScope->handle($workspace, $user);
+        $accessibleProjects = $scope->accessibleProjects;
 
         return Inertia::render('analytics/index', [
-            'analytics' => $action->handle($accessibleProjects, $filters),
+            'analytics' => $action->handle($scope, $filters),
             'filters' => [
                 'project_id' => $filters['project_id'] ?? null,
                 'from' => $filters['from'] ?? '',

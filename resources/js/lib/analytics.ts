@@ -35,6 +35,7 @@ export interface Analytics {
     past_meetings: number;
     total_projects: number;
     projects: ProjectSummary[];
+    scope: 'team' | 'personal';
 }
 
 export interface AnalyticsProjectOption {

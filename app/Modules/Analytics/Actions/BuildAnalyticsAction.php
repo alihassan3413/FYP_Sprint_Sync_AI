@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Analytics\Actions;
 
 use App\Modules\Analytics\Data\AnalyticsData;
+use App\Modules\Analytics\Data\AnalyticsScope;
 use App\Modules\Analytics\Data\ProjectSummaryData;
 use App\Modules\Analytics\Data\TaskAssigneeBreakdownData;
 use App\Modules\Analytics\Data\TaskColumnBreakdownData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Models\Task;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,24 +22,23 @@ final class BuildAnalyticsAction
     private const MAX_ASSIGNEES = 8;
 
     /**
-     * @param  Collection<int, Project>  $accessibleProjects
      * @param  array{project_id?: int, from?: string, to?: string}  $filters
      */
-    public function handle(Collection $accessibleProjects, array $filters): AnalyticsData
+    public function handle(AnalyticsScope $scope, array $filters): AnalyticsData
     {
-        $accessibleProjectIds = $accessibleProjects->pluck('id');
+        $accessibleProjectIds = $scope->accessibleProjects->pluck('id');
 
         $scopedProjectIds = isset($filters['project_id'])
             ? $accessibleProjectIds->intersect([(int) $filters['project_id']])
             : $accessibleProjectIds;
 
-        $projectIds = $scopedProjectIds->all();
+        $projectIds = $scopedProjectIds->values()->all();
 
-        $totalTasks = Task::query()->whereIn('project_id', $projectIds)->count();
-        $completedTasks = Task::query()->whereIn('project_id', $projectIds)
+        $totalTasks = $this->taskQuery($scope, $projectIds)->count();
+        $completedTasks = $this->taskQuery($scope, $projectIds)
             ->whereHas('boardColumn', fn ($q) => $q->where('is_done', true))
             ->count();
-        $overdueTasks = Task::query()->whereIn('project_id', $projectIds)->overdue()->count();
+        $overdueTasks = $this->taskQuery($scope, $projectIds)->overdue()->count();
 
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : null;
         $to = ! empty($filters['to']) ? Carbon::parse($filters['to'])->endOfDay() : null;
@@ -52,14 +53,48 @@ final class BuildAnalyticsAction
             open_tasks: $totalTasks - $completedTasks,
             task_completion_percentage: $this->percentage($completedTasks, $totalTasks),
             overdue_tasks: $overdueTasks,
-            tasks_by_column: $this->tasksByColumn($projectIds),
-            tasks_by_assignee: $this->tasksByAssignee($projectIds),
+            tasks_by_column: $this->tasksByColumn($scope, $projectIds),
+            tasks_by_assignee: $this->tasksByAssignee($scope, $projectIds),
             total_meetings: (clone $meetingsQuery)->count(),
             upcoming_meetings: (clone $meetingsQuery)->upcoming()->count(),
             past_meetings: (clone $meetingsQuery)->past()->count(),
-            total_projects: $accessibleProjects->count(),
-            projects: $this->projectSummaries($scopedProjectIds, $accessibleProjects),
+            total_projects: $scope->accessibleProjects->count(),
+            projects: $this->projectSummaries($scope, $scopedProjectIds),
+            scope: $scope->label(),
         );
+    }
+
+    /**
+     * @param  array<int, int>  $projectIds
+     */
+    private function taskQuery(AnalyticsScope $scope, array $projectIds): Builder
+    {
+        return $this->applyScope(Task::query(), $scope, $projectIds);
+    }
+
+    /**
+     * @template TQuery of \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder
+     *
+     * @param  TQuery  $query
+     * @param  array<int, int>  $projectIds
+     * @return TQuery
+     */
+    private function applyScope($query, AnalyticsScope $scope, array $projectIds)
+    {
+        $teamIds = $scope->teamProjectIdsWithin($projectIds);
+        $personalIds = $scope->personalProjectIdsWithin($projectIds);
+        $personalUserId = $scope->personalUserId;
+
+        return $query->where(function ($outer) use ($teamIds, $personalIds, $personalUserId) {
+            $outer->whereIn('tasks.project_id', $teamIds);
+
+            if ($personalUserId !== null && $personalIds !== []) {
+                $outer->orWhere(function ($inner) use ($personalIds, $personalUserId) {
+                    $inner->whereIn('tasks.project_id', $personalIds)
+                        ->where('tasks.assigned_to', $personalUserId);
+                });
+            }
+        });
     }
 
     private function percentage(int $part, int $total): int
@@ -75,11 +110,10 @@ final class BuildAnalyticsAction
      * @param  array<int, int>  $projectIds
      * @return array<int, TaskColumnBreakdownData>
      */
-    private function tasksByColumn(array $projectIds): array
+    private function tasksByColumn(AnalyticsScope $scope, array $projectIds): array
     {
-        return DB::table('tasks')
+        return $this->applyScope(DB::table('tasks'), $scope, $projectIds)
             ->join('board_columns', 'board_columns.id', '=', 'tasks.board_column_id')
-            ->whereIn('tasks.project_id', $projectIds)
             ->selectRaw('board_columns.name as name, board_columns.is_done as is_done, MIN(board_columns.position) as position, COUNT(*) as count')
             ->groupBy('board_columns.name', 'board_columns.is_done')
             ->orderBy('position')
@@ -97,11 +131,10 @@ final class BuildAnalyticsAction
      * @param  array<int, int>  $projectIds
      * @return array<int, TaskAssigneeBreakdownData>
      */
-    private function tasksByAssignee(array $projectIds): array
+    private function tasksByAssignee(AnalyticsScope $scope, array $projectIds): array
     {
-        return DB::table('tasks')
+        return $this->applyScope(DB::table('tasks'), $scope, $projectIds)
             ->leftJoin('users', 'users.id', '=', 'tasks.assigned_to')
-            ->whereIn('tasks.project_id', $projectIds)
             ->selectRaw("tasks.assigned_to as assignee_id, COALESCE(users.name, 'Unassigned') as name, COUNT(*) as count")
             ->groupBy('tasks.assigned_to', 'users.name')
             ->orderByDesc('count')
@@ -118,22 +151,20 @@ final class BuildAnalyticsAction
 
     /**
      * @param  Collection<int, int>  $scopedProjectIds
-     * @param  Collection<int, Project>  $accessibleProjects
      * @return array<int, ProjectSummaryData>
      */
-    private function projectSummaries(Collection $scopedProjectIds, Collection $accessibleProjects): array
+    private function projectSummaries(AnalyticsScope $scope, Collection $scopedProjectIds): array
     {
-        $projectIds = $scopedProjectIds->all();
+        $projectIds = $scopedProjectIds->values()->all();
 
-        $counts = DB::table('tasks')
+        $counts = $this->applyScope(DB::table('tasks'), $scope, $projectIds)
             ->join('board_columns', 'board_columns.id', '=', 'tasks.board_column_id')
-            ->whereIn('tasks.project_id', $projectIds)
             ->selectRaw('tasks.project_id as project_id, COUNT(*) as total, SUM(CASE WHEN board_columns.is_done = 1 THEN 1 ELSE 0 END) as completed')
             ->groupBy('tasks.project_id')
             ->get()
             ->keyBy('project_id');
 
-        return $accessibleProjects
+        return $scope->accessibleProjects
             ->whereIn('id', $projectIds)
             ->map(function (Project $project) use ($counts) {
                 $row = $counts->get($project->id);

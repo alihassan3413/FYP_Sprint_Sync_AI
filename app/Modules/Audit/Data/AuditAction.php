@@ -14,6 +14,10 @@ enum AuditAction: string
     case MEMBER_REMOVED = 'member.removed';
     case MEMBER_ROLE_CHANGED = 'member.role_changed';
 
+    case INVITE_LINK_GENERATED = 'invite_link.generated';
+    case INVITE_LINK_REVOKED = 'invite_link.revoked';
+    case INVITE_LINK_JOINED = 'invite_link.joined';
+
     case PROJECT_CREATED = 'project.created';
     case PROJECT_UPDATED = 'project.updated';
     case PROJECT_DELETED = 'project.deleted';
@@ -52,7 +56,7 @@ enum AuditAction: string
     {
         return match (true) {
             str_starts_with($this->value, 'workspace.') => 'Workspace',
-            str_starts_with($this->value, 'member.') => 'Team',
+            str_starts_with($this->value, 'member.'), str_starts_with($this->value, 'invite_link.') => 'Team',
             str_starts_with($this->value, 'project.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
@@ -85,6 +89,9 @@ enum AuditAction: string
             self::MEMBER_INVITED => 'Member invited',
             self::MEMBER_REMOVED => 'Member removed',
             self::MEMBER_ROLE_CHANGED => 'Workspace role changed',
+            self::INVITE_LINK_GENERATED => 'Invite link generated',
+            self::INVITE_LINK_REVOKED => 'Invite link revoked',
+            self::INVITE_LINK_JOINED => 'Joined via invite link',
             self::PROJECT_CREATED => 'Project created',
             self::PROJECT_UPDATED => 'Project updated',
             self::PROJECT_DELETED => 'Project deleted',

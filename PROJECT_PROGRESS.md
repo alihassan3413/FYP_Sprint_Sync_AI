@@ -10,14 +10,14 @@ rather than a work-log heading.
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 15 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR26, FR29, FR30, FR32, FR33, FR34 |
-| Partial | 14 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR28, FR31, FR35 |
+| Complete | 16 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR26, FR29, FR30, FR31, FR32, FR33, FR34 |
+| Partial | 13 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR28, FR35 |
 | Design Mismatch | 2 | FR02, FR27 |
 | Not started | 4 | FR10, FR11, FR12, FR13 |
 
-Strict completion: **15 / 35 (42.9%)**. Counting the two Design Mismatches as
-satisfied-by-design (the recommended resolution): **17 / 35 (48.6%)**.
-Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **68.6%**.
+Strict completion: **16 / 35 (45.7%)**. Counting the two Design Mismatches as
+satisfied-by-design (the recommended resolution): **18 / 35 (51.4%)**.
+Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **70.0%**.
 
 Entry #27 closed FR04-03, FR04-05, FR06-01 and FR32-05, moving FR32 to
 Complete and FR04 into the blocked-only group. Entry #28 closed FR14-04,
@@ -31,11 +31,11 @@ across all 35 FRs, applying the rule that an FR cannot stay Complete while a
 mandatory sub-requirement is unimplemented. Nothing regressed; the earlier
 numbers were graded per-FR against work-log headings, which flattered them.
 
-**The more useful number.** Of the 14 Partials, **six (FR04, FR15, FR19,
-FR22, FR23, FR28) have no unblocked work left at all** — every remaining gap in
-them is Blocked by FR10–FR13. So **21 of 35 FRs need no further work before the
+**The more useful number.** Of the 13 Partials, **seven (FR04, FR15, FR19,
+FR22, FR23, FR28, FR35) have no unblocked work left at all** — every remaining gap in
+them is Blocked by FR10–FR13. So **23 of 35 FRs need no further work before the
 AI pipeline**, and the realistic pre-FR10 target is the unblocked list in entry
-#26, not all 14.
+#26, not all 13.
 
 Per-FR history for FR30, FR33, FR34 and FR35 (entries #21–#25) is superseded
 by the sub-requirement grading in **entry #26**, which is the authoritative
@@ -2096,7 +2096,7 @@ FR10–FR13, **DM** Design Mismatch.
 | FR01 Login | 01 C, 02 C, 03 C, 04 C, 05 C, 06 **P** | Partial |
 | FR02 Reset Password | 01 C, 02 C, 03 C, 04 **DM**, 05 **DM**, 06 **DM**, 07 C | Design Mismatch |
 | FR03 Logout | 01 C, 02 C, 03 C | **Complete** |
-| FR04 View Dashboard | 01 P, 02 C, 03 **C**, 04 **B**, 05 **C** | Partial (blocked-only) |
+| FR04 View Dashboard | 01 **C**, 02 C, 03 **C**, 04 **B**, 05 **C** | Partial (blocked-only) |
 | FR05 Schedule Meeting | 01 P, 02 C, 03 **DM**, 04 C, 05 **NS**, 06 C | Partial |
 | FR06 View Meeting Details | 01 **C**, 02 P, 03 **B** | Partial |
 | FR07 Join Meeting | 01 C, 02 C, 03 **DM** | **Complete** |
@@ -2112,7 +2112,7 @@ FR10–FR13, **DM** Design Mismatch.
 | FR17 Edit and Delete Task | 01 C, 02 C | **Complete** |
 | FR18 View Meeting Archive | 01 C, 02 P, 03 **B** | Partial |
 | FR19 Search Meeting Archive | 01 C, 02 C, 03 **B**, 04 C | Partial (blocked-only) |
-| FR20 View Sprint Analytics | 01 C, 02 P, 03 **B**, 04 P, 05 **NS** | Partial |
+| FR20 View Sprint Analytics | 01 C, 02 P, 03 **B**, 04 P, 05 **C** | Partial |
 | FR21 View Notifications | 01 C, 02 C, 03 C | **Complete** |
 | FR22 In-App Triggers | 01 **B**, 02 **B**, 03 C | Partial (blocked-only) |
 | FR23 Email Triggers | 01 C, 02 **B**, 03 C | Partial (blocked-only) |
@@ -2123,11 +2123,11 @@ FR10–FR13, **DM** Design Mismatch.
 | FR28 View Audit Log | 01 P (**B** only), 02 C, 03 P (**B** only) | Partial (blocked-only) |
 | FR29 Create Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
 | FR30 Edit Workspace | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
-| FR31 Invite Team Members | 01 C, 02 C, 03 C, 04 **NS**, 05 C, 06 C, 07 C | Partial |
+| FR31 Invite Team Members | 01 C, 02 C, 03 C, 04 **C**, 05 C, 06 C, 07 C | **Complete** |
 | FR32 Create/Manage Projects | 01 C, 02 C, 03 C, 04 C, 05 **C**, 06 C | **Complete** |
 | FR33 Custom Roles | 01 C, 02 C, 03 C, 04 C, 05 C, 06 C | **Complete** |
 | FR34 Assign Roles to Members | 01 C, 02 C, 03 C, 04 C, 05 C | **Complete** |
-| FR35 Role-Based Visibility | 01 **NS**, 02 P, 03 C, 04 P, 05 C, 06 C | Partial |
+| FR35 Role-Based Visibility | 01 **C**, 02 **C**, 03 C, 04 P (**B** only), 05 C, 06 C | Partial (blocked-only) |
 
 #### Evidence for every non-Complete verdict
 
@@ -3798,33 +3798,309 @@ unrelated. No frontend file was modified.
 working outbound mail, which was previously not true of this feature
 because nothing was ever dispatched.
 
-## Next recommended task (updated 2026-08-18, after entry #37)
+### 38. FR20-05 — role-aware team versus personal analytics
 
-**FR20-05 — team-wide analytics for Scrum Masters and Team Leads, personal
-task analytics for Developers.**
+Analytics previously scoped only by `accessibleProjectsFor()`, so a
+Developer saw the same workspace-wide aggregate a Scrum Master did.
+FR20-05 asks for a different *shape* of analytics per role.
 
-With entry #37 the security backlog is empty: the Assistant audit is fully
-closed (#31, #34, #35, #36) and email verification is genuinely enforced
-(#37). The remaining work is product.
+**Role mapping — the report's roles do not exist, so intent was mapped
+onto the real authorization model.** No new enum was introduced (the
+FR27 terminology mismatch from entry #26 stands):
 
-FR20-05 is the largest unblocked FR clause left. Analytics currently scope
-only by `accessibleProjectsFor()` — project membership — with no role-tier
-split, so a Developer sees the same team-wide aggregate a Scrum Master
-does. `BuildAnalyticsAction` already computes `tasks_by_assignee`, and a
-personal view is the same aggregates filtered to `assigned_to = $user->id`,
-so no new tables are needed.
+| Report role | Actual model | Analytics scope |
+|---|---|---|
+| Scrum Master | workspace Owner/Admin | team-wide across all accessible projects |
+| Team Lead | project **Manager** | team-wide for the projects they manage |
+| Developer | project Member / plain workspace Member | personal only |
 
-Settle the role mapping first (same question entry #30 raised): the report
-names Scrum Master / Developer / Team Lead while the code has Owner /
-Admin / Member plus project Manager / Member. The natural reading is
-workspace Admin+ or project Manager → team-wide, everyone else → personal.
+**Scope is per project, not per user — which the requirement demands.** A
+user who manages Alpha and merely belongs to Beta gets *all* of Alpha's
+tasks plus *only their own* tasks in Beta. New
+`ResolveAnalyticsScope` returns an `AnalyticsScope` carrying the
+accessible projects, the subset the viewer has team authority over, and a
+`personalUserId` (null for Admin+, meaning nothing is personally
+filtered). Every aggregate then applies one predicate:
 
-Other open product work:
+`tasks in teamProjectIds  OR  (tasks in personalProjectIds AND assigned_to = viewer)`
 
-- **Meeting tools** for the assistant, still blocked on the **FR05-03
-  participants decision** (entry #26, Group 3).
-- The standing **FR02 / FR27 report-amendment decisions** (entry #26,
-  Group 3), which need your call rather than code.
+applied uniformly to totals, completed, overdue, the column breakdown, the
+assignee breakdown and the per-project summary — so the per-project table
+shows Alpha's full count next to Beta's personal count in the same view.
+For an Admin every accessible project is a team project, so the personal
+branch is never emitted and behaviour is byte-identical to before.
+
+**Meetings deliberately untouched.** FR20-05 says nothing about personal
+meeting analytics and there is no meaningful per-user meeting metric in
+this data model (meetings have no participant relation — see FR05-03).
+Meeting counts remain scoped to accessible projects, per the task's
+explicit instruction.
+
+**The dashboard was deliberately not changed.** `DashboardController`
+also consumes `BuildAnalyticsAction`; it now passes
+`AnalyticsScope::teamWide($accessibleProjects)`, preserving entry #27's
+behaviour exactly. FR04-05 asks for a completion widget with no role
+qualifier, while FR20-05 scopes the *Analytics section*. Making the
+dashboard role-aware would have changed FR04-05's meaning and broken
+entry #27's tests for a requirement that does not ask for it. This
+asymmetry is a natural candidate for **FR35-01** (role-distinct dashboard
+layout), which is where it belongs.
+
+**Scope is decided server-side only.** `AnalyticsData` gained a
+`scope: 'team'|'personal'` field derived from authorization; the frontend
+reads it purely to render a `Team analytics` / `My analytics` badge in the
+page header and to hide the "Tasks by assignee" panel when personal
+(a one-bar chart of yourself). There is no role selector and no way for
+the client to request a wider scope — the `project_id` filter can only
+narrow, never widen, which is asserted by a test.
+
+**Tests**: new `AnalyticsScopeTest` (13) — Owner and Admin team-wide
+totals; a Manager's team totals for a managed project; **a Manager of one
+project sees only their own tasks in a project they merely belong to**
+(4 team + 2 own of 9 = 6); the per-project summary reflects that mixed
+scope row by row; a Member sees only their own assigned tasks; another
+user's tasks are excluded and the assignee breakdown contains only the
+viewer; personal completion/overdue percentages count only own tasks; a
+member with no assignments gets a true zero state rather than team data;
+an unassigned workspace member sees nothing; a project managed in another
+workspace never leaks; and the project filter cannot widen a personal
+scope.
+
+One existing test was rewritten, not deleted:
+`test_project_member_only_sees_their_own_project_data` asserted a project
+Member seeing **all** tasks in their project — precisely the behaviour
+FR20-05 changes. It is now
+`test_project_member_only_sees_their_own_assigned_tasks_in_their_own_project`
+and keeps its original cross-project isolation intent while asserting the
+new personal scoping. The other 13 `AnalyticsTest` cases and all 15
+`DashboardWidgetsTest` cases pass unchanged.
+
+**Verification**: `php artisan test --compact` → **480 passed, 2550
+assertions** (468 baseline + 12 net). `vendor/bin/pint --dirty --format
+agent` → passed (reformatted `BuildAnalyticsAction` on first run; re-run
+clean). `npm run lint:check` → clean. `npm run build` → built in 2.71s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** (`./resources/js/types`,
+`vue/tsx`) from entry #24 — unchanged and unrelated.
+
+**FR20 status**: FR20-05 moves **Not Started → Complete**. FR20 remains
+**Partial**, now blocked-only: FR20-02 needs a sprint entity that does not
+exist, and FR20-03/04's blocker frequency and action-item totals are
+Blocked by FR10–FR13.
+
+### 39. FR35-01 / FR35-02 — role-aware dashboard layout and widgets
+
+Closes the two clauses entry #26 opened against FR35, and FR04-01 with
+them. No new role enum: the report's Scrum Master / Team Lead / Developer
+are mapped onto the real model exactly as entry #38 did.
+
+**Role → dashboard mapping**
+
+| Report role | Actual model | Dashboard |
+|---|---|---|
+| Scrum Master | workspace Owner/Admin | team dashboard, workspace-wide totals |
+| Team Lead | project **Manager** | team totals in managed projects, personal in member-only projects |
+| Developer | project Member / plain member | personal dashboard only |
+
+**Role logic is reused, not duplicated.** `DashboardController` now calls
+`ResolveAnalyticsScope` and hands the resulting `AnalyticsScope` to
+`BuildAnalyticsAction`, exactly as `AnalyticsController` does. Entry #38's
+per-project predicate — *all tasks in managed projects, own tasks
+elsewhere* — therefore applies to `taskProgress` and the project summary
+list for free, and the dashboard is the second consumer of one rule rather
+than a second copy of it. Entry #38 had deliberately left the dashboard on
+`AnalyticsScope::teamWide()` because FR04-05 carries no role qualifier;
+FR35-01/02 is the requirement that authorises the change, and that
+temporary call is now gone.
+
+**FR35-02's "widgets" clause, by composition rather than redesign.** One
+`Dashboard.vue` is kept; what differs is which widgets compose it:
+
+- **Stat row** — team scope keeps Team / Online / Pending invites /
+  Workspace age; personal scope gets My tasks / Completed / Overdue /
+  Projects. Every figure comes from data already in the payload; no widget
+  was invented.
+- **Onboarding checklist** — hidden unless `canManageWorkspace`. Its steps
+  are invite a teammate, assign roles, create a project: actions a plain
+  member cannot perform, which is precisely the
+  "team-management-oriented widget" FR35-02 says they should not see. The
+  keyboard tip card is gated with it.
+- **Header** — a `Team dashboard` / `My dashboard` badge, plus an "Invite
+  teammate" button shown only when `canInviteMembers`.
+- **Unchanged for everyone**: meetings, project list, activity feed and
+  the online-now card. Each is either already scoped per viewer or shows
+  data the Team page already exposes to any member, so hiding it would be
+  theatre rather than access control.
+
+**A dead control was removed.** The header's "Quick actions ⌘K" button had
+no handler and never had one. FR35-02 requires users only see actions they
+can use, and a button that does nothing fails that for every role — same
+call as the dead Filter button in entry #23.
+
+**Capabilities come from policies, not role names.** The new
+`capabilities` prop is `canInviteMembers` (`invite`), `canCreateProjects`
+(`ProjectPolicy::create`) and `canManageWorkspace` (`update`) — all
+`$user->can(...)`. The frontend performs no role-name comparison anywhere;
+`scope` itself is derived server-side from `AnalyticsScope::label()`. A
+client cannot request a wider scope because none is accepted as input.
+
+**Custom role permissions — the gap, stated precisely.** FR35 speaks of
+"role and its associated permissions". `WorkspacePermission` values are
+created, edited, stored on `workspace_roles.permissions` and displayed
+(FR33, Complete), but `WorkspaceRole::grants()` is called from **nothing
+in `app/`** — verified by grep; only tests reference it. No policy
+consults a custom permission, so custom roles cannot currently widen or
+narrow anything on the dashboard. Per this task's instruction, no broad
+enforcement was invented here. The exact remaining gap: **making
+`WorkspacePermission` authoritative would require every policy to gain a
+precedence rule for system rank versus custom permission**, which is the
+open decision first recorded in entry #22 and still unresolved.
+
+**FR04-01** — "a role-appropriate dashboard upon successful login" — is
+satisfied by the above and moves to Complete. FR04-04 stays Blocked by
+FR10–FR13, untouched.
+
+**Tests**: new `DashboardScopeTest` (9) — Owner team totals with all three
+capability flags true; Admin team totals; the mixed Manager case (4 team +
+2 own of 9 = 6) asserted both in aggregate and row-by-row in the project
+list; a plain member's personal totals with all capability flags false;
+another user's tasks excluded; a zero-assignment member gets a true zero
+state rather than team data; an unassigned workspace member sees no
+projects; cross-workspace tasks never appear; and a user who manages a
+project in *another* workspace still gets personal scope here.
+
+One existing test was rewritten, not deleted:
+`test_task_progress_excludes_tasks_from_inaccessible_projects` asserted a
+project Member seeing 2 unassigned tasks — the behaviour FR35-01/02
+changes. It is now
+`test_task_progress_excludes_inaccessible_projects_and_other_peoples_tasks`
+and keeps its cross-project isolation intent while asserting personal
+scoping. The other 13 `DashboardWidgetsTest` cases and both `DashboardTest`
+cases pass unchanged.
+
+**Verification**: `php artisan test --compact` → **489 passed, 2693
+assertions** (480 baseline + 9). `vendor/bin/pint --dirty --format agent`
+→ passed (reordered imports on first run; re-run clean).
+`npm run lint:check` → clean. `npm run build` → built in 2.54s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** (`./resources/js/types`,
+`vue/tsx`) from entry #24 — unchanged and unrelated.
+
+**Status**: FR35-01 and FR35-02 move Not Started/Partial → **Complete**.
+FR35 remains **Partial but blocked-only** — its last gap is FR35-04's
+summary-approval clause, Blocked by FR12/FR13. FR04-01 moves → **Complete**;
+FR04 stays Partial, blocked-only on FR04-04.
+
+### 40. FR31-04 — shareable workspace invite link
+
+The last email-bound gap in FR31. Every invitation was tied to one address:
+`showAccept` rejected a signed-in user whose email differed, and a
+signed-out visitor could only register under the invited address.
+
+**A separate table, not a nullable email on `workspace_invitations`.**
+Overloading the existing table looked cheaper but breaks on two counts:
+`email` is `NOT NULL` with a `unique(workspace_id, email)` constraint, and
+`accepted_at` makes an invitation **single-use** — `AcceptWorkspaceInvitation
+Action` rejects anything already accepted. A shareable link is by
+definition multi-use, so reusing that row would have made `accepted_at`
+meaningless for one row type and leaked into everything reading
+`pendingInvitations()`: the Team roster, the dashboard count, and
+`get_workspace_info`. New `workspace_invite_links` (workspace, creator,
+64-char token, `uses` counter, `expires_at`, `revoked_at`) keeps the two
+mechanisms independent; nothing in the email-invitation path changed.
+
+**Bearer authority, so the caps are structural.** An open link is
+possession-based, which is why the design differs from an email
+invitation in three deliberate ways:
+
+- **Member only, with no role column at all.** The link cannot be
+  configured to grant Admin — not by validation that could later be
+  relaxed, but because no role is stored: `AcceptWorkspaceInviteLinkAction`
+  hardcodes `UserRole::MEMBER`. FR31-06's "assigned a default role" is the
+  supporting wording, and admins can still invite an admin by email. A
+  test asserts a joiner is never Admin or Owner.
+- **One active link per workspace.** Generating revokes any existing
+  active link in the same transaction, so a leaked URL is replaced rather
+  than accumulating alongside its successor.
+- **Expiry reuses `workspace.invitation_ttl_days`** (7), the same config
+  FR31-03 already drives, so both invite mechanisms expire on one setting.
+
+**Authorization** is the existing `WorkspacePolicy::invite` (Admin+) on
+generate and revoke. FR31-04 says "Workspace Owner"; the app has
+consistently let Admins invite since entry #23, and that superset is
+preserved rather than special-cased here.
+
+**Join flow.** `GET /join/{token}` renders a new `Join.vue` when the link
+is usable; revoked and expired links redirect to login with a distinct
+message, an unknown token 404s, and an existing member is sent to the
+dashboard without incrementing `uses`. `POST /join/{token}` joins a
+signed-in user directly, or registers a new one first. The registration
+form needs an **email field** — the one real difference from the email
+invitation, where the address is already known. An email that already has
+an account is rejected with guidance to sign in first, mirroring
+`showAccept`'s behaviour rather than silently attaching to the wrong
+account. Both routes carry the existing `throttle:invitation-accept`
+limiter.
+
+**Audit coverage.** Three new `AuditAction` cases —
+`invite_link.generated`, `invite_link.revoked`, `invite_link.joined` —
+categorised as **Team** alongside `member.*`, so the workspace audit
+filter list is unchanged (no new category appears in the UI) while the
+events are recorded and visible. A bearer link that can add members
+without an email trail is exactly the thing that needs to be auditable.
+
+**UI.** The existing invite page gained a "Shareable invite link" panel,
+gated on `canManageInviteLink`: generate when none exists; otherwise the
+URL with copy-to-clipboard, expiry date, use count, and Regenerate /
+Revoke. Copy uses the same `useClipboard` + toast pattern as the Team
+page's invite-link action from entry #23.
+
+**Tests**: new `WorkspaceInviteLinkTest` (18) — generation with a 7-day
+expiry and 64-char token; regeneration revokes the predecessor; Admin can
+generate, plain Member gets 403 on both generate and revoke; revoke works;
+a signed-in user joins as Member with `current_workspace_id` updated and
+`uses` incremented; the link is genuinely multi-use (3 joiners, 4 members);
+a new user registers through it; an existing email is rejected with a
+validation error and does not join; revoked and expired links are unusable
+via both GET and POST; an unknown token 404s; an existing member is
+redirected without consuming a use; the link never grants Admin or Owner;
+a link from another workspace joins only that workspace; generation,
+joining and revocation are all audited; and the invite page exposes the
+active link or `null`.
+
+**Verification**: `php artisan test --compact` → **507 passed, 2767
+assertions** (489 baseline + 18). `vendor/bin/pint --dirty --format agent`
+→ passed. `npm run lint:check` → clean. `npm run build` → built in 2.55s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** from entry #24 — unchanged and
+unrelated.
+
+**Status**: FR31-04 moves Not Started → Complete, and **FR31 is now
+Complete** — all seven sub-requirements satisfied.
+
+## Next recommended task (updated 2026-08-18, after entry #40)
+
+**Decide FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR05-03 / FR05-05** — meeting participants and a generated meeting
+  link; FR05-03 also unblocks assistant meeting tools.
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
 
 ## Superseded next-task note (after entry #35)
 

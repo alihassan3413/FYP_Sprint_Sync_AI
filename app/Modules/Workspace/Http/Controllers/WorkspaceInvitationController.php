@@ -21,10 +21,18 @@ use Inertia\Response;
 
 final class WorkspaceInvitationController
 {
-    public function create(Workspace $workspace): Response
+    public function create(Request $request, Workspace $workspace): Response
     {
+        $link = $workspace->activeInviteLink();
+
         return Inertia::render('workspace/invitations/Create', [
             'workspace' => ['name' => $workspace->name, 'slug' => $workspace->slug],
+            'inviteLink' => $link === null ? null : [
+                'url' => route('workspace.join.show', ['token' => $link->token]),
+                'expires_at' => $link->expires_at->toIso8601String(),
+                'uses' => $link->uses,
+            ],
+            'canManageInviteLink' => $request->user()->can('invite', $workspace),
         ]);
     }
 
