@@ -31,9 +31,9 @@ across all 35 FRs, applying the rule that an FR cannot stay Complete while a
 mandatory sub-requirement is unimplemented. Nothing regressed; the earlier
 numbers were graded per-FR against work-log headings, which flattered them.
 
-**The more useful number.** Of the 13 Partials, **seven (FR04, FR15, FR19,
-FR22, FR23, FR28, FR35) have no unblocked work left at all** — every remaining gap in
-them is Blocked by FR10–FR13. So **23 of 35 FRs need no further work before the
+**The more useful number.** Of the 13 Partials, **eight (FR04, FR06, FR15,
+FR19, FR22, FR23, FR28, FR35) have no unblocked work left at all** — every remaining gap in
+them is Blocked by FR10–FR13. So **24 of 35 FRs need no further work before the
 AI pipeline**, and the realistic pre-FR10 target is the unblocked list in entry
 #26, not all 13.
 
@@ -2097,9 +2097,9 @@ FR10–FR13, **DM** Design Mismatch.
 | FR02 Reset Password | 01 C, 02 C, 03 C, 04 **DM**, 05 **DM**, 06 **DM**, 07 C | Design Mismatch |
 | FR03 Logout | 01 C, 02 C, 03 C | **Complete** |
 | FR04 View Dashboard | 01 **C**, 02 C, 03 **C**, 04 **B**, 05 **C** | Partial (blocked-only) |
-| FR05 Schedule Meeting | 01 P, 02 C, 03 **DM**, 04 C, 05 **NS**, 06 C | Partial |
-| FR06 View Meeting Details | 01 **C**, 02 P, 03 **B** | Partial |
-| FR07 Join Meeting | 01 C, 02 C, 03 **DM** | **Complete** |
+| FR05 Schedule Meeting | 01 P, 02 C, 03 **C**, 04 C, 05 **C**, 06 C | Partial |
+| FR06 View Meeting Details | 01 **C**, 02 **C**, 03 **B** | Partial (blocked-only) |
+| FR07 Join Meeting | 01 C, 02 C, 03 **C** | **Complete** |
 | FR08 Edit Meeting | 01 C, 02 C | **Complete** |
 | FR09 Cancel Meeting | 01 C, 02 C | **Complete** |
 | FR10 Auto-Transcribe | 01–04 **NS** | Not Started |
@@ -4078,9 +4078,214 @@ unrelated.
 **Status**: FR31-04 moves Not Started → Complete, and **FR31 is now
 Complete** — all seven sub-requirements satisfied.
 
-## Next recommended task (updated 2026-08-18, after entry #40)
+### 41. FR05-03 / FR05-05 — explicit meeting participants and a generated join link
 
-**Decide FR02 and FR27 — the two Design Mismatches.**
+Resolves the participants design mismatch entry #26 recorded, rather than
+amending the report. Meetings previously had no participant concept at all:
+`ResolveMeetingRecipients` returned `project->members()`, so every project
+member was an implicit attendee and got every meeting email.
+
+**Participation is now explicit.** New `meeting_participants`
+(`meeting_id`, nullable `user_id`, `email`, nullable `name`) with a
+`unique(meeting_id, email)` constraint. Emails are normalised to trimmed
+lowercase through `MeetingParticipant::normaliseEmail()` before storage and
+comparison, so `Guest@Example.com` and `guest@example.com` cannot both be
+attached. No RSVP or status column was added — the report does not ask for
+one.
+
+**External participants are first-class.** A participant is either an
+existing user (`user_id` set) or an external invitee (`user_id = null`).
+The request takes two separate arrays — `participant_user_ids` and
+`participant_emails` — rather than one polymorphic list, which makes
+validation unambiguous and means **the server derives email and name from
+the user record** rather than trusting the client. `SyncMeetingParticipants`
+collapses an external email that matches a selected member into the single
+user row, and promotes a typed email to an internal participant when it
+belongs to a user who legitimately has project access.
+
+**Attachment by ID is authorisation-checked.** Both requests reject a
+`participant_user_ids` entry that is not a project member or workspace
+Admin+ — the same predicate `StoreTaskRequest` uses for assignees — so a
+user from another project or another workspace cannot be attached. Capped
+at 50 participants per meeting.
+
+**FR05-05: a SprintSync-controlled join link, not a conferencing
+integration.** Each meeting gets a 64-character `join_token` generated
+server-side by `Str::random(64)` inside the creation transaction, surfaced
+as `GET /meetings/join/{token}`. Sequential meeting IDs are never the
+authority. No Zoom, Meet, Teams or WebRTC was added; the optional
+`meeting_link` remains the eventual conferencing destination, and the
+SprintSync page is the controlled entry point that redirects to it. When no
+`meeting_link` exists the page shows an explicit "no conferencing link yet"
+state rather than failing or inventing a conference.
+
+**FR07 authorisation now turns on explicit participation.** For an
+authenticated visitor the join page requires being a listed participant
+**or** holding `update` on the meeting (organiser/manager); an unrelated
+project member gets 403, which is exactly what FR07-03 asks for and was
+previously impossible to express. An unauthenticated visitor holding the
+token gets a deliberately reduced page: title, time, duration and agenda
+only — **no project name, no workspace name, no participant list** —
+asserted by a test using `assertDontSee` on both names. The token is bearer
+authority to one meeting's join flow and grants no workspace or project
+access whatsoever.
+
+**Email recipients changed, and that is the point.** All three lifecycle
+actions now resolve recipients from participants:
+`ResolveMeetingRecipients::handle()` returns internal participants (minus
+the actor, preserving the existing convention) for email **and** in-app
+notifications, and the new `externals()` returns external participants for
+**email only** — they have no account, so no in-app notification and no
+preference row. Unrelated project members now receive nothing. Cancellation
+captures external emails *before* the delete, mirroring how the action
+already captured the other details.
+
+**Emails carry the SprintSync link, not the provider URL.** Per the
+requirement, `joinUrl` in all meeting mail is now
+`route('meetings.join', …)`. An existing test asserted the raw
+`https://meet.example.com/...` URL; it now asserts the SprintSync link
+*and* that the provider URL is absent.
+
+**FR06-02** is closed by the same work: `MeetingData` exposes
+`participants` and `join_url`, and the meeting details view lists each
+participant with name, email and a "Guest" marker for externals.
+
+**Backward compatibility — the deliberate choice.** The migration
+backfills a `join_token` for every existing meeting (they would otherwise
+be unjoinable) but **creates no participant rows**. Marking every project
+member as a historical participant would fabricate a record of who was
+invited to meetings that predate the feature, and would then email them on
+the next edit. Existing meetings therefore legitimately show an empty
+participant list until someone edits them — which is the least misleading
+option available.
+
+**Tests**: new `MeetingParticipantTest` (20) — creation with user and with
+external participants; case-insensitive collapse of a duplicate; repeated
+payload emails and malformed emails rejected with no meeting created;
+users from an unrelated project and from another workspace rejected by id;
+explicit participants emailed while unrelated members are not; a meeting
+with no participants emails nobody; tokens auto-generated, 64 chars and
+unique; the project page exposes participants and `join_url`; a listed
+participant and a manager can open the join page; an unrelated project
+member is forbidden; the external page hides project internals; unknown
+token 404s; update adds and removes participants; cancellation reaches
+internals and externals; and participants cascade on delete.
+
+Three existing suites needed updating because their assertions encoded the
+old implicit-membership behaviour: `MeetingNotificationTest` (11 payloads
+now pass explicit participants, and the join-URL assertion was inverted as
+described above) and two `NotificationPreferenceTest` cases. This is the
+requirement changing, not tests bent to fit the code — the whole point of
+FR05-03 is that project membership no longer implies an invitation.
+
+**Verification**: `php artisan test --compact` → **526 passed, 2859
+assertions** (507 baseline + 19). `vendor/bin/pint --dirty --format agent`
+→ passed (reformatted two files on first run; re-run clean).
+`npm run lint:check` → clean. `npm run build` → built in 2.62s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** from entry #24 — unchanged and
+unrelated.
+
+**Status**: FR05-03 moves Design Mismatch → **Complete** and FR05-05 Not
+Started → **Complete**; FR05 stays Partial only on FR05-01 (scheduling is
+reached from the project page, not the dashboard). **FR06-02 → Complete**,
+leaving FR06 blocked-only on FR06-03's summary statuses. **FR07-03 moves
+Design Mismatch → Complete**, so FR07 is Complete on its own terms rather
+than by mismatch.
+
+### 42. `list_meetings` — read-only meeting discovery for the assistant
+
+The read tool that precedes `schedule_meeting`, mirroring how
+`list_projects` (entry #31) preceded `create_task`. The Assistant module
+stays outside the FR table, so counts are unchanged.
+
+**Scoping reuses the existing predicates, none restated.** Meetings are
+drawn from `Workspace::accessibleProjectsFor($user)`, which matches what
+the project page already shows: any project member sees that project's
+meetings. Deliberately *not* narrowed to entry #41's participant rule —
+that rule governs **joining** a meeting, not seeing that it exists, and
+tightening discovery here would contradict the UI. Upcoming/past filtering
+uses the existing `Meeting::scopeUpcoming()` / `scopePast()`, so the
+SQLite date arithmetic lives in one place still.
+
+**A `project_id` filter cannot widen access.** It is intersected with the
+accessible set before use; a project that exists but is inaccessible
+returns the same `project_not_found` error as one that does not exist, so
+the tool cannot be used to probe which project IDs are real — the same
+non-leaking shape `create_task` uses.
+
+**Two things it deliberately does not return.**
+
+- **No participant emails.** Only `participant_count`. Meetings can now
+  carry *external* participants (entry #41) — people outside the
+  workspace entirely — and replaying their addresses into the model's
+  context, and from there into `assistant_messages` history, would be a
+  new class of exposure that no other tool creates. The count answers
+  "how big is this meeting" without the PII.
+- **No join link.** `Meeting::join_token` is bearer authority to a
+  meeting's join flow (entry #41). Emitting it would persist a live
+  credential in chat history, redacted only after
+  `tool_result_days` (entry #35). The tool returns the meeting's
+  `?meeting={id}` deep link instead, where the real join button lives and
+  normal authorization applies. A test asserts neither the token nor a
+  participant email appears anywhere in the serialised result.
+
+**Untrusted text is scrubbed**, per entry #34: meeting titles and agendas
+are user-controlled, so they pass through `UntrustedText::inline()` /
+`block()` (agenda truncated to 160 characters), with a test using a
+hostile title containing a newline and `<|im_start|>`.
+
+Bounded at 25 results with `total` / `returned` / `truncated`, ordered
+ascending for upcoming and descending for past.
+
+**Tests**: new `AssistantListMeetingsToolTest` (15) — upcoming by default,
+past and all scopes, title search, project filter; meetings in
+inaccessible projects and other workspaces never appear; an unassigned
+workspace member sees nothing; an inaccessible `project_id` is rejected
+without leaking existence; participant emails, join tokens and a
+`join_url` key are all absent; a hostile title and agenda are scrubbed;
+the tool is read-only and offered to any workspace member but not without
+a workspace; an invalid `scope` fails schema validation and a stray
+`workspace_id` argument is dropped.
+
+**Verification**: `php artisan test --compact` → **541 passed, 2890
+assertions** (526 baseline + 15). `vendor/bin/pint --dirty --format agent`
+→ passed. `npm run lint:check` → clean. `npm run build` → built in 2.92s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** from entry #24 — unchanged and
+unrelated. No frontend file was modified.
+
+**Tool inventory is now seven**: `get_workspace_info`, `list_projects` and
+`list_meetings` (read-only, auto-run); `create_workspace`, `invite_user`,
+`create_project` and `create_task` (write, confirmation-gated).
+
+## Next recommended task (updated 2026-08-18, after entry #42)
+
+**`schedule_meeting` — the assistant's fifth write tool.**
+
+`list_meetings` (entry #42) and `list_projects` now give the model real
+project IDs, and entry #41 gave meetings an unambiguous participant
+contract. Reuse the entry #32 pattern exactly: `requiresConfirmation()
+=> true`, `project_id` re-resolved through `accessibleProjectsFor()`,
+`MeetingPolicy::create` as the gate, delegation to `CreateMeetingAction`,
+and a `summarizeTool()` case **in the same change** — the standing rule
+since entry #32.
+
+Two decisions specific to this tool:
+
+- **Participants as emails, not user IDs** — the entry #32 reasoning
+  applies identically (a hallucinated integer is plausibly a valid user
+  ID belonging to the wrong person; a hallucinated email fails loudly),
+  and `StoreMeetingRequest` already accepts `participant_emails`
+  alongside `participant_user_ids`, so the tool can pass emails straight
+  through and let the existing validator resolve them.
+- **The confirmation card must show the participant list**, since
+  scheduling a meeting emails external people who may not be in the
+  workspace at all. That is the highest-consequence write tool so far.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
 
 These are the only remaining items that need *your* call rather than code,
 and they now gate a meaningful slice of the FR table. Both are cases where
@@ -4097,8 +4302,6 @@ the implementation is better engineering than the report:
 
 Once decided, the remaining *unblocked* build work is:
 
-- **FR05-03 / FR05-05** — meeting participants and a generated meeting
-  link; FR05-03 also unblocks assistant meeting tools.
 - **FR16-02** — realtime propagation (new infrastructure).
 - **FR20-02** — "current sprint" (needs a sprint entity).
 

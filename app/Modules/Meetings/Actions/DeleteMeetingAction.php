@@ -30,6 +30,7 @@ final class DeleteMeetingAction
     public function handle(Meeting $meeting, User $actor): void
     {
         $recipients = $this->resolveMeetingRecipients->handle($meeting, $actor);
+        $externalEmails = $this->resolveMeetingRecipients->externals($meeting)->pluck('email');
         $project = $meeting->project;
         $projectName = $project->name;
         $meetingTitle = $meeting->title;
@@ -47,15 +48,16 @@ final class DeleteMeetingAction
 
         $meeting->delete();
 
-        $this->notify($recipients, $projectName, $meetingTitle, $scheduledAt, $url, $actor);
+        $this->notify($recipients, $externalEmails, $projectName, $meetingTitle, $scheduledAt, $url, $actor);
     }
 
     /**
      * @param  Collection<int, User>  $recipients
+     * @param  Collection<int, string>  $externalEmails
      */
-    private function notify(Collection $recipients, string $projectName, string $meetingTitle, string $scheduledAt, string $url, User $actor): void
+    private function notify(Collection $recipients, Collection $externalEmails, string $projectName, string $meetingTitle, string $scheduledAt, string $url, User $actor): void
     {
-        if ($recipients->isEmpty()) {
+        if ($recipients->isEmpty() && $externalEmails->isEmpty()) {
             return;
         }
 
@@ -64,6 +66,15 @@ final class DeleteMeetingAction
 
             foreach ($emailRecipients as $recipient) {
                 Mail::to($recipient->email)->queue(new MeetingCancelledMail(
+                    projectName: $projectName,
+                    meetingTitle: $meetingTitle,
+                    scheduledAt: $scheduledAt,
+                    cancelledByName: $actor->name,
+                ));
+            }
+
+            foreach ($externalEmails as $email) {
+                Mail::to($email)->queue(new MeetingCancelledMail(
                     projectName: $projectName,
                     meetingTitle: $meetingTitle,
                     scheduledAt: $scheduledAt,

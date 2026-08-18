@@ -373,6 +373,7 @@ function onDeleted() {
         v-if="canManageMeetings"
         :open="isCreateMeetingModalOpen"
         :project-id="project.id"
+        :participant-options="projectMembers"
         @update:open="(value) => (isCreateMeetingModalOpen = value)"
     />
 
@@ -380,6 +381,7 @@ function onDeleted() {
         :open="meetingModalTarget !== null"
         :meeting="meetingModalTarget"
         :can-manage="canManageMeetings"
+        :participant-options="projectMembers"
         @update:open="(value) => !value && (meetingModalTarget = null)"
     />
 

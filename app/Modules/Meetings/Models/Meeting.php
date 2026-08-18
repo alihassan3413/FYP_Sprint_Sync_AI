@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -22,6 +23,7 @@ use Illuminate\Support\Str;
  * @property Carbon $scheduled_at
  * @property int $duration_minutes
  * @property string|null $meeting_link
+ * @property string|null $join_token
  * @property int $project_id
  * @property int $workspace_id
  * @property int $created_by
@@ -37,6 +39,7 @@ final class Meeting extends Model
         'scheduled_at',
         'duration_minutes',
         'meeting_link',
+        'join_token',
         'project_id',
         'workspace_id',
         'created_by',
@@ -63,6 +66,21 @@ final class Meeting extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(MeetingParticipant::class);
+    }
+
+    public function hasParticipant(User $user): bool
+    {
+        return $this->participants()->where('user_id', $user->id)->exists();
+    }
+
+    public function joinUrl(): string
+    {
+        return route('meetings.join', ['token' => $this->join_token]);
     }
 
     public function hasValidJoinLink(): bool

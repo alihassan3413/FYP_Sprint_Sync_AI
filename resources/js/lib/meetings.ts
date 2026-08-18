@@ -2,6 +2,14 @@
  * Meeting-related types and pure helpers, mirroring `lib/tasks.ts`.
  */
 
+export interface MeetingParticipant {
+    id: number;
+    user_id: number | null;
+    email: string;
+    name: string | null;
+    is_external: boolean;
+}
+
 export interface Meeting {
     id: number;
     title: string;
@@ -14,6 +22,8 @@ export interface Meeting {
     workspace_id: number;
     created_by: number;
     creator_name: string | null;
+    join_url: string | null;
+    participants: MeetingParticipant[];
     /** ISO datetime */
     created_at: string;
     /** ISO datetime */

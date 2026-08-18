@@ -128,6 +128,7 @@ declare module 'vue' {
     Layout: typeof import('./../layouts/settings/Layout.vue')['default']
     MeetingActionsMenu: typeof import('./../components/meetings/MeetingActionsMenu.vue')['default']
     MeetingCard: typeof import('./../components/meetings/MeetingCard.vue')['default']
+    MeetingParticipantPicker: typeof import('./../components/meetings/MeetingParticipantPicker.vue')['default']
     MeetingsList: typeof import('./../components/meetings/MeetingsList.vue')['default']
     MemberActionsMenu: typeof import('./../components/team/MemberActionsMenu.vue')['default']
     MemberCell: typeof import('./../components/team/MemberCell.vue')['default']

@@ -163,6 +163,7 @@ final class NotificationPreferenceTest extends TestCase
                 'title' => 'Sprint planning',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => [$this->assignee->id],
             ])
             ->assertRedirect();
 
@@ -187,6 +188,7 @@ final class NotificationPreferenceTest extends TestCase
                 'title' => 'Sprint planning',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => [$this->assignee->id],
             ])
             ->assertRedirect();
 

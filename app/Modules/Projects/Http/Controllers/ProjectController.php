@@ -69,7 +69,7 @@ final class ProjectController
                 ->map(TaskData::fromModel(...))
                 ->values(),
             'meetings' => $project->meetings()
-                ->with('creator:id,name,email')
+                ->with(['creator:id,name,email', 'participants'])
                 ->orderBy('scheduled_at')
                 ->get()
                 ->map(MeetingData::fromModel(...))

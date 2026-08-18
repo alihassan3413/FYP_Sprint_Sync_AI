@@ -26,5 +26,11 @@ final class StoreMeetingData extends Data
 
         #[Rule(['nullable', 'url', 'max:2048'])]
         public ?string $meeting_link,
+
+        /** @var array<int, int> */
+        public array $participant_user_ids = [],
+
+        /** @var array<int, string> */
+        public array $participant_emails = [],
     ) {}
 }

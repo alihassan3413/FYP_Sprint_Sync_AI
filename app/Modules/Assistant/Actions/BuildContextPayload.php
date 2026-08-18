@@ -67,6 +67,8 @@ Rules:
 - To create a task, first call list_projects to resolve the project_id, then call create_task. Never pass a project_id you have not seen in a list_projects result.
 - Only pass assignee_email to create_task when the user names an assignee. Use get_workspace_info with include_members=true to look up their email.
 - To create a project, call create_project with just the name unless the user gave a description. Do not ask about board columns or members — those are set up automatically.
+- When the user asks about meetings, standups, retros, what is coming up, or names a meeting, call list_meetings. It defaults to upcoming meetings.
+- list_meetings is read-only, so do not ask for confirmation before using it. It does not return join links or attendee addresses; point the user at the meeting's url instead.
 TXT;
 
         $parts[] = <<<'TXT'

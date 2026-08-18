@@ -12,6 +12,7 @@ use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
+use App\Modules\Assistant\Tools\ListMeetingsTool;
 use App\Modules\Assistant\Tools\ListProjectsTool;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use App\Support\Modules\ModuleServiceProvider;
@@ -31,6 +32,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         InvitationTool::class,
         GetWorkspaceInfoTool::class,
         ListProjectsTool::class,
+        ListMeetingsTool::class,
         CreateProjectTool::class,
         CreateTaskTool::class,
     ];

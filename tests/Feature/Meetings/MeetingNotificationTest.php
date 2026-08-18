@@ -61,6 +61,14 @@ final class MeetingNotificationTest extends TestCase
         $this->project->members()->attach($this->projectMember->id, ['role' => ProjectRole::MEMBER->value]);
     }
 
+    /**
+     * @return array<int, int>
+     */
+    private function participantIds(): array
+    {
+        return [$this->manager->id, $this->projectMember->id];
+    }
+
     private function meetingRoute(string $name, ?Meeting $meeting = null, array $extra = []): string
     {
         $params = array_merge(['workspace' => $this->workspace, 'project' => $this->project], $extra);
@@ -79,6 +87,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Sprint planning',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -97,15 +106,20 @@ final class MeetingNotificationTest extends TestCase
                 'scheduled_at' => '2026-09-05 14:00:00',
                 'duration_minutes' => 45,
                 'meeting_link' => 'https://meet.example.com/design-review',
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
+
+        $meeting = Meeting::query()->where('title', 'Design review')->firstOrFail();
 
         Mail::assertQueued(MeetingScheduledMail::class, fn ($mail) => $mail->projectName === $this->project->name
             && $mail->meetingTitle === 'Design review'
             && $mail->agenda === 'Walk through the new mockups.'
             && $mail->durationMinutes === 45
-            && $mail->joinUrl === 'https://meet.example.com/design-review'
+            && $mail->joinUrl === route('meetings.join', ['token' => $meeting->join_token])
             && $mail->scheduledByName === $this->owner->name);
+
+        Mail::assertQueued(MeetingScheduledMail::class, fn ($mail) => $mail->joinUrl !== 'https://meet.example.com/design-review');
     }
 
     public function test_the_meeting_creator_is_not_emailed_their_own_meeting(): void
@@ -115,6 +129,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Manager scheduled',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -125,7 +140,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_updating_meaningful_meeting_details_emails_the_project_members(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create([
             'title' => 'Old title',
             'description' => null,
             'scheduled_at' => '2026-09-01 10:00:00',
@@ -138,6 +153,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'New title',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -147,7 +163,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_updating_a_meeting_without_meaningful_changes_does_not_email(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create([
             'title' => 'Stable title',
             'description' => null,
             'scheduled_at' => '2026-09-01 10:00:00',
@@ -160,6 +176,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Stable title',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -168,7 +185,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_the_meeting_editor_is_not_emailed_their_own_update(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create([
             'title' => 'Old title',
             'description' => null,
             'meeting_link' => null,
@@ -179,6 +196,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'New title',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -189,7 +207,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_deleting_a_meeting_emails_a_cancellation_to_the_project_members(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create(['title' => 'Retro']);
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create(['title' => 'Retro']);
 
         $this->actingAs($this->owner)
             ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
@@ -201,7 +219,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_the_meeting_deleter_is_not_emailed_their_own_cancellation(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create();
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create();
 
         $this->actingAs($this->manager)
             ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
@@ -214,7 +232,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_unassigned_workspace_members_are_never_notified(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create([
             'description' => null,
             'meeting_link' => null,
         ]);
@@ -224,6 +242,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Rescheduled',
                 'scheduled_at' => '2026-10-01 10:00:00',
                 'duration_minutes' => 60,
+                'participant_user_ids' => $this->participantIds(),
             ]);
 
         $this->actingAs($this->owner)
@@ -241,6 +260,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Dedup check',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -259,6 +279,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Sprint planning',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -270,7 +291,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_updating_a_meeting_creates_in_app_notifications(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create([
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create([
             'title' => 'Old title',
             'description' => null,
             'meeting_link' => null,
@@ -281,6 +302,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'New title',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 
@@ -293,7 +315,7 @@ final class MeetingNotificationTest extends TestCase
 
     public function test_cancelling_a_meeting_creates_in_app_notifications(): void
     {
-        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->create(['title' => 'Retro']);
+        $meeting = Meeting::factory()->forProject($this->project)->createdBy($this->owner)->withParticipants($this->manager, $this->projectMember)->create(['title' => 'Retro']);
 
         $this->actingAs($this->owner)
             ->delete($this->meetingRoute('workspace.projects.meetings.destroy', $meeting))
@@ -311,6 +333,7 @@ final class MeetingNotificationTest extends TestCase
                 'title' => 'Sprint planning',
                 'scheduled_at' => '2026-09-01 10:00:00',
                 'duration_minutes' => 30,
+                'participant_user_ids' => $this->participantIds(),
             ])
             ->assertRedirect();
 

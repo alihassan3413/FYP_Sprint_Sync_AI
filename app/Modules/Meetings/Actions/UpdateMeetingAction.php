@@ -14,6 +14,7 @@ use App\Notifications\MeetingUpdatedNotification;
 use App\Notifications\NotificationChannel;
 use App\Notifications\NotificationPreferenceGate;
 use App\Notifications\NotificationType;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -27,19 +28,31 @@ final class UpdateMeetingAction
         private readonly ResolveMeetingRecipients $resolveMeetingRecipients,
         private readonly NotificationPreferenceGate $preferences,
         private readonly RecordAuditLogAction $auditLogger,
+        private readonly SyncMeetingParticipants $syncParticipants,
     ) {}
 
     public function handle(Meeting $meeting, User $actor, StoreMeetingData $data): Meeting
     {
-        $meeting->update([
-            'title' => $data->title,
-            'description' => $data->description,
-            'scheduled_at' => $data->scheduled_at,
-            'duration_minutes' => $data->duration_minutes,
-            'meeting_link' => $data->meeting_link,
-        ]);
+        $participantChange = DB::transaction(function () use ($meeting, $data) {
+            $meeting->update([
+                'title' => $data->title,
+                'description' => $data->description,
+                'scheduled_at' => $data->scheduled_at,
+                'duration_minutes' => $data->duration_minutes,
+                'meeting_link' => $data->meeting_link,
+            ]);
 
-        if ($meeting->wasChanged(self::NOTIFIABLE_FIELDS)) {
+            return $this->syncParticipants->handle(
+                $meeting,
+                $meeting->project,
+                $data->participant_user_ids,
+                $data->participant_emails,
+            );
+        });
+
+        $participantsChanged = $participantChange['added']->isNotEmpty() || $participantChange['removed']->isNotEmpty();
+
+        if ($meeting->wasChanged(self::NOTIFIABLE_FIELDS) || $participantsChanged) {
             $this->auditLogger->handle(
                 $meeting->project->workspace,
                 $meeting->project,
@@ -60,7 +73,7 @@ final class UpdateMeetingAction
     {
         $recipients = $this->resolveMeetingRecipients->handle($meeting, $actor);
 
-        if ($recipients->isEmpty()) {
+        if ($recipients->isEmpty() && $this->resolveMeetingRecipients->externals($meeting)->isEmpty()) {
             return;
         }
 
@@ -74,7 +87,19 @@ final class UpdateMeetingAction
                     scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
                     durationMinutes: $meeting->duration_minutes,
                     agenda: $meeting->description,
-                    joinUrl: $meeting->hasValidJoinLink() ? $meeting->meeting_link : null,
+                    joinUrl: $meeting->joinUrl(),
+                    updatedByName: $actor->name,
+                ));
+            }
+
+            foreach ($this->resolveMeetingRecipients->externals($meeting) as $external) {
+                Mail::to($external->email)->queue(new MeetingUpdatedMail(
+                    projectName: $meeting->project->name,
+                    meetingTitle: $meeting->title,
+                    scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                    durationMinutes: $meeting->duration_minutes,
+                    agenda: $meeting->description,
+                    joinUrl: $meeting->joinUrl(),
                     updatedByName: $actor->name,
                 ));
             }

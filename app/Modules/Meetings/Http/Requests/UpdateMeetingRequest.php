@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Meetings\Http\Requests;
 
+use App\Models\User;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Projects\Models\Project;
+use App\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdateMeetingRequest extends FormRequest
@@ -26,7 +29,46 @@ final class UpdateMeetingRequest extends FormRequest
             'scheduled_at' => ['required', 'date'],
             'duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
             'meeting_link' => ['nullable', 'url', 'max:2048'],
+            'participant_user_ids' => ['nullable', 'array', 'max:'.StoreMeetingRequest::MAX_PARTICIPANTS],
+            'participant_user_ids.*' => ['integer', 'distinct'],
+            'participant_emails' => ['nullable', 'array', 'max:'.StoreMeetingRequest::MAX_PARTICIPANTS],
+            'participant_emails.*' => ['email:rfc', 'max:255', 'distinct:ignore_case'],
         ];
+    }
+
+    public function withValidator(mixed $validator): void
+    {
+        $validator->after(function ($validator) {
+            $userIds = (array) $this->input('participant_user_ids', []);
+
+            if ($userIds === []) {
+                return;
+            }
+
+            $project = $this->project();
+
+            $assignable = User::query()
+                ->whereIn('id', $userIds)
+                ->get()
+                ->filter(fn (User $user) => $project->workspace->userHasAtLeast($user, UserRole::ADMIN)
+                    || $project->hasMember($user))
+                ->pluck('id')
+                ->all();
+
+            foreach ($userIds as $index => $userId) {
+                if (! in_array((int) $userId, $assignable, true)) {
+                    $validator->errors()->add(
+                        "participant_user_ids.{$index}",
+                        'That person does not have access to this project.',
+                    );
+                }
+            }
+        });
+    }
+
+    public function project(): Project
+    {
+        return $this->route('project');
     }
 
     public function meeting(): Meeting
@@ -36,6 +78,12 @@ final class UpdateMeetingRequest extends FormRequest
 
     public function toDTO(): StoreMeetingData
     {
-        return StoreMeetingData::from($this->validated());
+        $validated = $this->validated();
+
+        return StoreMeetingData::from([
+            ...$validated,
+            'participant_user_ids' => array_map('intval', $validated['participant_user_ids'] ?? []),
+            'participant_emails' => $validated['participant_emails'] ?? [],
+        ]);
     }
 }

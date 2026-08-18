@@ -20,7 +20,7 @@ const hasJoinLink = computed(() => isValidMeetingLink(props.meeting.meeting_link
 
 <template>
     <div
-        class="bg-card flex cursor-pointer flex-col gap-3 rounded-lg border p-4 shadow-sm transition-colors hover:border-foreground/15 sm:flex-row sm:items-center sm:justify-between"
+        class="bg-card hover:border-foreground/15 flex cursor-pointer flex-col gap-3 rounded-lg border p-4 shadow-sm transition-colors sm:flex-row sm:items-center sm:justify-between"
         :class="past && 'opacity-70'"
         @click="emit('open', meeting)"
     >
@@ -48,7 +48,16 @@ const hasJoinLink = computed(() => isValidMeetingLink(props.meeting.meeting_link
         </div>
 
         <div class="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-            <Button v-if="hasJoinLink" as="a" :href="meeting.meeting_link!" target="_blank" rel="noopener noreferrer" size="sm" class="gap-1.5" @click.stop>
+            <Button
+                v-if="hasJoinLink"
+                as="a"
+                :href="meeting.meeting_link!"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="sm"
+                class="gap-1.5"
+                @click.stop
+            >
                 <Video class="size-3.5" />
                 Join Meeting
             </Button>

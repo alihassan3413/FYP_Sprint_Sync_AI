@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { ParticipantOption } from '@/components/meetings/MeetingParticipantPicker.vue';
 import { Loader2 } from 'lucide-vue-next';
 
 const props = defineProps<{
     open: boolean;
     projectId: number;
+    participantOptions?: ParticipantOption[];
 }>();
 
 const emit = defineEmits<{
@@ -19,12 +21,16 @@ const form = useForm<{
     scheduled_at: string;
     duration_minutes: string;
     meeting_link: string;
+    participant_user_ids: number[];
+    participant_emails: string[];
 }>({
     title: '',
     description: '',
     scheduled_at: '',
     duration_minutes: '30',
     meeting_link: '',
+    participant_user_ids: [],
+    participant_emails: [],
 });
 
 function submit() {
@@ -106,6 +112,14 @@ function handleClose(value: boolean) {
             </div>
 
             <p class="text-muted-foreground text-xs">Meeting link is optional — paste a Zoom, Meet, or Teams URL.</p>
+
+            <MeetingParticipantPicker
+                v-model:user-ids="form.participant_user_ids"
+                v-model:emails="form.participant_emails"
+                :options="participantOptions ?? []"
+                :user-ids-error="form.errors.participant_user_ids"
+                :emails-error="form.errors.participant_emails"
+            />
         </form>
 
         <template #footer>

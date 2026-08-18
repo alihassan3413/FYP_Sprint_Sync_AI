@@ -6,6 +6,7 @@ namespace App\Modules\Meetings\Actions;
 
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Meetings\Models\MeetingParticipant;
 use Illuminate\Support\Collection;
 
 final class ResolveMeetingRecipients
@@ -15,10 +16,22 @@ final class ResolveMeetingRecipients
      */
     public function handle(Meeting $meeting, User $actor): Collection
     {
-        return $meeting->project->members()
+        return $meeting->participants()
+            ->internal()
+            ->with('user')
             ->get()
+            ->map(fn (MeetingParticipant $participant) => $participant->user)
+            ->filter()
             ->unique('id')
-            ->reject(fn (User $member) => $member->id === $actor->id)
+            ->reject(fn (User $user) => $user->id === $actor->id)
             ->values();
+    }
+
+    /**
+     * @return Collection<int, MeetingParticipant>
+     */
+    public function externals(Meeting $meeting): Collection
+    {
+        return $meeting->participants()->external()->get()->values();
     }
 }

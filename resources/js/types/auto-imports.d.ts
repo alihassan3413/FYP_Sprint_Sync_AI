@@ -137,7 +137,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { Meeting } from '../lib/meetings'
+  export type { MeetingParticipant, Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
   export type { MemberStatus, MemberRole, WorkspaceRoleOption, Member } from '../lib/members'

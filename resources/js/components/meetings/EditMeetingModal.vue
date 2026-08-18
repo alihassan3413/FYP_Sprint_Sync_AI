@@ -1,12 +1,22 @@
 <script setup lang="ts">
+import type { ParticipantOption } from '@/components/meetings/MeetingParticipantPicker.vue';
 import { CalendarClock, Clock, Loader2, User as UserIcon, Video } from 'lucide-vue-next';
 
-import { formatDuration, formatMeetingDate, formatMeetingTime, isPastMeeting, isValidMeetingLink, toDateTimeLocalValue, type Meeting } from '@/lib/meetings';
+import {
+    formatDuration,
+    formatMeetingDate,
+    formatMeetingTime,
+    isPastMeeting,
+    isValidMeetingLink,
+    toDateTimeLocalValue,
+    type Meeting,
+} from '@/lib/meetings';
 
 const props = defineProps<{
     open: boolean;
     meeting: Meeting | null;
     canManage: boolean;
+    participantOptions?: ParticipantOption[];
 }>();
 
 const emit = defineEmits<{
@@ -22,12 +32,16 @@ const form = useForm<{
     scheduled_at: string;
     duration_minutes: string;
     meeting_link: string;
+    participant_user_ids: number[];
+    participant_emails: string[];
 }>({
     title: '',
     description: '',
     scheduled_at: '',
     duration_minutes: '30',
     meeting_link: '',
+    participant_user_ids: [],
+    participant_emails: [],
 });
 
 watch(
@@ -39,6 +53,8 @@ watch(
         form.scheduled_at = meeting ? toDateTimeLocalValue(meeting.scheduled_at) : '';
         form.duration_minutes = meeting ? String(meeting.duration_minutes) : '30';
         form.meeting_link = meeting?.meeting_link ?? '';
+        form.participant_user_ids = (meeting?.participants ?? []).filter((p) => p.user_id !== null).map((p) => p.user_id as number);
+        form.participant_emails = (meeting?.participants ?? []).filter((p) => p.is_external).map((p) => p.email);
     },
     { immediate: true },
 );
@@ -67,7 +83,15 @@ function handleClose(value: boolean) {
 <template>
     <AppModal :open="open" :title="canManage ? 'Edit meeting' : 'Meeting details'" size="md" @update:open="handleClose">
         <form v-if="meeting && canManage" id="edit-meeting-form" class="space-y-5 pt-2" @submit.prevent="submit">
-            <AppFormInput id="edit-meeting-title" v-model="form.title" label="Title" :error="form.errors.title" required autofocus autocomplete="off" />
+            <AppFormInput
+                id="edit-meeting-title"
+                v-model="form.title"
+                label="Title"
+                :error="form.errors.title"
+                required
+                autofocus
+                autocomplete="off"
+            />
 
             <div class="grid gap-1.5">
                 <Label for="edit-meeting-description" class="text-sm font-medium">
@@ -107,6 +131,14 @@ function handleClose(value: boolean) {
             </div>
 
             <p class="text-muted-foreground text-xs">Meeting link is optional — paste a Zoom, Meet, or Teams URL.</p>
+
+            <MeetingParticipantPicker
+                v-model:user-ids="form.participant_user_ids"
+                v-model:emails="form.participant_emails"
+                :options="participantOptions ?? []"
+                :user-ids-error="form.errors.participant_user_ids"
+                :emails-error="form.errors.participant_emails"
+            />
         </form>
 
         <div v-else-if="meeting" class="space-y-4 pt-2">
@@ -141,7 +173,15 @@ function handleClose(value: boolean) {
             <div>
                 <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Meeting link</p>
                 <div class="mt-1.5">
-                    <Button v-if="hasJoinLink" as="a" :href="meeting.meeting_link!" target="_blank" rel="noopener noreferrer" size="sm" class="gap-1.5">
+                    <Button
+                        v-if="hasJoinLink"
+                        as="a"
+                        :href="meeting.meeting_link!"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        size="sm"
+                        class="gap-1.5"
+                    >
                         <Video class="size-3.5" />
                         Join Meeting
                     </Button>
@@ -156,6 +196,21 @@ function handleClose(value: boolean) {
                     <span class="text-sm">{{ meeting.creator_name ?? 'Unknown' }}</span>
                 </div>
             </div>
+        </div>
+
+        <div v-if="meeting && !canManage && meeting.participants.length > 0" class="grid gap-2 pt-4">
+            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Participants</p>
+
+            <ul class="divide-border/60 divide-y">
+                <li v-for="participant in meeting.participants" :key="participant.id" class="flex items-center justify-between gap-3 py-2">
+                    <div class="min-w-0">
+                        <p class="text-foreground truncate text-[13px]">{{ participant.name ?? participant.email }}</p>
+                        <p v-if="participant.name" class="text-muted-foreground truncate text-[11px]">{{ participant.email }}</p>
+                    </div>
+
+                    <span v-if="participant.is_external" class="text-muted-foreground shrink-0 text-[10.5px] uppercase">Guest</span>
+                </li>
+            </ul>
         </div>
 
         <template #footer>
