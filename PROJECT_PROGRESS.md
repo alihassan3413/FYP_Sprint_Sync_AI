@@ -4455,7 +4455,290 @@ assertions** (566 → 587, +21: 9 `UserTimeTest`, 5 `TimezoneTest`, 5
 --noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
 from entry #24, unchanged and unrelated.
 
-## Next recommended task (updated 2026-08-18, after entry #44)
+### 45. `edit_meeting` — partial edits to an existing meeting
+
+The second assistant tool that emails people **outside** the workspace, and
+the first that can remove someone from a meeting. The Assistant module
+stays outside the FR table, so counts are unchanged.
+
+**Nothing from the Meetings domain was reimplemented.** The tool resolves,
+authorises and merges, then hands a `StoreMeetingData` to
+`UpdateMeetingAction`. Participant reconciliation, update emails to
+internal *and* external recipients, in-app notifications, the
+`meeting.updated` audit entry and the no-op suppression all stay owned by
+Meetings.
+
+**Only `meeting_id` identifies the target — the model never supplies a
+workspace or project.** Resolution runs
+`Meeting::whereKey($id)->whereIn('project_id', $workspace->accessibleProjectsFor($user)->select('projects.id'))`,
+where `$workspace` comes from the conversation, not the user's current
+workspace. A meeting in another workspace, another tenant, or a project the
+user cannot reach returns the identical `meeting_not_found` code and
+message as a meeting ID that does not exist — asserted by comparing the two
+error payloads field for field, so the tool cannot be used to probe for
+meeting IDs. `MeetingPolicy::update` is then re-checked at execution time,
+so a plain project member is refused even though the meeting resolved.
+
+**Partial edits, by construction.** `UpdateMeetingAction` takes a full DTO
+and overwrites every field, so the tool merges supplied values over current
+ones. Only keys the model actually sent are validated (`sometimes` rules),
+which is what makes "omitted means unchanged" real rather than a
+convention. Two consequences worth stating: an explicit `description: null`
+clears the agenda, which is the useful reading of an explicit null; and an
+edit that does not mention `participant_emails` re-sends the meeting's
+**current** participant emails rather than an empty list, so an unrelated
+retitle cannot silently uninvite everyone. `meeting_link` is preserved the
+same way — the assistant never nulls a conferencing URL somebody set by
+hand, and a test pins that.
+
+**Timezone reuses entry #44 and adds no second conversion path.**
+`scheduled_at` goes through `UserTime::toUtc($value, $user->timezone)`,
+identical to `UpdateMeetingRequest::toDTO()`. Storage stays UTC. The
+confirmation card renders through `UserTime::format()`, so a Karachi user
+moving a 10:00 UTC meeting sees
+`September 1, 2026 3:00 PM (PKT) → September 2, 2026 6:30 PM (PKT)` rather
+than a bare UTC string.
+
+**The confirmation card is the whole safety story for participants.**
+Because an edit re-emails everyone and can remove people, a generic card
+was not acceptable. `confirmationDetails()` returns server-derived context:
+project, current title, `old → new` for the title, the local `when` with a
+zone label (with `old → new` when it moves), duration, agenda and link when
+those change, and — when `participant_emails` is supplied — the **complete
+resulting list** plus separate `adding` and `removing` lines. When the
+participant list is untouched the card instead states how many existing
+participants will be emailed, because an edit notifies them regardless.
+Details are computed at emit time and never persisted; only `args` are
+stored on the pending message.
+
+**No-op edits are the domain's decision, not the tool's.**
+`UpdateMeetingAction` already gates audit and notification on
+`wasChanged(NOTIFIABLE_FIELDS) || $participantsChanged`. The tool computes
+the same answer independently, but only to set `changed` in the result and
+to flag "Nothing changes — nobody will be emailed." on the card; suppression
+itself remains the action's. A confirmed no-op returns `success: true,
+changed: false` and queues nothing, asserted with
+`Mail::assertNothingQueued()` and `Notification::assertNothingSent()`. A
+call carrying no editable field at all is refused up front with
+`nothing_to_change`, which is a clearer signal to the model than a silent
+success.
+
+**Thin result shape.** Meeting id, title, project id/name, ISO time,
+duration, participant count, deep link, and `changed`. A test JSON-encodes
+the whole result and asserts the 64-character join token, the provider URL
+and every participant email are absent.
+
+**Tests**: 33 in `AssistantEditMeetingToolTest` — registration and
+confirmation-gating, admin and project-manager allowed, plain member
+refused, workspace-outsider and cross-tenant refused, conversation
+workspace beating the user's current workspace, omitted fields preserved,
+timezone conversion plus the null-timezone fallback, participant add and
+remove in one edit, an email belonging to a project member promoted to an
+internal participant, external participants emailed, no-op suppression,
+join-token and provider-URL absence, argument-tampering rejection, and
+schema-validation failures.
+
+**One testing limitation, unchanged from entry #43.** The reject path is
+exercised at the collaborator level rather than through the SSE endpoint:
+`EventStream::respond()` closes every output buffer, and calling
+`streamedContent()` fails with `ob_end_clean(): Failed to delete buffer`.
+Rather than reshape production streaming code to suit a test, the test
+performs the same state transition `ConfirmActionController::reject()`
+performs and then proves the meaningful guarantee over HTTP — a rejected
+message can no longer be confirmed, returning 404, with the meeting
+untouched.
+
+**Verification**: `php artisan test --compact` → **620 passed, 3105
+assertions** (587 → 620, +33). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded. `npx vue-tsc
+--noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
+from entry #24, unchanged and unrelated. `ModuleBoundaryTest` passes — the
+tool imports only from `Actions`, `Data` and `Models`.
+
+**Tool inventory is now nine**: `get_workspace_info`, `list_projects`,
+`list_meetings` (read-only, auto-run); `create_workspace`, `invite_user`,
+`create_project`, `create_task`, `schedule_meeting`, `edit_meeting`
+(write, confirmation-gated).
+
+### 46. `cancel_meeting` — the irreversible one
+
+Completes the meeting trio held back from entry #43. The Assistant module
+stays outside the FR table, so counts are unchanged.
+
+**The smallest tool so far, deliberately.** It accepts `meeting_id` and
+nothing else — a test asserts the parameter schema has exactly that one
+property. There is no reason field because `MeetingCancelledMail` has none;
+inventing one would have meant either dropping it silently or changing the
+Meetings domain to carry model-authored prose into other people's inboxes.
+Resolution, the confirmation card and the ordering around deletion are
+where the care went.
+
+**Resolution and authorization mirror `edit_meeting` exactly.** Target
+lookup runs
+`Meeting::whereKey($id)->whereIn('project_id', $workspace->accessibleProjectsFor($user)->select('projects.id'))`
+against the *conversation* workspace, and `MeetingPolicy::delete` is
+re-checked at execution time. A nonexistent meeting and an inaccessible one
+return the identical error code and message, asserted by comparing both
+payloads. A plain project member is refused even though the meeting
+resolves for them.
+
+**`DeleteMeetingAction` still owns everything.** It resolves recipients
+*before* deleting, audits `meeting.cancelled` while the row still exists,
+then deletes and notifies — so the tool must not reorder any of that. What
+the tool does do is snapshot id, title, project, time, duration and
+recipient count **before** calling the action, because after it returns the
+meeting no longer exists. Participants disappear via
+`cascadeOnDelete`, which a test pins alongside the audit row.
+
+**The confirmation card is the entire safety mechanism here.** An edit that
+goes wrong can be edited back; a cancellation cannot. The card names the
+project, the meeting title, the local scheduled time with a zone label
+(through `UserTime::format()`, entry #44), the duration, **the full list of
+addresses that will receive a cancellation**, and an explicit
+`Cancelling deletes the meeting for everyone. This cannot be undone.`
+The recipient list comes from `ResolveMeetingRecipients` — the same
+collaborator `DeleteMeetingAction` uses — rather than a second reading of
+the participants table, so the card cannot drift from who actually gets
+mail. A meeting with no other participants says
+`nobody else is on this meeting` instead of showing an empty line.
+
+One honest caveat: that list is the resolved recipient set, not the
+post-preference set. A participant who has switched off cancellation emails
+appears on the card but will not be mailed, because
+`NotificationPreferenceGate` is applied inside the action. Showing more
+names than will be contacted is the safe direction for a card whose job is
+to make the blast radius obvious.
+
+**Thin result shape.** Meeting id, title, project id/name, ISO time,
+duration, `notified_count`, and a link to the project — not a
+`?meeting={id}` deep link, which would point at a row that no longer
+exists. A test JSON-encodes the result and asserts the join token and every
+participant address are absent.
+
+**Tests**: 23 in `AssistantCancelMeetingToolTest` — registration and
+confirmation-gating, the single-parameter schema, admin and project-manager
+allowed, plain member refused, workspace-outsider and cross-tenant refused,
+nonexistent indistinguishable from inaccessible, conversation workspace
+beating the user's current workspace, internal and external cancellation
+emails plus the in-app notification, audit row and participant cascade,
+result leak checks, dropped model-supplied `workspace_id`/`project_id`,
+schema validation, both confirmation-card shapes, and the full
+pending/confirm/reject flow including a tampering test that proves a
+different `meeting_id` in the request body cannot redirect the deletion.
+
+**The reject path carries the same testing limitation as entries #43 and
+#45** — `EventStream::respond()` closes every output buffer, so the test
+performs the transition `ConfirmActionController::reject()` performs and
+then proves over HTTP that a rejected message can no longer be confirmed
+(404), with the meeting still present.
+
+**Verification**: `php artisan test --compact` → **643 passed, 3167
+assertions** (620 → 643, +23). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded. `npx vue-tsc
+--noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
+from entry #24, unchanged and unrelated. `ModuleBoundaryTest` passes — the
+tool imports only from `Actions` and `Models`.
+
+**Tool inventory is now ten**: `get_workspace_info`, `list_projects`,
+`list_meetings` (read-only, auto-run); `create_workspace`, `invite_user`,
+`create_project`, `create_task`, `schedule_meeting`, `edit_meeting`,
+`cancel_meeting` (write, confirmation-gated). The meeting lifecycle is
+complete.
+
+## Next recommended task (updated 2026-08-18, after entry #46)
+
+**Close the two timezone follow-ups, then pick up the FR table again.**
+
+The assistant's meeting lifecycle is complete, so the highest-value
+remaining work is no longer tool-shaped. Two small items are still open
+from entry #44:
+
+- **Per-recipient in-app notifications.** Meeting emails are already
+  formatted in each recipient's zone, but in-app notifications go out in a
+  single `Notification::send()` call carrying one pre-formatted string, so
+  they use the actor's zone. Moving formatting into each notification's
+  `toArray()` fixes it and removes the last inconsistency between the two
+  channels.
+- **Capture a timezone at registration.** New users resolve to
+  `app.timezone` until they visit settings.
+
+Neither is large, and both are genuine correctness gaps rather than polish.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
+
+## Superseded next-task note (after entry #45)
+
+**`cancel_meeting`.**
+
+The last of the three meeting tools held back from entry #43, and the
+highest-consequence of them: cancelling emails every participant including
+external guests, and unlike an edit it cannot be undone by the recipient
+re-reading the invitation. It should follow the `edit_meeting` shape
+exactly — `meeting_id` only, resolution through the conversation workspace
+and `accessibleProjectsFor`, `MeetingPolicy::delete` re-checked at
+execution time, and `DeleteMeetingAction` doing the actual work so
+cancellation emails, in-app notifications and the `meeting.cancelled`
+audit entry stay owned by Meetings.
+
+Its confirmation card matters more than any tool so far. It should name the
+project, the meeting title, the local scheduled time with a zone label, and
+**the full list of people who will be emailed a cancellation** — the same
+`ProvidesConfirmationDetails` mechanism entry #43 introduced and entry #45
+extended. There is no partial-edit merge to worry about, so the tool is
+smaller than `edit_meeting`; the care goes into resolution, the card and
+making the irreversibility obvious.
+
+Two smaller follow-ups still open from entry #44:
+
+- **Per-recipient in-app notifications.** They still use the actor's zone
+  because they are sent in one `Notification::send()` call. Moving
+  formatting into the notification's `toArray()` would fix it.
+- **Capture a timezone at registration.** New users resolve to
+  `app.timezone` until they visit settings.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
+
+## Superseded next-task note (after entry #44)
 
 **`cancel_meeting`, then `edit_meeting`.**
 

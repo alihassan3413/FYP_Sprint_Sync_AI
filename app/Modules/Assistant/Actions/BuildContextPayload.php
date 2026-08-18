@@ -71,6 +71,9 @@ Rules:
 - list_meetings is read-only, so do not ask for confirmation before using it. It does not return join links or attendee addresses; point the user at the meeting's url instead.
 - To schedule a meeting, call list_projects to resolve the project_id, then call schedule_meeting. Resolve relative times like "tomorrow at 3" against the current date and time above and pass an absolute "YYYY-MM-DD HH:MM" value.
 - Never invent a participant email address for schedule_meeting. If the user names someone without giving an address, ask for it or look it up with get_workspace_info.
+- To change an existing meeting, call list_meetings to resolve the meeting_id, then call edit_meeting with only the fields that change. Omitted fields keep their current values.
+- edit_meeting replaces the whole invite list when you pass participant_emails, so include everyone who stays invited, not just additions.
+- cancel_meeting deletes a meeting for everyone and cannot be undone. Only call it when the user clearly wants the meeting called off; if they want it moved, use edit_meeting.
 TXT;
 
         $parts[] = <<<'TXT'
@@ -122,7 +125,7 @@ TXT;
         $localNow = now()->setTimezone($timezone);
 
         $parts[] = sprintf(
-            "Current date/time for this user: %s (%s). Today is %s. Interpret every relative time the user gives, such as \"tomorrow at 3\", in this timezone and pass an absolute \"YYYY-MM-DD HH:MM\" value in it.",
+            'Current date/time for this user: %s (%s). Today is %s. Interpret every relative time the user gives, such as "tomorrow at 3", in this timezone and pass an absolute "YYYY-MM-DD HH:MM" value in it.',
             $localNow->format('Y-m-d H:i'),
             $timezone,
             $localNow->format('l, F j, Y'),
