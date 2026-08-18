@@ -10,6 +10,8 @@ export interface PendingTool {
     toolCallId: string;
     name: string;
     args: Record<string, unknown>;
+    /** Server-derived context the args alone cannot show, such as a resolved project name. */
+    details: Record<string, string>;
     /** Short human-readable summary shown to user. Built locally from name+args. */
     summary: string;
 }
@@ -156,6 +158,11 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
             return `Create task "${args.title ?? 'untitled'}"${args.assignee_email ? ` for ${args.assignee_email}` : ''}`;
         case 'create_project':
             return `Create project "${args.name ?? 'untitled'}"`;
+        case 'schedule_meeting': {
+            const invitees = Array.isArray(args.participant_emails) ? args.participant_emails.length : 0;
+
+            return `Schedule "${args.title ?? 'untitled'}" and invite ${invitees} ${invitees === 1 ? 'person' : 'people'}`;
+        }
         // Add more as you build tools.
         default:
             return name.replace(/_/g, ' ');
@@ -175,6 +182,9 @@ function getToolIntro(name: string): string {
 
         case 'create_project':
             return 'I can create this project for you. Please confirm first.';
+
+        case 'schedule_meeting':
+            return 'I can schedule this meeting and email everyone below. Please check the details and recipients first.';
 
         default:
             return 'I’m ready to perform this action. Please confirm.';
@@ -281,6 +291,7 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
                     toolCallId: event.tool_call_id as string,
                     name: toolName,
                     args,
+                    details: (event.details as Record<string, string>) ?? {},
                     summary: summarizeTool(toolName, args),
                 };
 

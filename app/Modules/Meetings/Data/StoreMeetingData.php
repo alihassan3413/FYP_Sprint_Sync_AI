@@ -11,6 +11,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 #[TypeScript]
 final class StoreMeetingData extends Data
 {
+    public const MAX_PARTICIPANTS = 50;
+
     public function __construct(
         #[Rule(['required', 'string', 'min:2', 'max:150'])]
         public string $title,

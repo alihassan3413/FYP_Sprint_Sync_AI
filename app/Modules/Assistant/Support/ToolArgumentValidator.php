@@ -60,6 +60,14 @@ final class ToolArgumentValidator
                 $fieldRules[] = 'in:'.implode(',', $definition['enum']);
             }
 
+            if (isset($definition['minimum'])) {
+                $fieldRules[] = 'min:'.$definition['minimum'];
+            }
+
+            if (isset($definition['maximum'])) {
+                $fieldRules[] = 'max:'.$definition['maximum'];
+            }
+
             if (isset($definition['minLength'])) {
                 $fieldRules[] = 'min:'.$definition['minLength'];
             }

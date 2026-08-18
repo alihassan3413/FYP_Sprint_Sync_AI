@@ -14,6 +14,7 @@ use App\Notifications\MeetingUpdatedNotification;
 use App\Notifications\NotificationChannel;
 use App\Notifications\NotificationPreferenceGate;
 use App\Notifications\NotificationType;
+use App\Support\Time\UserTime;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -84,7 +85,7 @@ final class UpdateMeetingAction
                 Mail::to($recipient->email)->queue(new MeetingUpdatedMail(
                     projectName: $meeting->project->name,
                     meetingTitle: $meeting->title,
-                    scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                    scheduledAt: UserTime::format($meeting->scheduled_at, $recipient->timezone),
                     durationMinutes: $meeting->duration_minutes,
                     agenda: $meeting->description,
                     joinUrl: $meeting->joinUrl(),
@@ -96,7 +97,7 @@ final class UpdateMeetingAction
                 Mail::to($external->email)->queue(new MeetingUpdatedMail(
                     projectName: $meeting->project->name,
                     meetingTitle: $meeting->title,
-                    scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                    scheduledAt: UserTime::format($meeting->scheduled_at, $actor->timezone),
                     durationMinutes: $meeting->duration_minutes,
                     agenda: $meeting->description,
                     joinUrl: $meeting->joinUrl(),
@@ -109,7 +110,7 @@ final class UpdateMeetingAction
             Notification::send($inAppRecipients, new MeetingUpdatedNotification(
                 projectName: $meeting->project->name,
                 meetingTitle: $meeting->title,
-                scheduledAt: $meeting->scheduled_at->format('F j, Y g:i A'),
+                scheduledAt: UserTime::format($meeting->scheduled_at, $actor->timezone),
                 updatedByName: $actor->name,
                 url: route('workspace.projects.show', ['workspace' => $meeting->project->workspace->slug, 'project' => $meeting->project_id]),
             ));

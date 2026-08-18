@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\Workspace;
+use App\Support\Time\UserTime;
 use App\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -35,6 +36,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'timezone',
         'password',
         'current_workspace_id',
     ];
@@ -63,6 +65,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function resolvedTimezone(): string
+    {
+        return UserTime::resolve($this->timezone);
     }
 
     protected function avatarUrl(): Attribute

@@ -8,13 +8,12 @@ use App\Models\User;
 use App\Modules\Meetings\Data\StoreMeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
+use App\Support\Time\UserTime;
 use App\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class StoreMeetingRequest extends FormRequest
 {
-    public const MAX_PARTICIPANTS = 50;
-
     public function authorize(): bool
     {
         return $this->user()?->can('create', [Meeting::class, $this->project()]) ?? false;
@@ -31,9 +30,9 @@ final class StoreMeetingRequest extends FormRequest
             'scheduled_at' => ['required', 'date'],
             'duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
             'meeting_link' => ['nullable', 'url', 'max:2048'],
-            'participant_user_ids' => ['nullable', 'array', 'max:'.self::MAX_PARTICIPANTS],
+            'participant_user_ids' => ['nullable', 'array', 'max:'.StoreMeetingData::MAX_PARTICIPANTS],
             'participant_user_ids.*' => ['integer', 'distinct'],
-            'participant_emails' => ['nullable', 'array', 'max:'.self::MAX_PARTICIPANTS],
+            'participant_emails' => ['nullable', 'array', 'max:'.StoreMeetingData::MAX_PARTICIPANTS],
             'participant_emails.*' => ['email:rfc', 'max:255', 'distinct:ignore_case'],
         ];
     }
@@ -79,6 +78,7 @@ final class StoreMeetingRequest extends FormRequest
 
         return StoreMeetingData::from([
             ...$validated,
+            'scheduled_at' => UserTime::toUtc($validated['scheduled_at'], $this->user()?->timezone)->toDateTimeString(),
             'participant_user_ids' => array_map('intval', $validated['participant_user_ids'] ?? []),
             'participant_emails' => $validated['participant_emails'] ?? [],
         ]);

@@ -6,6 +6,7 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AiProvider;
+use App\Modules\Assistant\Contracts\ProvidesConfirmationDetails;
 use App\Modules\Assistant\Models\Conversation;
 use App\Modules\Assistant\Models\Message;
 use App\Modules\Assistant\Support\ToolArgumentValidator;
@@ -322,6 +323,9 @@ final class ProcessChatMessage
                 'name' => $name,
                 'args' => $args,
                 'description' => $tool->description(),
+                'details' => $tool instanceof ProvidesConfirmationDetails
+                    ? $tool->confirmationDetails($args, $toolContext)
+                    : [],
             ];
 
             if (isset($supersededIdsByName[$name])) {

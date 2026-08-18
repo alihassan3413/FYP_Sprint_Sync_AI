@@ -13,6 +13,7 @@ use App\Notifications\MeetingCancelledNotification;
 use App\Notifications\NotificationChannel;
 use App\Notifications\NotificationPreferenceGate;
 use App\Notifications\NotificationType;
+use App\Support\Time\UserTime;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -34,7 +35,7 @@ final class DeleteMeetingAction
         $project = $meeting->project;
         $projectName = $project->name;
         $meetingTitle = $meeting->title;
-        $scheduledAt = $meeting->scheduled_at->format('F j, Y g:i A');
+        $scheduledAt = UserTime::format($meeting->scheduled_at, $actor->timezone);
         $url = route('workspace.projects.show', ['workspace' => $project->workspace->slug, 'project' => $meeting->project_id]);
 
         $this->auditLogger->handle(

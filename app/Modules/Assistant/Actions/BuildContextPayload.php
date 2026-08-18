@@ -69,6 +69,8 @@ Rules:
 - To create a project, call create_project with just the name unless the user gave a description. Do not ask about board columns or members — those are set up automatically.
 - When the user asks about meetings, standups, retros, what is coming up, or names a meeting, call list_meetings. It defaults to upcoming meetings.
 - list_meetings is read-only, so do not ask for confirmation before using it. It does not return join links or attendee addresses; point the user at the meeting's url instead.
+- To schedule a meeting, call list_projects to resolve the project_id, then call schedule_meeting. Resolve relative times like "tomorrow at 3" against the current date and time above and pass an absolute "YYYY-MM-DD HH:MM" value.
+- Never invent a participant email address for schedule_meeting. If the user names someone without giving an address, ask for it or look it up with get_workspace_info.
 TXT;
 
         $parts[] = <<<'TXT'
@@ -116,10 +118,14 @@ TXT;
             $parts[] = "Current route: {$route}.";
         }
 
+        $timezone = $user->resolvedTimezone();
+        $localNow = now()->setTimezone($timezone);
+
         $parts[] = sprintf(
-            'Current date/time: %s. Today is %s.',
-            now()->toIso8601String(),
-            now()->format('l, F j, Y'),
+            "Current date/time for this user: %s (%s). Today is %s. Interpret every relative time the user gives, such as \"tomorrow at 3\", in this timezone and pass an absolute \"YYYY-MM-DD HH:MM\" value in it.",
+            $localNow->format('Y-m-d H:i'),
+            $timezone,
+            $localNow->format('l, F j, Y'),
         );
 
         if (! empty($supersededActions)) {

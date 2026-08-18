@@ -4259,29 +4259,145 @@ unrelated. No frontend file was modified.
 `list_meetings` (read-only, auto-run); `create_workspace`, `invite_user`,
 `create_project` and `create_task` (write, confirmation-gated).
 
-## Next recommended task (updated 2026-08-18, after entry #42)
+### 43. `schedule_meeting` — the assistant's highest-consequence write tool
 
-**`schedule_meeting` — the assistant's fifth write tool.**
+The first assistant tool that contacts people **outside** the workspace.
+The Assistant module stays outside the FR table, so counts are unchanged.
 
-`list_meetings` (entry #42) and `list_projects` now give the model real
-project IDs, and entry #41 gave meetings an unambiguous participant
-contract. Reuse the entry #32 pattern exactly: `requiresConfirmation()
-=> true`, `project_id` re-resolved through `accessibleProjectsFor()`,
-`MeetingPolicy::create` as the gate, delegation to `CreateMeetingAction`,
-and a `summarizeTool()` case **in the same change** — the standing rule
-since entry #32.
+**No meeting logic was duplicated.** The tool resolves and authorises, then
+hands a `StoreMeetingData` to `CreateMeetingAction`. Persistence,
+participant rows, invitation emails to internal *and* external recipients,
+in-app notifications, the generated SprintSync join token and the
+`meeting.scheduled` audit entry all remain owned by the Meetings domain —
+tests assert the mail, the 64-character token and the audit row all still
+appear when creation comes from the assistant.
 
-Two decisions specific to this tool:
+**Participants are emails, never user IDs.** `participant_emails` only;
+`participant_user_ids` is not in the schema and a model that supplies it
+has the key dropped by `ToolArgumentValidator` (asserted). Same reasoning
+as `create_task` (entry #32): a hallucinated integer is plausibly a valid
+user ID belonging to the wrong person, whereas a bad email fails loudly.
+`SyncMeetingParticipants` (entry #41) already promotes an email belonging
+to a project member into an internal participant, so nothing is lost by
+withholding IDs from the model.
 
-- **Participants as emails, not user IDs** — the entry #32 reasoning
-  applies identically (a hallucinated integer is plausibly a valid user
-  ID belonging to the wrong person; a hallucinated email fails loudly),
-  and `StoreMeetingRequest` already accepts `participant_emails`
-  alongside `participant_user_ids`, so the tool can pass emails straight
-  through and let the existing validator resolve them.
-- **The confirmation card must show the participant list**, since
-  scheduling a meeting emails external people who may not be in the
-  workspace at all. That is the highest-consequence write tool so far.
+**Validation mirrors `StoreMeetingRequest` rather than inventing a
+ruleset.** Identical rule strings for title, description, `scheduled_at`,
+duration and `participant_emails` (including `distinct:ignore_case`), run
+inside `execute()` — so confirmed arguments are revalidated a second time,
+after the universal schema check that already ran at proposal time
+(entry #31). `MAX_PARTICIPANTS` moved from `StoreMeetingRequest` to
+`StoreMeetingData` so both the Meetings requests and the Assistant tool
+share one constant: `ModuleBoundaryTest` **caught the first attempt**,
+where the tool imported the request class directly — `Http` is a private
+segment, `Data` is public.
+
+**Scoping and authorization.** `project_id` is re-resolved through
+`$context->workspace->accessibleProjectsFor($user)` — never
+`$user->currentWorkspace` — and an inaccessible project returns the same
+`project_not_found` as a nonexistent one, so the tool cannot probe which
+IDs exist. `MeetingPolicy::create` is re-checked at execution.
+`authorize()` mirrors it precisely (workspace Admin+ or at least one
+managed project), so a plain project member never sees the tool.
+
+**The confirmation card shows who will be emailed.** A generic "Schedule
+meeting?" card would have been unacceptable for a tool that mails
+outsiders, so this entry added a small, general mechanism: the optional
+`ProvidesConfirmationDetails` contract. A tool implementing it can attach
+**server-derived** context to the `tool_pending` event; `schedule_meeting`
+returns the resolved project *name* and the recipient count, which the
+model's own arguments cannot authoritatively supply. An inaccessible
+project renders as "Unknown project" rather than leaking its name
+(tested). The card lists every argument, and array values now render
+comma-joined instead of as JSON, so the full recipient list is visible and
+readable rather than hidden behind a count. `summarizeTool()` and
+`getToolIntro()` gained their cases in the same change, per the standing
+rule from entry #32. Existing tools are untouched — the contract is
+opt-in, so none of the other six needed changing.
+
+**Result shape is deliberately thin.** Returns meeting id, title, project
+id/name, scheduled time, duration, participant **count** and the
+`?meeting={id}` deep link. It does **not** return `join_token`, the
+participant email list, or the provider URL. The user already saw the
+recipients in the confirmation card; persisting them again in
+`assistant_messages` would add PII to chat history for no benefit
+(entries #34/#35). A test asserts neither the token nor a recipient
+address appears anywhere in the serialised result.
+
+**Timezone — a documented gap, not an assumption.** The application has
+**no timezone handling at all**: `config('app.timezone')` is `UTC`, there
+is no timezone column on users or workspaces, and the meeting form posts a
+naive `datetime-local` wall-clock string that Laravel stores as UTC. A
+user in UTC+5 typing 3 PM already stores 3 PM UTC — a pre-existing bug in
+the normal UI, not something this tool introduces. The tool therefore
+behaves **identically to the UI**: it takes an absolute
+`YYYY-MM-DD HH:MM` and stores it unconverted. The model is told to resolve
+relative phrases like "tomorrow at 3" against the "Current date/time"
+already injected into the system prompt, which is server time. Fixing this
+properly needs a user or workspace timezone field and a conversion at both
+entry points; it was not invented here.
+
+**Tests**: new `AssistantScheduleMeetingToolTest` (24) — registration and
+confirmation-required; scheduling with internal and external participants;
+invitations still sent by the Meetings domain; join token generated but
+absent from the result along with recipient emails; audit row written;
+`list_meetings` sees the new meeting; project Manager can schedule while a
+plain project member is `unauthorized` and is not offered the tool;
+unassigned member and cross-workspace project both `project_not_found`;
+the conversation workspace beats the user's current workspace; invalid and
+duplicate emails rejected with nothing created and no mail; model-supplied
+`workspace_id` and `participant_user_ids` dropped; missing title,
+out-of-range duration and malformed datetime fail schema validation;
+confirmation details resolve the project name and count without leaking an
+inaccessible project's name; a pending action creates nothing; confirming
+executes the stored arguments; `ConfirmActionRequest` accepts only
+`message_id` and `action`; stored arguments are the only source of
+recipients; another user cannot confirm and the row stays pending.
+
+**One testing limitation, stated plainly.** The confirm-flow assertions
+exercise the same collaborators `ConfirmActionController` uses, in the
+same order, rather than driving the SSE endpoint end to end.
+`EventStream::respond()` closes every output buffer and writes straight to
+stdout, which defeats both `streamedContent()` and PHPUnit's output
+capture (it marks such tests risky). Driving it would have meant changing
+production streaming code to suit tests. The HTTP layer's *guard* is still
+covered end to end — another user confirming gets a 404 before the stream
+opens.
+
+**Verification**: `php artisan test --compact` → **566 passed, 2954
+assertions** (541 baseline + 25). `vendor/bin/pint --dirty --format agent`
+→ passed. `npm run lint:check` → clean. `npm run build` → built in 2.72s.
+`npx vue-tsc --noEmit` → **exactly two errors, both the pre-existing
+`TS2688` `tsconfig.json` `types` entries** from entry #24 — unchanged and
+unrelated.
+
+**Tool inventory is now eight**: `get_workspace_info`, `list_projects`,
+`list_meetings` (read-only, auto-run); `create_workspace`, `invite_user`,
+`create_project`, `create_task`, `schedule_meeting` (write,
+confirmation-gated).
+
+## Next recommended task (updated 2026-08-18, after entry #43)
+
+**Give the assistant a timezone, or accept UTC everywhere.**
+
+Entry #43 surfaced that SprintSync has **no timezone handling at all** —
+`app.timezone` is UTC, no user or workspace timezone field exists, and the
+meeting form posts a naive `datetime-local` string stored as UTC. A user
+in UTC+5 who types 3 PM already gets 3 PM UTC, in the normal UI. The
+assistant now inherits that behaviour exactly.
+
+This is a genuine product bug that predates the assistant and is now more
+visible, because a model resolving "tomorrow at 3" has no user-local
+anchor either. The fix is small in shape and worth doing before more
+scheduling features: add a timezone to the user (or workspace), convert on
+input at both the form and the tool, and render in the viewer's zone.
+
+After that, the remaining assistant meeting work would be `edit_meeting`
+and `cancel_meeting`, which were explicitly out of scope for entry #43 and
+should follow the same confirmation-and-recipients pattern —
+`cancel_meeting` especially, since cancelling emails everyone.
+
+Still needing your decision rather than code:
 
 Still needing your decision rather than code:
 

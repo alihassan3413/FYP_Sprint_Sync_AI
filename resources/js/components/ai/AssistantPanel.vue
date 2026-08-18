@@ -202,9 +202,14 @@ watch(
                             </p>
 
                             <div class="mt-1.5 space-y-0.5">
-                                <div v-for="(value, key) in msg.pendingTool.args" :key="key" class="flex gap-1.5 text-[10.5px]">
+                                <div v-for="(value, key) in msg.pendingTool.details" :key="key" class="flex gap-1.5 text-[10.5px]">
                                     <span class="text-white/50">{{ key }}:</span>
                                     <span class="text-white/85">{{ value }}</span>
+                                </div>
+
+                                <div v-for="(value, key) in msg.pendingTool.args" :key="key" class="flex gap-1.5 text-[10.5px]">
+                                    <span class="text-white/50">{{ key }}:</span>
+                                    <span class="break-all text-white/85">{{ Array.isArray(value) ? value.join(', ') : value }}</span>
                                 </div>
                             </div>
 

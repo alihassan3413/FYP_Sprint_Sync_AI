@@ -14,6 +14,7 @@ use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
 use App\Modules\Assistant\Tools\ListMeetingsTool;
 use App\Modules\Assistant\Tools\ListProjectsTool;
+use App\Modules\Assistant\Tools\ScheduleMeetingTool;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use App\Support\Modules\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -35,6 +36,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         ListMeetingsTool::class,
         CreateProjectTool::class,
         CreateTaskTool::class,
+        ScheduleMeetingTool::class,
     ];
 
     public function register(): void
