@@ -130,7 +130,7 @@ final class WorkspaceInvitationController
             'password' => Hash::make($request->string('password')->toString()),
         ]));
 
-        $user->forceFill(['email_verified_at' => now()])->save();
+        $user->markEmailAsVerified();
 
         Auth::login($user);
         $request->session()->regenerate();

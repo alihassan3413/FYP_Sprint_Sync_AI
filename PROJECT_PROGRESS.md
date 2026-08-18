@@ -3713,37 +3713,118 @@ assertions** (454 baseline + 3). `vendor/bin/pint --dirty --format agent`
 validation (#31), authoritative workspace context (#31), prompt-injection
 hardening (#34), conversation retention (#35), and route parity (#36).
 
-## Next recommended task (updated 2026-08-18, after entry #36)
+### 37. Email verification actually enforced (`MustVerifyEmail`)
 
-**Decide whether `User` should implement `MustVerifyEmail`.**
+Entry #36 found that `verified` was decorative across the whole
+application because `App\Models\User` never implemented
+`Illuminate\Contracts\Auth\MustVerifyEmail`. This entry enables it. The
+decision was the user's; the implementation is Laravel's standard flow —
+no OTP, no custom verification, and FR02's reset-password flow untouched.
 
-This is a decision, not a coding task, and it is now the highest-value
-open security item because it silently disables a control the codebase
-appears to rely on in ~30 route definitions. Either:
+**One interface, and the existing plumbing came alive.** Everything else
+was already in place and correct: `routes/auth.php` registers
+`verification.notice`, a signed `verification.verify`, and a throttled
+`verification.send`; `VerifyEmailController`, `EmailVerificationPromptController`
+and `EmailVerificationNotificationController` all exist and use the
+framework APIs; `RegisteredUserController` already fires
+`event(new Registered($user))`. Adding the interface made the
+`SendEmailVerificationNotification` listener fire on signup and made
+`EnsureEmailIsVerified` stop short-circuiting. Four route groups gained
+real enforcement at once: `TenantRoute` (every workspace, project, task,
+meeting, analytics, archive and audit route), the Workspace module's
+create/switch routes, the Assistant routes, and the stub emitted by
+`MakeModuleCommand` for future modules.
 
-- **Enable it** — add the interface, then handle the migration question
-  (existing accounts with `email_verified_at = null` would be locked out
-  until they verify; `UserFactory` already defaults to verified, so the
-  test suite should largely survive), confirm outbound mail works in each
-  environment, and add a real behavioural test that an unverified user is
-  redirected. The dead unverified-email UI in `settings/Profile.vue` would
-  start working as designed.
-- **Or drop the pretence** — remove `verified` from the route definitions
-  and the verification routes/UI, so the codebase stops implying a control
-  it does not enforce.
+**Existing users were grandfathered, not locked out.** New migration
+`grandfather_existing_users_as_verified` runs a single
+`whereNull('email_verified_at')->update([...])`. It is a **one-time data
+backfill, not a default**: on a fresh database the users table is empty, so
+it is a no-op, and every user registered afterwards starts unverified and
+must verify for real. The local development database had 7 users of which
+**2 were unverified**; after `php artisan migrate` all 7 retain access and
+`unverified = 0`. `UserFactory` already defaulted to
+`email_verified_at => now()`, so `DatabaseSeeder` output stays verified and
+the entire existing test suite kept passing unchanged — the factory's
+`unverified()` state is what the new tests use to exercise the gate.
 
-Doing neither is the worst option, because the current state reads as
-protected to anyone reviewing the routes.
+**Invitations keep working, and the reason is sound.** `WorkspaceInvitation
+Controller::registerInvitee` previously did
+`forceFill(['email_verified_at' => now()])`; it now calls the framework's
+`markEmailAsVerified()`. The behaviour is intentionally preserved: an
+invitation token is 64 random characters delivered to that address, so
+possession of the token already proves control of the inbox. Asking an
+invitee to verify an address they just proved they own would be
+theatre. A test registers through the invitation flow and asserts the new
+user is verified and can immediately reach the dashboard.
 
-After that, the remaining work is product rather than hardening:
+**Assistant impact — the entry #36 gap is now closed for real.** With
+`['auth', 'verified', 'throttle:assistant-chat']` and the interface in
+place, an unverified user gets `403` from both `assistant.chat` and
+`assistant.confirm`. Tests assert not only the status but that **no
+conversation row is created** and that a pending `create_workspace` action
+stays `pending` with no workspace written — so the block happens before any
+side effect, not merely before the response.
+
+**Settings stay reachable on purpose.** `routes/settings.php` is `auth`
+only, with no `verified`. That is what makes the flow usable: an unverified
+user can still open `/settings/profile`, where `mustVerifyEmail` is now
+genuinely `true`, so the amber unverified-email notice and the "Resend
+link" action built in the settings redesign finally render and work. They
+were unreachable dead UI before this entry.
+
+**Tests**: new `EmailVerificationEnforcementTest` (11) — the model
+implements `MustVerifyEmail`; registration creates an *unverified* user and
+sends `VerifyEmail`; a newly registered user hitting the dashboard is
+bounced to the notice; an unverified member is redirected from both
+`dashboard` and `workspace.projects.index`; a verified user reaches the
+dashboard; assistant chat and confirm both `403` with no side effects;
+profile settings remain reachable while unverified with
+`mustVerifyEmail: true`; resend dispatches a fresh notification; and an
+invitation-created user is verified and can use the app. The four existing
+`EmailVerificationTest` cases pass unchanged.
+
+**Verification**: `php artisan test --compact` → **468 passed, 2376
+assertions** (457 baseline + 11), with **no existing test modified**.
+`vendor/bin/pint --dirty --format agent` → passed (reordered one import on
+first run; re-run clean). `npm run lint:check` → clean. `npm run build` →
+built in 2.55s. `npx vue-tsc --noEmit` → **exactly two errors, both the
+pre-existing `TS2688` `tsconfig.json` `types` entries**
+(`./resources/js/types`, `vue/tsx`) from entry #24 — unchanged and
+unrelated. No frontend file was modified.
+
+**Operational note.** Verification mail now actually sends on registration.
+`.env.example` ships `MAIL_MAILER=log`, so in development the link lands in
+`storage/logs/laravel.log`; any environment expecting real signups needs
+working outbound mail, which was previously not true of this feature
+because nothing was ever dispatched.
+
+## Next recommended task (updated 2026-08-18, after entry #37)
+
+**FR20-05 — team-wide analytics for Scrum Masters and Team Leads, personal
+task analytics for Developers.**
+
+With entry #37 the security backlog is empty: the Assistant audit is fully
+closed (#31, #34, #35, #36) and email verification is genuinely enforced
+(#37). The remaining work is product.
+
+FR20-05 is the largest unblocked FR clause left. Analytics currently scope
+only by `accessibleProjectsFor()` — project membership — with no role-tier
+split, so a Developer sees the same team-wide aggregate a Scrum Master
+does. `BuildAnalyticsAction` already computes `tasks_by_assignee`, and a
+personal view is the same aggregates filtered to `assigned_to = $user->id`,
+so no new tables are needed.
+
+Settle the role mapping first (same question entry #30 raised): the report
+names Scrum Master / Developer / Team Lead while the code has Owner /
+Admin / Member plus project Manager / Member. The natural reading is
+workspace Admin+ or project Manager → team-wide, everyone else → personal.
+
+Other open product work:
 
 - **Meeting tools** for the assistant, still blocked on the **FR05-03
   participants decision** (entry #26, Group 3).
-- **FR20-05** (team-wide vs personal analytics by role) — the largest
-  remaining unblocked FR clause, needing the role-mapping decision from
-  entry #30.
 - The standing **FR02 / FR27 report-amendment decisions** (entry #26,
-  Group 3).
+  Group 3), which need your call rather than code.
 
 ## Superseded next-task note (after entry #35)
 
