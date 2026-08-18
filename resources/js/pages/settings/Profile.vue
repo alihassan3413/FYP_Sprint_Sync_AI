@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { BadgeCheck, MailWarning, UserRound } from 'lucide-vue-next';
+import { BadgeCheck, Globe, MailWarning, UserRound } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 import AvatarSettings from '@/components/AvatarSettings.vue';
@@ -32,10 +32,29 @@ const breadcrumbs: BreadcrumbItem[] = [
 const page = usePage<SharedData>();
 const user = page.props.auth.user as User;
 
+const detectedTimezone = detectTimezone();
+const timezoneChoices = timezoneOptions();
+
 const form = useForm({
     name: user.name,
     email: user.email,
+    timezone: user.timezone ?? detectedTimezone,
 });
+
+const selectedOffset = computed(() => (form.timezone ? timezoneOffsetLabel(form.timezone) : null));
+
+const localPreview = computed(() =>
+    form.timezone
+        ? new Date().toLocaleString(undefined, {
+              timeZone: form.timezone,
+              weekday: 'short',
+              hour: 'numeric',
+              minute: '2-digit',
+          })
+        : null,
+);
+
+const canUseDetected = computed(() => form.timezone !== detectedTimezone);
 
 const memberSince = computed(() => {
     const joined = new Date(user.created_at);
@@ -105,6 +124,43 @@ const submit = () => {
                             :class="form.errors.email && 'border-destructive focus-visible:ring-destructive'"
                         />
                         <InputError :message="form.errors.email" />
+                    </div>
+
+                    <div class="grid gap-2 sm:col-span-2">
+                        <div class="flex items-center justify-between gap-3">
+                            <Label for="timezone">Timezone</Label>
+
+                            <button
+                                v-if="canUseDetected"
+                                type="button"
+                                class="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2 transition-colors"
+                                @click="form.timezone = detectedTimezone"
+                            >
+                                Use detected ({{ detectedTimezone }})
+                            </button>
+                        </div>
+
+                        <select
+                            id="timezone"
+                            v-model="form.timezone"
+                            class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+                            :aria-invalid="!!form.errors.timezone"
+                            :class="form.errors.timezone && 'border-destructive focus-visible:ring-destructive'"
+                        >
+                            <option v-for="option in timezoneChoices" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </option>
+                        </select>
+
+                        <p v-if="localPreview" class="text-muted-foreground flex items-center gap-1.5 text-xs">
+                            <Globe class="size-3.5 shrink-0" />
+                            <span>
+                                Meeting times are entered and displayed in this zone. It is
+                                {{ localPreview }} there ({{ selectedOffset }}).
+                            </span>
+                        </p>
+
+                        <InputError :message="form.errors.timezone" />
                     </div>
 
                     <div

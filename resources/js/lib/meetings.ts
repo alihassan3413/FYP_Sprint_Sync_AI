@@ -35,12 +35,12 @@ export function isPastMeeting(meeting: Pick<Meeting, 'scheduled_at' | 'duration_
     return end < Date.now();
 }
 
-export function formatMeetingDate(iso: string): string {
-    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+export function formatMeetingDate(iso: string, timeZone?: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 }
 
-export function formatMeetingTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+export function formatMeetingTime(iso: string, timeZone?: string): string {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
 }
 
 export function formatDuration(minutes: number): string {
@@ -50,10 +50,27 @@ export function formatDuration(minutes: number): string {
     return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`;
 }
 
-export function toDateTimeLocalValue(iso: string): string {
+export function toDateTimeLocalValue(iso: string, timeZone?: string): string {
     const date = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(date);
+
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)?.value ?? '00';
+    const hour = part('hour') === '24' ? '00' : part('hour');
+
+    return `${part('year')}-${part('month')}-${part('day')}T${hour}:${part('minute')}`;
 }
 
 export function isValidMeetingLink(link: string | null | undefined): link is string {

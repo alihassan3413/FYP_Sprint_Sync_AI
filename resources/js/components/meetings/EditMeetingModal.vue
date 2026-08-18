@@ -25,6 +25,8 @@ const emit = defineEmits<{
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
+const timeZone = useUserTimezone();
+const timezoneHint = computed(() => `Times are shown in ${timeZone.value} (${timezoneOffsetLabel(timeZone.value)}).`);
 
 const form = useForm<{
     title: string;
@@ -50,7 +52,7 @@ watch(
         form.clearErrors();
         form.title = meeting?.title ?? '';
         form.description = meeting?.description ?? '';
-        form.scheduled_at = meeting ? toDateTimeLocalValue(meeting.scheduled_at) : '';
+        form.scheduled_at = meeting ? toDateTimeLocalValue(meeting.scheduled_at, timeZone.value) : '';
         form.duration_minutes = meeting ? String(meeting.duration_minutes) : '30';
         form.meeting_link = meeting?.meeting_link ?? '';
         form.participant_user_ids = (meeting?.participants ?? []).filter((p) => p.user_id !== null).map((p) => p.user_id as number);
@@ -106,6 +108,7 @@ function handleClose(value: boolean) {
                 v-model="form.scheduled_at"
                 type="datetime-local"
                 label="Date & time"
+                :hint="timezoneHint"
                 :error="form.errors.scheduled_at"
                 required
             />
@@ -157,7 +160,7 @@ function handleClose(value: boolean) {
                     <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Date & time</p>
                     <div class="mt-1.5 flex items-center gap-1.5">
                         <CalendarClock class="text-muted-foreground size-3.5" />
-                        <span class="text-sm">{{ formatMeetingDate(meeting.scheduled_at) }} · {{ formatMeetingTime(meeting.scheduled_at) }}</span>
+                        <span class="text-sm">{{ formatMeetingDate(meeting.scheduled_at, timeZone) }} · {{ formatMeetingTime(meeting.scheduled_at, timeZone) }}</span>
                     </div>
                 </div>
 

@@ -16,6 +16,8 @@ const props = defineProps<{
     isInternal: boolean;
 }>();
 
+const timeZone = useUserTimezone();
+
 const when = computed(() =>
     new Date(props.meeting.scheduled_at).toLocaleString(undefined, {
         weekday: 'short',
@@ -23,6 +25,8 @@ const when = computed(() =>
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: timeZone.value,
+        timeZoneName: 'short',
     }),
 );
 

@@ -15,6 +15,8 @@ export interface DashboardMeeting {
     url: string;
 }
 
+const timeZone = useUserTimezone();
+
 const props = defineProps<{
     upcoming: DashboardMeeting[];
     past: DashboardMeeting[];
@@ -41,8 +43,8 @@ const hasAny = computed(() => props.upcoming.length > 0 || props.past.length > 0
                                 {{ meeting.title }}
                             </Link>
                             <p class="text-muted-foreground mt-0.5 truncate text-xs">
-                                {{ meeting.project_name }} · {{ formatMeetingDate(meeting.scheduled_at) }} at
-                                {{ formatMeetingTime(meeting.scheduled_at) }} · {{ formatDuration(meeting.duration_minutes) }}
+                                {{ meeting.project_name }} · {{ formatMeetingDate(meeting.scheduled_at, timeZone) }} at
+                                {{ formatMeetingTime(meeting.scheduled_at, timeZone) }} · {{ formatDuration(meeting.duration_minutes) }}
                             </p>
                         </div>
 
@@ -65,7 +67,7 @@ const hasAny = computed(() => props.upcoming.length > 0 || props.past.length > 0
                             {{ meeting.title }}
                         </Link>
                         <p class="text-muted-foreground mt-0.5 truncate text-xs">
-                            {{ meeting.project_name }} · {{ formatMeetingDate(meeting.scheduled_at) }}
+                            {{ meeting.project_name }} · {{ formatMeetingDate(meeting.scheduled_at, timeZone) }}
                         </p>
                     </li>
                 </ul>

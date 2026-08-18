@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
 
             'auth' => [
                 'user' => $request->user(),
+                'timezone' => $request->user()?->resolvedTimezone(),
             ],
 
             'workspace' => fn () => app(WorkspaceService::class)->inertiaFor($request->user()),

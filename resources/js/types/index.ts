@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-vue-next';
 
 export interface Auth {
     user: User;
+    timezone: string | null;
 }
 
 export interface BreadcrumbItem {
@@ -74,6 +75,7 @@ export interface User {
     email: string;
     avatar_url: string | null;
     email_verified_at: string | null;
+    timezone: string | null;
     created_at: string;
     updated_at: string;
 }

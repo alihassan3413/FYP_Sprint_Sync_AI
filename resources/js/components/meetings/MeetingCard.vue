@@ -14,6 +14,7 @@ const emit = defineEmits<{
     (e: 'delete', meeting: Meeting): void;
 }>();
 
+const timeZone = useUserTimezone();
 const past = computed(() => isPastMeeting(props.meeting));
 const hasJoinLink = computed(() => isValidMeetingLink(props.meeting.meeting_link));
 </script>
@@ -37,7 +38,7 @@ const hasJoinLink = computed(() => isValidMeetingLink(props.meeting.meeting_link
             <div class="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span class="inline-flex items-center gap-1">
                     <CalendarClock class="size-3" />
-                    {{ formatMeetingDate(meeting.scheduled_at) }} · {{ formatMeetingTime(meeting.scheduled_at) }}
+                    {{ formatMeetingDate(meeting.scheduled_at, timeZone) }} · {{ formatMeetingTime(meeting.scheduled_at, timeZone) }}
                 </span>
                 <span class="inline-flex items-center gap-1">
                     <Clock class="size-3" />

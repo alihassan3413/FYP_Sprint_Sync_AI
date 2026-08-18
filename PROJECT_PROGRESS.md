@@ -4376,7 +4376,132 @@ unrelated.
 `create_project`, `create_task`, `schedule_meeting` (write,
 confirmation-gated).
 
-## Next recommended task (updated 2026-08-18, after entry #43)
+### 44. Timezone support — user zones end to end
+
+Closes the gap entry #43 documented. Previously `app.timezone` was UTC,
+no timezone field existed anywhere, and the meeting form posted a naive
+`datetime-local` wall-clock string that was stored verbatim as UTC — so a
+user in UTC+5 typing 3 PM got 3 PM UTC. That was a real pre-existing bug
+in the normal UI, not just an assistant limitation.
+
+**One conversion helper, used everywhere.** `App\Support\Time\UserTime`
+holds `isValid()`, `resolve()`, `toUtc()` and `format()`. Every entry point
+that accepts a wall-clock time converts through `toUtc()`; every outbound
+string renders through `format()`, which appends a zone label (`PKT`,
+`EDT`, or `UTC+05:45` for zones PHP reports numerically). Storage stays
+UTC — only interpretation and presentation changed.
+
+**Backend is authoritative for which zone applies.** `users.timezone` is
+nullable and resolves to `config('app.timezone')` when unset, so a user who
+never touches settings behaves exactly as before. `HandleInertiaRequests`
+shares the *resolved* zone as `auth.timezone`, so the frontend never
+decides — it renders whatever the backend already decided it would use for
+interpreting input. That keeps the standing rule from FR35 intact.
+
+**Conversion points**: `StoreMeetingRequest::toDTO()`,
+`UpdateMeetingRequest::toDTO()`, and `ScheduleMeetingTool` all call
+`UserTime::toUtc(..., $user->timezone)`. `BuildContextPayload` now states
+the user's local time and zone in the system prompt, so the model resolving
+"tomorrow at 3" has a real anchor instead of a server-UTC one.
+
+**Emails are per recipient.** `CreateMeetingAction`, `UpdateMeetingAction`
+and `DeleteMeetingAction` format `scheduledAt` inside the internal-recipient
+loop using `$recipient->timezone` — two participants in Karachi and New
+York receive the same instant written as 3:00 PM PKT and 6:00 AM EDT, and
+`MeetingTimezoneTest` asserts exactly that. External participants get the
+organiser's zone, since SprintSync knows nothing about them.
+
+**Known limitation, deliberately not papered over.** In-app notifications
+go out through a single `Notification::send($inAppRecipients, ...)` call
+carrying one pre-formatted string, so they use the *actor's* zone rather
+than each recipient's. Making those per-recipient means either sending in a
+loop or moving formatting into the notification's `toArray()`; both are
+reasonable, neither was in scope here.
+
+**Frontend.** `lib/timezones.ts` (detection, offset labels, option list via
+`Intl.supportedValuesOf` with a curated fallback) and the
+`useUserTimezone()` composable, which reads `auth.timezone` and only falls
+back to the browser zone when nobody is authenticated. `lib/meetings.ts`
+helpers take an optional `timeZone`; `toDateTimeLocalValue()` now builds the
+edit-form value from `Intl.DateTimeFormat` parts in that zone instead of
+browser-local. `MeetingCard`, `UpcomingMeetingsCard` and `EditMeetingModal`
+pass it through. Both meeting modals show a hint naming the zone times are
+entered in. `pages/meetings/Join.vue` renders with `timeZoneName: 'short'`
+and correctly falls back to the browser zone for unauthenticated external
+invitees. Profile settings gained a timezone selector defaulting to the
+detected zone with a one-click "Use detected" affordance and a live preview
+of the current time there.
+
+**A regression was found and fixed in the process.** The half-finished
+timezone work had been committed in `247a2a7` (bundled with
+`schedule_meeting`) and pushed without re-running the suite; it broke 36
+tests. `AppServiceProvider` enables
+`Model::preventAccessingMissingAttributes()` outside production, and
+`actingAs($user)` authenticates the *factory-built* instance rather than a
+DB-retrieved one — `UserFactory` never set `timezone`, so `$user->timezone`
+threw `MissingAttributeException` and every meeting create/update 500'd.
+Production was unaffected (strict mode off there), but local and CI were
+hard-broken. Fixed by adding `'timezone' => null` to `UserFactory`.
+
+**Not done, and why**: registration does not capture a detected timezone.
+A new user resolves to `app.timezone` until they set one, and the meeting
+form states that zone explicitly, so nothing is silently wrong — it is a UX
+improvement, not a correctness gap.
+
+**Verification**: `php artisan test --compact` → **587 passed, 3020
+assertions** (566 → 587, +21: 9 `UserTimeTest`, 5 `TimezoneTest`, 5
+`MeetingTimezoneTest`, 2 assistant). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded. `npx vue-tsc
+--noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
+from entry #24, unchanged and unrelated.
+
+## Next recommended task (updated 2026-08-18, after entry #44)
+
+**`cancel_meeting`, then `edit_meeting`.**
+
+With timezones closed (entry #44), the remaining assistant meeting work is
+the two tools explicitly held back from entry #43. `cancel_meeting` first:
+it is the higher-consequence of the pair because cancelling emails every
+participant including externals, so it exercises the confirmation card and
+recipient-count context that `ProvidesConfirmationDetails` already
+supports. `edit_meeting` follows the same pattern but has to decide what
+"unchanged fields" means when the model supplies a partial argument set.
+
+Both should reuse `UpdateMeetingAction` / `DeleteMeetingAction` rather than
+reimplementing notification fan-out, exactly as `schedule_meeting` reuses
+`CreateMeetingAction`.
+
+Two smaller follow-ups worth folding in when convenient:
+
+- **Per-recipient in-app notifications.** Entry #44 left these using the
+  actor's zone because they are sent in one `Notification::send()` call.
+  Moving formatting into the notification's `toArray()` would fix it.
+- **Capture a timezone at registration.** New users currently resolve to
+  `app.timezone` until they visit settings.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
+
+## Superseded next-task note (after entry #43)
 
 **Give the assistant a timezone, or accept UTC everywhere.**
 

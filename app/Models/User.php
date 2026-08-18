@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $email
  * @property int|null $current_workspace_id
  * @property string|null $avatar_path
+ * @property string|null $timezone
  */
 class User extends Authenticatable implements MustVerifyEmail
 {

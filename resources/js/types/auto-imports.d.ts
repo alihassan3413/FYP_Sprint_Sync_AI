@@ -20,6 +20,7 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const detectTimezone: typeof import('../lib/timezones').detectTimezone
   const effectScope: typeof import('vue').effectScope
   const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
@@ -47,6 +48,7 @@ declare global {
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
+  const isSupportedTimezone: typeof import('../lib/timezones').isSupportedTimezone
   const isValidMeetingLink: typeof import('../lib/meetings').isValidMeetingLink
   const markRaw: typeof import('vue').markRaw
   const memberPresence: typeof import('../lib/members').memberPresence
@@ -76,6 +78,9 @@ declare global {
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
   const storeToRefs: typeof import('pinia').storeToRefs
+  const timezoneAbbreviation: typeof import('../lib/timezones').timezoneAbbreviation
+  const timezoneOffsetLabel: typeof import('../lib/timezones').timezoneOffsetLabel
+  const timezoneOptions: typeof import('../lib/timezones').timezoneOptions
   const toDateTimeLocalValue: typeof import('../lib/meetings').toDateTimeLocalValue
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
@@ -108,6 +113,7 @@ declare global {
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useToggle: typeof import('@vueuse/core').useToggle
+  const useUserTimezone: typeof import('../composables/useUserTimezone').useUserTimezone
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -148,6 +154,9 @@ declare global {
   // @ts-ignore
   export type { Task, TaskComment, TaskMember, BoardColumn } from '../lib/tasks'
   import('../lib/tasks')
+  // @ts-ignore
+  export type { TimezoneOption } from '../lib/timezones'
+  import('../lib/timezones')
 }
 
 // for vue template auto import
@@ -169,6 +178,7 @@ declare module 'vue' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly detectTimezone: UnwrapRef<typeof import('../lib/timezones')['detectTimezone']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
@@ -196,6 +206,7 @@ declare module 'vue' {
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
+    readonly isSupportedTimezone: UnwrapRef<typeof import('../lib/timezones')['isSupportedTimezone']>
     readonly isValidMeetingLink: UnwrapRef<typeof import('../lib/meetings')['isValidMeetingLink']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
@@ -225,6 +236,9 @@ declare module 'vue' {
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
+    readonly timezoneAbbreviation: UnwrapRef<typeof import('../lib/timezones')['timezoneAbbreviation']>
+    readonly timezoneOffsetLabel: UnwrapRef<typeof import('../lib/timezones')['timezoneOffsetLabel']>
+    readonly timezoneOptions: UnwrapRef<typeof import('../lib/timezones')['timezoneOptions']>
     readonly toDateTimeLocalValue: UnwrapRef<typeof import('../lib/meetings')['toDateTimeLocalValue']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
@@ -257,6 +271,7 @@ declare module 'vue' {
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
+    readonly useUserTimezone: UnwrapRef<typeof import('../composables/useUserTimezone')['useUserTimezone']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>

@@ -81,6 +81,26 @@ final class AssistantScheduleMeetingToolTest extends TestCase
         ], $args), $this->contextFor($user));
     }
 
+    public function test_it_interprets_the_time_in_the_users_timezone(): void
+    {
+        $this->owner->forceFill(['timezone' => 'Asia/Karachi'])->save();
+
+        $this->schedule($this->owner, ['scheduled_at' => '2026-09-01 15:00']);
+
+        $this->assertSame('2026-09-01 10:00:00', Meeting::query()->firstOrFail()->scheduled_at->toDateTimeString());
+    }
+
+    public function test_it_falls_back_to_the_application_timezone_when_the_user_has_none(): void
+    {
+        $this->owner->forceFill(['timezone' => null])->save();
+
+        $this->schedule($this->owner, ['scheduled_at' => '2026-09-01 15:00']);
+
+        $expected = now()->parse('2026-09-01 15:00', config('app.timezone'))->utc()->toDateTimeString();
+
+        $this->assertSame($expected, Meeting::query()->firstOrFail()->scheduled_at->toDateTimeString());
+    }
+
     public function test_the_tool_is_registered_and_requires_confirmation(): void
     {
         $names = array_map(

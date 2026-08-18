@@ -15,6 +15,9 @@ const emit = defineEmits<{
 
 const { workspaceRoute } = useCurrentWorkspace();
 
+const timeZone = useUserTimezone();
+const timezoneHint = computed(() => `Times are shown in ${timeZone.value} (${timezoneOffsetLabel(timeZone.value)}).`);
+
 const form = useForm<{
     title: string;
     description: string;
@@ -87,6 +90,7 @@ function handleClose(value: boolean) {
                 v-model="form.scheduled_at"
                 type="datetime-local"
                 label="Date & time"
+                :hint="timezoneHint"
                 :error="form.errors.scheduled_at"
                 required
             />
