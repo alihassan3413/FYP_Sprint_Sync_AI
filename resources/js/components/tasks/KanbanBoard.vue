@@ -5,6 +5,7 @@ import type { BoardColumn, Task } from '@/lib/tasks';
 
 const props = withDefaults(
     defineProps<{
+        projectId: number;
         tasks: Task[];
         boardColumns: BoardColumn[];
         currentUserId: number;
@@ -54,6 +55,22 @@ watch(
         localColumnOrder.value = [...boardColumns].sort((a, b) => a.position - b.position);
     },
 );
+
+useProjectTaskStream(props.projectId, (payload) => {
+    if (payload.project_id !== props.projectId) return;
+
+    const task = localTasks.value.find((candidate) => candidate.id === payload.task_id);
+    if (!task) return;
+
+    if (!localColumnOrder.value.some((column) => column.id === payload.board_column_id)) {
+        router.reload({ only: ['tasks', 'boardColumns'] });
+        return;
+    }
+
+    if (task.board_column_id === payload.board_column_id) return;
+
+    task.board_column_id = payload.board_column_id;
+});
 
 const visibleTasks = computed(() =>
     props.scope === 'mine' ? localTasks.value.filter((task) => task.assigned_to === props.currentUserId) : localTasks.value,

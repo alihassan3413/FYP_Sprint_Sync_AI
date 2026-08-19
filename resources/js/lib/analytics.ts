@@ -35,7 +35,34 @@ export interface Analytics {
     past_meetings: number;
     total_projects: number;
     projects: ProjectSummary[];
+    sprint_progress: SprintProgress;
     scope: 'team' | 'personal';
+}
+
+export interface SprintRef {
+    id: number;
+    name: string;
+    starts_on: string;
+    ends_on: string;
+    project_id: number;
+    project_name: string;
+}
+
+export interface SprintProgress {
+    has_sprint: boolean;
+    sprints: SprintRef[];
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    completion_percentage: number;
+    tasks_by_column: TaskColumnBreakdown[];
+}
+
+export interface AnalyticsSprintOption {
+    id: number;
+    name: string;
+    project_id: number;
+    is_current: boolean;
 }
 
 export interface AnalyticsProjectOption {
@@ -45,6 +72,7 @@ export interface AnalyticsProjectOption {
 
 export interface AnalyticsFilters {
     project_id: number | null;
+    sprint_id: number | null;
     from: string;
     to: string;
 }

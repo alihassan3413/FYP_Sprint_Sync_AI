@@ -30,6 +30,11 @@ enum AuditAction: string
     case TASK_DELETED = 'task.deleted';
     case TASK_MOVED = 'task.moved';
     case TASK_ASSIGNED = 'task.assigned';
+
+    case SPRINT_CREATED = 'sprint.created';
+    case SPRINT_UPDATED = 'sprint.updated';
+    case SPRINT_DELETED = 'sprint.deleted';
+
     case BOARD_COLUMN_CREATED = 'board_column.created';
     case BOARD_COLUMN_DELETED = 'board_column.deleted';
     case BOARD_COLUMN_REORDERED = 'board_column.reordered';
@@ -57,7 +62,7 @@ enum AuditAction: string
         return match (true) {
             str_starts_with($this->value, 'workspace.') => 'Workspace',
             str_starts_with($this->value, 'member.'), str_starts_with($this->value, 'invite_link.') => 'Team',
-            str_starts_with($this->value, 'project.') => 'Projects',
+            str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
             str_starts_with($this->value, 'account.') => 'Account',
@@ -103,6 +108,9 @@ enum AuditAction: string
             self::TASK_DELETED => 'Task deleted',
             self::TASK_MOVED => 'Task moved',
             self::TASK_ASSIGNED => 'Task assigned',
+            self::SPRINT_CREATED => 'Sprint created',
+            self::SPRINT_UPDATED => 'Sprint updated',
+            self::SPRINT_DELETED => 'Sprint deleted',
             self::BOARD_COLUMN_CREATED => 'Board column created',
             self::BOARD_COLUMN_DELETED => 'Board column deleted',
             self::BOARD_COLUMN_REORDERED => 'Board columns reordered',

@@ -7,7 +7,18 @@ import { createPinia } from 'pinia';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+import { configureEcho } from '@laravel/echo-vue';
 import { initializeTheme } from './composables/useAppearance';
+
+configureEcho({
+    broadcaster: 'reverb',
+    key: import.meta.env.VITE_REVERB_APP_KEY,
+    wsHost: import.meta.env.VITE_REVERB_HOST,
+    wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 80),
+    wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 443),
+    forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
+    enabledTransports: ['ws', 'wss'],
+});
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {

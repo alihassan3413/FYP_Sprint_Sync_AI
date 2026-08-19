@@ -34,6 +34,16 @@ final class Project extends Model
         'workspace_id',
     ];
 
+    public function sprints(): HasMany
+    {
+        return $this->hasMany(Sprint::class);
+    }
+
+    public function currentSprint(): ?Sprint
+    {
+        return $this->sprints()->current()->orderByDesc('starts_on')->first();
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

@@ -6,6 +6,7 @@ namespace App\Modules\Tasks\Models;
 
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Database\Factories\TaskFactory;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property int $board_column_id
  * @property Carbon|null $due_date
  * @property int $project_id
+ * @property int|null $sprint_id
  * @property int $workspace_id
  * @property int|null $assigned_to
  */
@@ -36,6 +38,7 @@ final class Task extends Model
         'board_column_id',
         'due_date',
         'project_id',
+        'sprint_id',
         'workspace_id',
         'assigned_to',
     ];
@@ -50,6 +53,11 @@ final class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function sprint(): BelongsTo
+    {
+        return $this->belongsTo(Sprint::class);
     }
 
     public function workspace(): BelongsTo

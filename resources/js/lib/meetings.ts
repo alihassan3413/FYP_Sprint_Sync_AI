@@ -10,6 +10,19 @@ export interface MeetingParticipant {
     is_external: boolean;
 }
 
+export interface MeetingTranscript {
+    status: 'awaiting_audio' | 'queued' | 'processing' | 'completed' | 'failed';
+    status_label: string;
+    source: 'recording' | 'manual' | null;
+    has_audio: boolean;
+    is_low_confidence: boolean;
+    confidence: number | null;
+    language: string | null;
+    failure_reason: string | null;
+    text: string | null;
+    transcribed_at: string | null;
+}
+
 export interface Meeting {
     id: number;
     title: string;
@@ -23,6 +36,7 @@ export interface Meeting {
     created_by: number;
     creator_name: string | null;
     join_url: string | null;
+    transcript: MeetingTranscript | null;
     participants: MeetingParticipant[];
     /** ISO datetime */
     created_at: string;

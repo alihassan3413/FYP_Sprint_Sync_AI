@@ -34,6 +34,7 @@ final class UpdateTaskAction
             'description' => $data->description,
             'assigned_to' => $data->assigned_to,
             'due_date' => $data->due_date,
+            'sprint_id' => $data->sprint_id,
         ]);
 
         if ($task->wasChanged(['title', 'description', 'due_date'])) {

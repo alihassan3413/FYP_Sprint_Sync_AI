@@ -24,6 +24,8 @@ final class MeetingData extends Data
         public int $created_by,
         public ?string $creator_name,
         public ?string $join_url,
+        /** @var array<string, mixed>|null */
+        public ?array $transcript,
         /** @var array<int, array<string, mixed>> */
         public array $participants,
         public string $created_at,
@@ -44,6 +46,18 @@ final class MeetingData extends Data
             created_by: $meeting->created_by,
             creator_name: $meeting->creator?->name,
             join_url: $meeting->join_token === null ? null : $meeting->joinUrl(),
+            transcript: $meeting->transcript === null ? null : [
+                'status' => $meeting->transcript->status->value,
+                'status_label' => $meeting->transcript->status->label(),
+                'source' => $meeting->transcript->source?->value,
+                'has_audio' => $meeting->transcript->hasAudio(),
+                'is_low_confidence' => $meeting->transcript->is_low_confidence,
+                'confidence' => $meeting->transcript->confidence,
+                'language' => $meeting->transcript->language,
+                'failure_reason' => $meeting->transcript->failure_reason,
+                'text' => $meeting->transcript->text,
+                'transcribed_at' => $meeting->transcript->transcribed_at?->toIso8601String(),
+            ],
             participants: $meeting->participants
                 ->map(fn (MeetingParticipant $participant) => [
                     'id' => $participant->id,

@@ -11,9 +11,11 @@ use App\Modules\Projects\Actions\CreateProjectAction;
 use App\Modules\Projects\Actions\DeleteProjectAction;
 use App\Modules\Projects\Actions\UpdateProjectAction;
 use App\Modules\Projects\Data\ProjectData;
+use App\Modules\Projects\Data\SprintData;
 use App\Modules\Projects\Http\Requests\StoreProjectRequest;
 use App\Modules\Projects\Http\Requests\UpdateProjectRequest;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Data\BoardColumnData;
 use App\Modules\Tasks\Data\TaskData;
 use App\Modules\Tasks\Models\BoardColumn;
@@ -57,6 +59,13 @@ final class ProjectController
             'canManageMeetings' => $user->can('create', [Meeting::class, $project]),
             'canManageProjectMembers' => $canManageProjectMembers,
             'canManageBoardColumns' => $user->can('create', [BoardColumn::class, $project]),
+            'canManageSprints' => $user->can('create', [Sprint::class, $project]),
+            'sprints' => $project->sprints()
+                ->withCount('tasks')
+                ->orderByDesc('starts_on')
+                ->get()
+                ->map(SprintData::fromModel(...))
+                ->values(),
             'boardColumns' => $project->boardColumns()
                 ->orderBy('position')
                 ->get()
@@ -69,7 +78,7 @@ final class ProjectController
                 ->map(TaskData::fromModel(...))
                 ->values(),
             'meetings' => $project->meetings()
-                ->with(['creator:id,name,email', 'participants'])
+                ->with(['creator:id,name,email', 'participants', 'transcript'])
                 ->orderBy('scheduled_at')
                 ->get()
                 ->map(MeetingData::fromModel(...))

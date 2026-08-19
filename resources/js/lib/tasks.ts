@@ -10,6 +10,7 @@ export interface Task {
     /** ISO date (YYYY-MM-DD), no time component */
     due_date: string | null;
     project_id: number;
+    sprint_id: number | null;
     workspace_id: number;
     assigned_to: number | null;
     assignee_name: string | null;

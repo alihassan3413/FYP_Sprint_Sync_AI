@@ -10,14 +10,27 @@ rather than a work-log heading.
 
 | Status | Count | FRs |
 |---|---|---|
-| Complete | 16 | FR03, FR07, FR08, FR09, FR14, FR17, FR21, FR24, FR25, FR26, FR29, FR30, FR31, FR32, FR33, FR34 |
-| Partial | 13 | FR01, FR04, FR05, FR06, FR15, FR16, FR18, FR19, FR20, FR22, FR23, FR28, FR35 |
+| Complete | 18 | FR03, FR07, FR08, FR09, FR10, FR14, FR16, FR17, FR21, FR24, FR25, FR26, FR29, FR30, FR31, FR32, FR33, FR34 |
+| Partial | 12 | FR01, FR04, FR05, FR06, FR15, FR18, FR19, FR20, FR22, FR23, FR28, FR35 |
 | Design Mismatch | 2 | FR02, FR27 |
-| Not started | 4 | FR10, FR11, FR12, FR13 |
+| Not started | 3 | FR11, FR12, FR13 |
 
-Strict completion: **16 / 35 (45.7%)**. Counting the two Design Mismatches as
-satisfied-by-design (the recommended resolution): **18 / 35 (51.4%)**.
-Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **70.0%**.
+Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
+satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
+Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
+
+Entry #52 closed **FR10**, the first of the four deferred AI-pipeline
+requirements, moving it from Not started to Complete. Its one caveat is
+recorded in that entry: SprintSync does not host calls, so the meeting
+*recording* is ingested by upload rather than captured automatically.
+
+Entry #51 closed FR20-02 by adding the sprint entity every earlier audit
+deferred. **FR20 stays Partial** — FR20-03 and FR20-04 are Blocked by
+FR10–FR13 — so the counts do not move, but **the unblocked FR list is now
+empty**: every sub-requirement that does not depend on FR10–FR13 is done.
+
+Entry #50 closed FR16-02 with Laravel Reverb, moving **FR16 to Complete** —
+the first status change to the counts since entry #27.
 
 Entry #49 closed FR35-01, FR35-02, FR35-03, FR35-05, FR35-06 and FR04-01.
 **FR04 and FR35 both stay Partial, but their counts do not move**: each has
@@ -4920,7 +4933,462 @@ enum move. `npx vue-tsc --noEmit` → exactly the two pre-existing `TS2688`
 `tsconfig.json` errors from entry #24, unchanged and unrelated.
 `ModuleBoundaryTest` passes.
 
-## Next recommended task (updated 2026-08-19, after entry #49)
+### 50. FR16-02 — realtime task-status updates (Laravel Reverb)
+
+The first realtime infrastructure in SprintSync. Before this entry the
+project had **no broadcasting at all**: no `config/broadcasting.php`, no
+`routes/channels.php`, no Echo/Reverb/Pusher packages, and no
+`withRouting(channels: ...)` entry in `bootstrap/app.php`.
+
+**Stack decision: Laravel Reverb + Laravel Echo.** Reverb is first-party,
+runs in-process via `php artisan reverb:start`, needs no external account,
+and is fully supported on this stack (Laravel 12.57, PHP 8.4). No
+third-party SaaS was introduced — Pusher's *protocol* is used, but only via
+`pusher-js` as the wire client Reverb speaks; no Pusher account or hosted
+service is involved. Installed: `laravel/reverb`, plus `laravel-echo`,
+`pusher-js` and `@laravel/echo-vue` on the client. This is the only
+dependency change and it is exactly the stack the task nominated.
+
+**A single narrow event.** `App\Modules\Tasks\Events\TaskStatusUpdated`
+implements `ShouldBroadcast`, broadcasts as `task.status-updated`, and
+carries four fields and nothing else: `task_id`, `project_id`,
+`board_column_id`, `updated_at`. A test asserts the payload key list
+exactly and that neither the task title nor the assignee's email appears in
+the encoded payload. It is dispatched from `UpdateTaskStatusAction` inside
+the existing `wasChanged('board_column_id')` guard, so the no-op
+suppression that already governed audit and notifications governs
+broadcasting too — asserted by a test that moves a task to the column it is
+already in and expects no event.
+
+**Broadcast authorization reuses the existing rule, it does not restate
+it.** `routes/channels.php` registers `project.{projectId}` and delegates
+to `$user->can('view', $project)` — `ProjectPolicy::view`, which is
+workspace-admin-or-project-member and, since entry #49, also honours the
+`projects.view` custom permission. No parallel weaker rule exists. A
+missing project returns false rather than throwing, so probing for project
+IDs yields the same rejection as being unauthorised.
+
+**Broadcast failures cannot break a task move.** The dispatch is wrapped in
+the same `try`/`catch (Throwable)` + `Log::error` shape `notifyMove()`
+already used. Realtime is progressive enhancement: with Reverb down, the
+PATCH still persists, notifies and audits.
+
+**Client reconciliation is idempotent by construction.** `useProjectTaskStream`
+subscribes for the component's lifetime via `useEcho` (one configured Echo
+singleton from `app.ts`, not one per component) and short-circuits entirely
+when `VITE_REVERB_APP_KEY` is absent. On each event `KanbanBoard` finds the
+task in `localTasks` and:
+
+- ignores events for a different project;
+- ignores unknown task IDs (realtime task *creation* is out of scope);
+- calls `router.reload({ only: ['tasks', 'boardColumns'] })` if the target
+  column no longer exists locally, rather than corrupting state;
+- returns early when the task is already in that column — which is exactly
+  the actor's own echo, so their optimistic move never flashes or reverts;
+- otherwise mutates only `board_column_id`, preserving every other field.
+
+Because `visibleTasks` derives from `localTasks`, both the **My tasks** and
+**All tasks** scopes from FR14-04 update without further work, and custom
+board columns work because the payload carries `board_column_id` rather
+than an assumed status enum.
+
+**Two real problems surfaced during the work:**
+
+1. **`Dispatchable::dispatch()` is static.** The first implementation called
+   `TaskStatusUpdated::fromTask($task)->dispatch()`, which re-invokes the
+   static method and constructs a *new* argument-less event —
+   `ArgumentCountError`, silently swallowed by the surrounding
+   `catch (Throwable)`. The broadcast test caught it; it is now
+   `event(TaskStatusUpdated::fromTask($task))`. Worth recording as evidence
+   that the broad catch protects the request but hides mistakes.
+2. **The `log` broadcaster's `auth()` is a no-op**, so every
+   `/broadcasting/auth` rejection test passed vacuously. The suite runs on
+   `log` (forced in `phpunit.xml`) so no test ever opens a socket;
+   `ProjectBroadcastChannelTest` switches itself to the `reverb` broadcaster
+   in `setUp()` — auth is local HMAC, no network — and re-registers the
+   channel routes, which is what makes its four rejection cases meaningful.
+
+**Local development setup:**
+
+```
+php artisan reverb:start      # websocket server, default port 8080
+composer run dev              # app + vite as before
+```
+
+`BROADCAST_CONNECTION=reverb` and the `REVERB_*` / `VITE_REVERB_*` keys were
+added to `.env.example` with non-secret defaults (`localhost:8080`, `http`);
+real credentials were generated into the local `.env` only. `app.ts` reads
+host, port and scheme from `import.meta.env`, so nothing about localhost is
+hardcoded in production code. `QUEUE_CONNECTION=database` means a queue
+worker is needed for broadcasts to leave the request in production;
+`ShouldBroadcast` was chosen over `ShouldBroadcastNow` deliberately so a
+slow or unreachable socket cannot block the HTTP response.
+
+**FR16 status: Complete.** FR16-01 was already satisfied; FR16-02 is now
+satisfied for task status, which is what the requirement names ("immediately
+reflect all task status changes across all active users' dashboards").
+Realtime comments, task creation/deletion, meetings and presence were all
+explicitly out of scope and remain unimplemented.
+
+**Tests**: 17 new. `TaskStatusBroadcastTest` (6) covers dispatch on a real
+change, silence on a no-op, silence on an unauthorised move, the private
+channel name and event alias, the exact payload shape, and that persistence
+plus audit still happen. `ProjectBroadcastChannelTest` (11) covers owner,
+admin, project member, unassigned member, cross-workspace user and a custom
+role with `projects.view`, plus five `/broadcasting/auth` HTTP cases
+including guest, unknown project and cross-workspace project.
+
+**Frontend verification** was lint, `vue-tsc`, build and review, as
+instructed — no JS test runner was introduced.
+
+**Verification**: `php artisan test --compact` → **708 passed, 3533
+assertions** (691 → 708, +17). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded.
+`npx vue-tsc --noEmit` → exactly the two pre-existing `TS2688`
+`tsconfig.json` errors from entry #24, unchanged and unrelated.
+`ModuleBoundaryTest` passes. `php artisan reverb:start` boots and binds
+(verified on a free port; 8080 was occupied on this machine).
+
+### 51. FR20-02 — sprints, and sprint-scoped completion analytics
+
+The sprint entity that entries #26, #27 and #39 all deferred. Entry #27 put
+it precisely: the FR04-05 widget reports "completion across the current
+accessible-project task set" and *"if the architecture later gains a real
+sprint model, the widget's scope changes from all accessible tasks to tasks
+in the active sprint and nothing else about it needs to move."* This entry
+adds that model.
+
+**A sprint is a project-scoped, date-bounded iteration.** `sprints` holds
+`name`, optional `goal`, `starts_on`, `ends_on`, `project_id` and
+`workspace_id`; `tasks.sprint_id` is nullable with `nullOnDelete`, so
+deleting a sprint un-assigns its tasks rather than destroying work — a test
+pins that. The model lives in the **Projects** module because a sprint is
+project planning, and `Models` is a public segment, so Tasks and Analytics
+can both reference it without violating `ModuleBoundaryTest`.
+
+**"Current" is a date question, not a flag.** `Sprint::scopeCurrent()`
+matches `starts_on <= today <= ends_on`, and `Project::currentSprint()`
+returns the latest-starting match. There is no `is_active` boolean to drift
+out of sync with the calendar. To keep "current" unambiguous,
+`StoreSprintRequest` rejects a sprint whose dates overlap another sprint
+**in the same project** — overlapping sprints in *different* projects are
+fine and tested, and `UpdateSprintRequest` excludes the sprint being edited
+from its own overlap check, which is the classic bug in this shape of
+validation.
+
+**The FR20-02 chart.** `BuildAnalyticsAction` gained
+`sprint_progress`: `has_sprint`, the resolved sprint list, totals,
+completion percentage and a `tasks_by_column` breakdown limited to that
+sprint's tasks. `tasksByColumn()` took an optional `$sprintIds` argument
+rather than being duplicated. Because analytics span multiple projects,
+"current sprint" resolves to the **union of each accessible project's
+current sprint**; a `project_id` filter narrows it, and an explicit
+`sprint_id` filter overrides it so past sprints can be inspected. All three
+paths are tested.
+
+**Scope and tenancy come free, deliberately.** The sprint aggregates run
+through the same `applyScope()` used by every other analytics figure, so a
+plain member sees only their own tasks within the current sprint
+(`scope: personal`), while an admin sees the team-wide total — asserted
+directly. A `sprint_id` naming a sprint in an inaccessible project resolves
+to nothing because `resolveSprints()` is constrained to `$projectIds`,
+which already derives from `accessibleProjectsFor()`. No new tenancy rule
+was written.
+
+**Authorization reuses the project rules.** `SprintPolicy` delegates view to
+`ProjectPolicy::view` and create/update/delete to workspace-admin-or-project-
+manager — the same shape as `TaskPolicy::create`. A plain project member
+cannot create a sprint; a cross-workspace user gets 404 from
+`EnsureWorkspaceMember` before the policy runs. Task assignment is guarded
+separately: `sprint_id` on task create/update is rejected unless the sprint
+belongs to that project, so a supplied ID cannot pull a task into another
+project's sprint.
+
+**Audit coverage** follows the existing convention —
+`sprint.created` / `sprint.updated` / `sprint.deleted` were added to
+`AuditAction` with labels and a `Projects` category. The `label()` match is
+exhaustive, so omitting them would have thrown `UnhandledMatchError` at
+runtime rather than failing quietly.
+
+**UI.** A `Sprints` tab on the project page (`SprintPanel.vue`) lists
+sprints with status badges, task counts and inline create/edit/delete for
+users who can manage them. Task create and edit modals gained a sprint
+picker. The analytics page gained a **Sprint task completion** card —
+percentage, progress bar and per-column bars — plus a sprint selector that
+defaults to "Current sprint" and lists past sprints. With no sprint
+running, the card explains how to create one instead of showing a
+misleading zero.
+
+**FR status:**
+
+- **FR20-02** Complete — the chart shows completion across board columns
+  for the current sprint. The report names "To Do, In Progress, Done"; the
+  app uses custom board columns (the FR14-02 design mismatch already
+  recorded), so the chart renders whatever columns the project defines,
+  with `is_done` driving the completed count.
+- **FR20-01** and **FR20-05** were already Complete.
+- **FR20-03** (blocker frequency) and **FR20-04** (action items, blockers)
+  remain **Blocked by FR10–FR13**, so **FR20 stays Partial**.
+- **FR04-05** was left pointing at all accessible tasks rather than the
+  current sprint. It is marked Complete and its tests encode that
+  behaviour; re-scoping the dashboard widget is a deliberate follow-up, not
+  something to slip into this entry.
+
+**Tests**: 24 new. `SprintTest` (15) covers admin and manager creation,
+plain-member refusal, date-order and overlap validation, cross-project
+overlap being allowed, self-overlap on update, task preservation on
+delete, cross-project and cross-workspace rejection, current-sprint
+resolution, the no-current-sprint case, the project payload, and both task
+assignment guards. `SprintAnalyticsTest` (9) covers the sprint chart
+counting only sprint tasks, the column breakdown, the no-sprint state, the
+explicit sprint filter, multi-project union, project narrowing,
+inaccessible-sprint isolation, personal scope, and the selector list.
+
+**Verification**: `php artisan test --compact` → **732 passed, 3714
+assertions** (708 → 732, +24). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded.
+`php artisan typescript:transform` regenerated 30 types.
+`npx vue-tsc --noEmit` → exactly the two pre-existing `TS2688`
+`tsconfig.json` errors from entry #24, unchanged and unrelated.
+`ModuleBoundaryTest` passes.
+
+### 52. FR10 — auto-transcribe meeting
+
+The first of the four deliberately-deferred AI pipeline requirements.
+
+**The precondition FR10-02 assumes does not exist, and could not be
+invented.** The requirement says "a full speech-to-text transcript of the
+meeting **recording**" — but SprintSync does not host meetings. It stores a
+`meeting_link` pointing at an external provider and a SprintSync join token;
+it never touches audio, and every prior entry excluded Zoom / Google Meet /
+WebRTC integrations. There is therefore no recording for the system to
+transcribe.
+
+Rather than fabricate capture, this entry implements **recording
+ingestion**: an authorised user uploads the meeting audio and everything
+downstream — detection, transcription, confidence scoring, failure
+handling — is real. FR10-04 already puts manual upload in the requirement's
+own vocabulary, so upload is not a foreign concept here. If SprintSync ever
+hosts calls or integrates a provider API, only the *source* of the audio
+changes; the pipeline behind it does not.
+
+**FR10-01 — automatic detection.** `QueueCompletedMeetingTranscriptions`
+finds meetings whose `scheduled_at + duration_minutes` has passed (reusing
+the existing `Meeting::scopePast()`), creates a transcript row at
+`awaiting_audio`, and queues transcription for any that already have audio.
+It is idempotent — `firstOrCreate` on `meeting_id`, which is unique — so
+the scheduled run every five minutes never duplicates or re-queues work. A
+test asserts a second run detects nothing.
+
+**FR10-02 — transcription.** `TranscriptionProvider` mirrors the existing
+`AiProvider` contract: `OpenAiTranscriptionProvider` calls Whisper's
+`/audio/transcriptions` with `response_format=verbose_json`, and
+`NullTranscriptionProvider` is the fallback when no driver is configured,
+so an unconfigured install fails cleanly instead of erroring at a null API
+key. Transcripts, language, provider and model land in
+`meeting_transcripts`, one row per meeting.
+
+**FR10-03 — low-confidence flagging.** Whisper reports per-segment
+`avg_logprob` (a log probability) and `no_speech_prob`.
+`TranscriptionConfidence` folds both into a single 0–100 score —
+`exp(avg_logprob) × (1 - no_speech_prob)`, averaged — so nothing downstream
+has to know the provider's units. Below the configurable threshold (65 by
+default) the transcript is stored **and** flagged, and the UI shows an
+amber "review before relying on it" banner. A low-confidence transcript is
+still `completed`; the warning does not block use, which is what FR10-03
+asks for.
+
+**FR10-04 — failure handling.** Any failure sets status `failed` with a
+human-readable reason and notifies the people the report calls Scrum
+Masters — project managers plus workspace owners/admins, the same FR27
+mapping used since entry #38. The notification links straight to the manual
+upload affordance, and a test asserts a plain project member is *not*
+notified. Manual transcript entry and a retry endpoint both exist; retry is
+refused with 422 when there is no audio to retry.
+
+**Two real defects were found by the tests, not guessed at:**
+
+1. **Empty recordings crashed inside Guzzle.** `UploadedFile::fake()->create()`
+   produces a file with faked *metadata* but zero physical bytes, so
+   `file_get_contents()` returned `''` and Guzzle rejected the multipart
+   body with `A 'contents' key is required` — an internals message that
+   would have reached the user as the failure reason. The provider now
+   checks the audio is non-empty and readable first, and fails with a clear
+   message. The test writes real bytes so the happy path is exercised
+   honestly.
+2. **A stale HTTP fake masked the retry path.** `Http::fake()` keeps the
+   *first* matching stub, so re-faking the same URL for the retry
+   assertion silently kept returning the 500. Rewritten with
+   `Http::sequence()`, which is also a truer model of "fails, then
+   succeeds".
+
+**Authorization** reuses `MeetingPolicy`: `manageTranscript` delegates to
+`update` (workspace admin or project manager), `viewTranscript` to `view`.
+No parallel rule was written. Cross-workspace access is refused by
+`EnsureWorkspaceMember` before the policy runs, and a test drives a foreign
+meeting ID through this workspace's route to prove it 404s.
+
+**Audio storage** is the private `local` disk by default
+(`storage/app/private`), never the public one — recordings are not
+web-reachable. Re-uploading replaces the previous file rather than
+accumulating, asserted by a test.
+
+**Local setup:**
+
+```
+php artisan queue:work        # transcription runs as a queued job
+php artisan schedule:work     # detects completed meetings every 5 minutes
+```
+
+`TRANSCRIPTION_*` keys were added to `.env.example` with non-secret
+defaults; the API key reuses the existing `OPENAI_API_KEY`. Tests never
+reach the network — `Http::preventStrayRequests()` plus explicit fakes.
+
+**FR10 status: Complete, with the recording-source caveat recorded above.**
+FR10-01, FR10-03 and FR10-04 are satisfied outright. FR10-02 is satisfied
+for any meeting whose audio reaches SprintSync; automatic capture from a
+third-party call remains out of scope by prior decision, not by oversight.
+
+**Tests**: 20 in `MeetingTranscriptionTest` — detection of completed
+meetings, non-detection of future ones, idempotency across runs, queuing
+when audio exists, manager upload and successful transcription, plain
+member and cross-workspace refusal, non-audio upload rejection, low- and
+high-confidence flagging, provider failure with correct notification
+recipients, the manual-upload affordance in that notification, unconfigured
+provider, manual transcript entry, member refusal on manual entry, retry
+after failure, retry refusal without audio, transcribe-without-audio,
+recording replacement, and cross-workspace isolation.
+
+**Verification**: `php artisan test --compact` → **752 passed, 3777
+assertions** (732 → 752, +20). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded.
+`php artisan typescript:transform` regenerated 32 types.
+`npx vue-tsc --noEmit` → exactly the two pre-existing `TS2688`
+`tsconfig.json` errors from entry #24, unchanged and unrelated.
+`ModuleBoundaryTest` passes.
+
+## Next recommended task (updated 2026-08-19, after entry #52)
+
+**FR11 — generate AI summary.**
+
+FR10 produces the input FR11 needs, so the pipeline can continue directly.
+FR11 asks for a structured summary generated from the stored transcript on
+completion, organised into **Decisions Made**, **Action Items with owners
+and due dates**, and **Blockers Identified**, stored with status
+`Pending Review`, with a notification to the Scrum Master and a manual
+fallback if generation fails.
+
+Most of the shape already exists to copy: entry #52's
+`TranscriptionProvider` / job / failure-notification pattern maps almost
+one-to-one, and the Assistant module's `AiProvider` already talks to
+OpenAI, so summary generation should reuse it rather than add a second LLM
+client. The genuinely new work is the structured output schema and the
+`meeting_summaries` table with its status lifecycle — which FR12 and FR13
+then build on (review/edit, then approve-and-send).
+
+One thing to decide before starting FR11: **action item owners.** FR11-02
+wants owners assigned. The model can only guess owners from names spoken in
+a transcript, and SprintSync knows the real participant list. Resolving a
+spoken name to a `user_id` should be constrained to actual meeting
+participants, and left null when ambiguous, rather than trusting a
+model-supplied identity — the same rule entry #43 applied to
+`schedule_meeting` participants.
+
+After FR11: **FR12** (review UI, restricted by permission — this also
+closes the summary-approval half of FR35-04) and **FR13** (approve and
+send). Together they close the last open sub-requirements of FR04, FR06,
+FR15, FR19, FR20, FR22, FR23 and FR35.
+
+Still needing your decision rather than code:
+
+**FR02, FR27 and FR14-02 — the three Design Mismatches.**
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles;
+  the app uses per-workspace roles that FR29–FR35 depend on. Recommended:
+  amend the report.
+- **FR14-02 / FR20-02** assume fixed To Do / In Progress / Done columns;
+  the app has custom board columns, a superset. Recommended: amend the
+  report.
+
+## Superseded next-task note (after entry #51)
+
+**The unblocked FR list is now empty.** Every FR sub-requirement that does
+not depend on FR10–FR13 is implemented.
+
+What is left, in order of value:
+
+1. **FR10–FR13 — the AI meeting pipeline.** Recording, transcription,
+   summarisation and summary distribution. This is the largest remaining
+   block and it gates the last open sub-requirements of FR04, FR06, FR15,
+   FR19, FR20, FR22, FR23, FR28 and FR35. Nothing else in the FR table
+   moves until it does.
+
+2. **Two small follow-ups this work created or left:**
+   - **FR04-05 dashboard widget** still reports across all accessible
+     tasks rather than the current sprint. Entry #51 added the sprint model
+     that makes re-scoping possible; entry #27 predicted exactly this
+     change. Small, and it makes the dashboard widget match its own name.
+   - **The permission catalogue decision** from entry #49 — whether to add
+     `analytics.view` / `archive.view` / `audit.view`, and whether to drop
+     `billing.*` and `integrations.*`, which are checkboxes granting
+     nothing because those features do not exist.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report.
+
+A third is now worth naming: **FR14-02 / FR20-02 fixed columns.** The
+report assumes To Do / In Progress / Done; the app has custom board
+columns, which are a superset. The sprint chart renders whatever columns a
+project defines. Recommended: amend the report.
+
+## Superseded next-task note (after entry #50)
+
+**FR20-02 — "current sprint" analytics**, which needs a sprint entity, or
+the permission-catalogue decision still open from entry #49.
+
+With FR16 complete, the unblocked FR list is nearly exhausted. What remains:
+
+- **FR20-02** — the analytics module reports across all accessible
+  projects, but the report asks for *current sprint* progress. SprintSync
+  has no sprint entity, so this needs a real domain addition: a `sprints`
+  table scoped to a project, a date range, task association, and a notion
+  of which sprint is current. It is the last substantial unblocked build
+  item and it touches Tasks, Analytics and the dashboard.
+- **The permission catalogue decision** from entry #49 — whether to add
+  `analytics.view` / `archive.view` / `audit.view`, and whether to remove
+  `billing.*` and `integrations.*`, which are checkboxes that grant nothing
+  because those features do not exist.
+
+Everything else unblocked is done. FR10–FR13 (the AI meeting pipeline:
+recording, transcription, summarisation, summary distribution) remain the
+large deliberately-deferred block, and they gate the remaining
+sub-requirements of FR04, FR06, FR15, FR19, FR22, FR23, FR28 and FR35.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Entry #49 built
+  permission-aware visibility directly on that model. Recommended: amend
+  the report.
+
+## Superseded next-task note (after entry #49)
 
 **FR16-02 — realtime propagation**, or the analytics/archive/audit
 permission decision, depending on appetite.

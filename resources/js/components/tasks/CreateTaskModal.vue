@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { Sprint } from '@/lib/sprints';
 import { Loader2 } from 'lucide-vue-next';
 
 import type { TaskMember } from '@/lib/tasks';
 
 const props = defineProps<{
+    sprints?: Sprint[];
     open: boolean;
     projectId: number;
     members: TaskMember[];
@@ -21,11 +23,13 @@ const form = useForm<{
     description: string;
     assigned_to: number | null;
     due_date: string;
+    sprint_id: string;
 }>({
     title: '',
     description: '',
     assigned_to: null,
     due_date: '',
+    sprint_id: '',
 });
 
 function submit() {
@@ -85,6 +89,20 @@ function handleClose(value: boolean) {
                 </div>
 
                 <AppFormInput id="task-due-date" v-model="form.due_date" type="date" label="Due date" :error="form.errors.due_date" />
+                <div class="grid gap-1.5">
+                    <label :for="'task-sprint'" class="text-foreground text-sm font-medium">Sprint</label>
+                    <select
+                        :id="'task-sprint'"
+                        v-model="form.sprint_id"
+                        class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+                    >
+                        <option value="">No sprint</option>
+                        <option v-for="sprint in sprints" :key="sprint.id" :value="String(sprint.id)">
+                            {{ sprint.name }}{{ sprint.is_current ? ' (current)' : '' }}
+                        </option>
+                    </select>
+                    <InputError :message="form.errors.sprint_id" />
+                </div>
             </div>
         </form>
 

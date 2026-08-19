@@ -3,13 +3,14 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, FolderKanban
 
 import AppDataTable, { type Column } from '@/components/ui/AppDataTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { Analytics, AnalyticsFilters, AnalyticsProjectOption, ProjectSummary } from '@/lib/analytics';
+import type { Analytics, AnalyticsFilters, AnalyticsProjectOption, AnalyticsSprintOption, ProjectSummary } from '@/lib/analytics';
 import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     analytics: Analytics;
     filters: AnalyticsFilters;
     projects: AnalyticsProjectOption[];
+    sprints: AnalyticsSprintOption[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -17,6 +18,7 @@ const { workspaceRoute } = useCurrentWorkspace();
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Analytics', href: workspaceRoute('workspace.analytics.index') }];
 
 const projectId = ref(props.filters.project_id ? String(props.filters.project_id) : '');
+const sprintId = ref(props.filters.sprint_id ? String(props.filters.sprint_id) : '');
 const from = ref(props.filters.from);
 const to = ref(props.filters.to);
 
@@ -25,6 +27,7 @@ function applyFilters() {
         workspaceRoute('workspace.analytics.index'),
         {
             project_id: projectId.value || undefined,
+            sprint_id: sprintId.value || undefined,
             from: from.value || undefined,
             to: to.value || undefined,
         },
@@ -32,12 +35,13 @@ function applyFilters() {
     );
 }
 
-watch([projectId, from, to], () => applyFilters());
+watch([projectId, sprintId, from, to], () => applyFilters());
 
-const hasActiveFilters = computed(() => projectId.value !== '' || from.value !== '' || to.value !== '');
+const hasActiveFilters = computed(() => projectId.value !== '' || sprintId.value !== '' || from.value !== '' || to.value !== '');
 
 function clearFilters() {
     projectId.value = '';
+    sprintId.value = '';
     from.value = '';
     to.value = '';
 }
@@ -51,6 +55,25 @@ const columnBars = computed(() =>
 );
 
 const assigneeBars = computed(() => props.analytics.tasks_by_assignee.map((a) => ({ label: a.name, count: a.count })));
+
+const sprintProgress = computed(() => props.analytics.sprint_progress);
+
+const sprintBars = computed(() =>
+    sprintProgress.value.tasks_by_column.map((col) => ({
+        label: col.name,
+        count: col.count,
+        tone: col.is_done ? ('success' as const) : ('default' as const),
+    })),
+);
+
+const sprintHeading = computed(() => {
+    const sprints = sprintProgress.value.sprints;
+    if (sprints.length === 0) return 'Current sprint';
+    if (sprints.length === 1) return sprints[0].name;
+    return `${sprints.length} active sprints`;
+});
+
+const sprintSelectOptions = computed(() => props.sprints.filter((sprint) => projectId.value === '' || String(sprint.project_id) === projectId.value));
 
 const isPersonalScope = computed(() => props.analytics.scope === 'personal');
 
@@ -93,6 +116,18 @@ const projectColumns: Column<ProjectSummary>[] = [
                 >
                     <option value="">All projects</option>
                     <option v-for="project in projects" :key="project.id" :value="String(project.id)">{{ project.name }}</option>
+                </select>
+
+                <select
+                    v-if="sprintSelectOptions.length > 0"
+                    v-model="sprintId"
+                    aria-label="Sprint"
+                    class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+                >
+                    <option value="">Current sprint</option>
+                    <option v-for="sprint in sprintSelectOptions" :key="sprint.id" :value="String(sprint.id)">
+                        {{ sprint.name }}{{ sprint.is_current ? ' (current)' : '' }}
+                    </option>
                 </select>
 
                 <div class="flex items-center gap-2">
@@ -152,6 +187,46 @@ const projectColumns: Column<ProjectSummary>[] = [
                 <AppStatCard label="Meetings" :value="analytics.total_meetings" :hint="`${analytics.upcoming_meetings} upcoming`">
                     <template #icon><CalendarClock class="size-3.5" /></template>
                 </AppStatCard>
+            </div>
+
+            <div class="bg-card rounded-xl border p-5 shadow-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-[15px] font-semibold tracking-tight">Sprint task completion</h3>
+                        <span
+                            v-if="sprintProgress.has_sprint"
+                            class="border-border bg-muted/40 text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                        >
+                            {{ sprintHeading }}
+                        </span>
+                    </div>
+
+                    <span v-if="sprintProgress.has_sprint" class="text-muted-foreground text-xs tabular-nums">
+                        {{ sprintProgress.completed_tasks }} of {{ sprintProgress.total_tasks }} done
+                    </span>
+                </div>
+
+                <template v-if="sprintProgress.has_sprint">
+                    <div class="mt-4 flex items-baseline gap-2">
+                        <span class="text-3xl font-semibold tracking-tight tabular-nums"> {{ sprintProgress.completion_percentage }}% </span>
+                        <span class="text-muted-foreground text-xs tabular-nums">{{ sprintProgress.open_tasks }} open</span>
+                    </div>
+
+                    <div class="bg-muted mt-3 h-2 w-full overflow-hidden rounded-full">
+                        <div
+                            class="h-full rounded-full bg-emerald-500 transition-all"
+                            :style="{ width: `${sprintProgress.completion_percentage}%` }"
+                        />
+                    </div>
+
+                    <div class="mt-5">
+                        <AppBarList :items="sprintBars" empty-label="No tasks in this sprint yet." />
+                    </div>
+                </template>
+
+                <p v-else class="text-muted-foreground mt-4 text-xs">
+                    No sprint is running right now. Create a sprint on a project and assign tasks to it to see sprint progress here.
+                </p>
             </div>
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">

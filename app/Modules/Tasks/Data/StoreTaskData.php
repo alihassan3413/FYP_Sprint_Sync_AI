@@ -23,5 +23,8 @@ final class StoreTaskData extends Data
 
         #[Rule(['nullable', 'date'])]
         public ?string $due_date,
+
+        #[Rule(['nullable', 'integer'])]
+        public ?int $sprint_id = null,
     ) {}
 }

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Tasks\Data\UpdateTaskStatusData;
+use App\Modules\Tasks\Events\TaskStatusUpdated;
 use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Notifications\NotificationChannel;
@@ -46,9 +47,22 @@ final class UpdateTaskStatusAction
             );
 
             $this->notifyMove($task, $actor);
+            $this->broadcastMove($task);
         }
 
         return $task->refresh();
+    }
+
+    private function broadcastMove(Task $task): void
+    {
+        try {
+            event(TaskStatusUpdated::fromTask($task));
+        } catch (Throwable $e) {
+            Log::error('Task status broadcast failed', [
+                'task_id' => $task->id,
+                'exception' => $e,
+            ]);
+        }
     }
 
     private function notifyMove(Task $task, User $actor): void

@@ -7,10 +7,13 @@ namespace App\Modules\Analytics\Actions;
 use App\Modules\Analytics\Data\AnalyticsData;
 use App\Modules\Analytics\Data\AnalyticsScope;
 use App\Modules\Analytics\Data\ProjectSummaryData;
+use App\Modules\Analytics\Data\SprintProgressData;
+use App\Modules\Analytics\Data\SprintRefData;
 use App\Modules\Analytics\Data\TaskAssigneeBreakdownData;
 use App\Modules\Analytics\Data\TaskColumnBreakdownData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -22,7 +25,7 @@ final class BuildAnalyticsAction
     private const MAX_ASSIGNEES = 8;
 
     /**
-     * @param  array{project_id?: int, from?: string, to?: string}  $filters
+     * @param  array{project_id?: int, from?: string, to?: string, sprint_id?: int}  $filters
      */
     public function handle(AnalyticsScope $scope, array $filters): AnalyticsData
     {
@@ -60,8 +63,65 @@ final class BuildAnalyticsAction
             past_meetings: (clone $meetingsQuery)->past()->count(),
             total_projects: $scope->accessibleProjects->count(),
             projects: $this->projectSummaries($scope, $scopedProjectIds),
+            sprint_progress: $this->sprintProgress($scope, $projectIds, $filters),
             scope: $scope->label(),
         );
+    }
+
+    /**
+     * @param  array<int, int>  $projectIds
+     * @param  array{project_id?: int, from?: string, to?: string, sprint_id?: int}  $filters
+     */
+    private function sprintProgress(AnalyticsScope $scope, array $projectIds, array $filters): SprintProgressData
+    {
+        if ($projectIds === []) {
+            return SprintProgressData::none();
+        }
+
+        $sprints = $this->resolveSprints($projectIds, $filters);
+
+        if ($sprints->isEmpty()) {
+            return SprintProgressData::none();
+        }
+
+        $sprintIds = $sprints->pluck('id')->all();
+
+        $total = $this->taskQuery($scope, $projectIds)->whereIn('tasks.sprint_id', $sprintIds)->count();
+        $completed = $this->taskQuery($scope, $projectIds)
+            ->whereIn('tasks.sprint_id', $sprintIds)
+            ->whereHas('boardColumn', fn ($q) => $q->where('is_done', true))
+            ->count();
+
+        $projectNames = $scope->accessibleProjects->pluck('name', 'id');
+
+        return new SprintProgressData(
+            has_sprint: true,
+            sprints: $sprints
+                ->map(fn (Sprint $sprint) => SprintRefData::fromModel($sprint, (string) $projectNames->get($sprint->project_id, 'Unknown project')))
+                ->values()
+                ->all(),
+            total_tasks: $total,
+            completed_tasks: $completed,
+            open_tasks: $total - $completed,
+            completion_percentage: $this->percentage($completed, $total),
+            tasks_by_column: $this->tasksByColumn($scope, $projectIds, $sprintIds),
+        );
+    }
+
+    /**
+     * @param  array<int, int>  $projectIds
+     * @param  array{project_id?: int, from?: string, to?: string, sprint_id?: int}  $filters
+     * @return Collection<int, Sprint>
+     */
+    private function resolveSprints(array $projectIds, array $filters): Collection
+    {
+        $query = Sprint::query()->forProjects($projectIds);
+
+        if (isset($filters['sprint_id'])) {
+            return $query->whereKey((int) $filters['sprint_id'])->get();
+        }
+
+        return $query->current()->orderByDesc('starts_on')->get();
     }
 
     /**
@@ -108,11 +168,13 @@ final class BuildAnalyticsAction
 
     /**
      * @param  array<int, int>  $projectIds
+     * @param  array<int, int>|null  $sprintIds
      * @return array<int, TaskColumnBreakdownData>
      */
-    private function tasksByColumn(AnalyticsScope $scope, array $projectIds): array
+    private function tasksByColumn(AnalyticsScope $scope, array $projectIds, ?array $sprintIds = null): array
     {
         return $this->applyScope(DB::table('tasks'), $scope, $projectIds)
+            ->when($sprintIds !== null, fn ($q) => $q->whereIn('tasks.sprint_id', $sprintIds))
             ->join('board_columns', 'board_columns.id', '=', 'tasks.board_column_id')
             ->selectRaw('board_columns.name as name, board_columns.is_done as is_done, MIN(board_columns.position) as position, COUNT(*) as count')
             ->groupBy('board_columns.name', 'board_columns.is_done')

@@ -11,6 +11,7 @@ export type AnalyticsData = {
     past_meetings: number;
     total_projects: number;
     projects: Array<ProjectSummaryData>;
+    sprint_progress: SprintProgressData;
     scope: string;
 };
 export type ArchiveRecordData = {
@@ -46,6 +47,9 @@ export enum AuditAction {
     TASK_DELETED = 'task.deleted',
     TASK_MOVED = 'task.moved',
     TASK_ASSIGNED = 'task.assigned',
+    SPRINT_CREATED = 'sprint.created',
+    SPRINT_UPDATED = 'sprint.updated',
+    SPRINT_DELETED = 'sprint.deleted',
     BOARD_COLUMN_CREATED = 'board_column.created',
     BOARD_COLUMN_DELETED = 'board_column.deleted',
     BOARD_COLUMN_REORDERED = 'board_column.reordered',
@@ -99,6 +103,7 @@ export type MeetingData = {
     created_by: number;
     creator_name?: string;
     join_url?: string;
+    transcript?: { [key: string]: any } | null;
     participants: { [key: number]: { [key: string]: any } };
     created_at: string;
     updated_at: string;
@@ -134,6 +139,34 @@ export type ProjectSummaryData = {
     completed_tasks: number;
     completion_percentage: number;
 };
+export type SprintData = {
+    id: number;
+    name: string;
+    goal?: string;
+    starts_on: string;
+    ends_on: string;
+    project_id: number;
+    is_current: boolean;
+    is_upcoming: boolean;
+    task_count: number;
+};
+export type SprintProgressData = {
+    has_sprint: boolean;
+    sprints: Array<SprintRefData>;
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    completion_percentage: number;
+    tasks_by_column: Array<TaskColumnBreakdownData>;
+};
+export type SprintRefData = {
+    id: number;
+    name: string;
+    starts_on: string;
+    ends_on: string;
+    project_id: number;
+    project_name: string;
+};
 export type StoreMeetingData = {
     title: string;
     description?: string;
@@ -147,11 +180,18 @@ export type StoreProjectData = {
     name: string;
     description?: string;
 };
+export type StoreSprintData = {
+    name: string;
+    goal?: string;
+    starts_on: string;
+    ends_on: string;
+};
 export type StoreTaskData = {
     title: string;
     description?: string;
     assigned_to?: number;
     due_date?: string;
+    sprint_id?: number;
 };
 export type StoreWorkspaceRoleData = {
     name: string;
@@ -183,6 +223,7 @@ export type TaskData = {
     board_column_id: number;
     due_date?: string;
     project_id: number;
+    sprint_id?: number;
     workspace_id: number;
     assigned_to?: number;
     assignee_name?: string;
@@ -190,6 +231,17 @@ export type TaskData = {
     created_at: string;
     updated_at: string;
 };
+export enum TranscriptSource {
+    Recording = 'recording',
+    Manual = 'manual',
+}
+export enum TranscriptStatus {
+    AwaitingAudio = 'awaiting_audio',
+    Queued = 'queued',
+    Processing = 'processing',
+    Completed = 'completed',
+    Failed = 'failed',
+}
 export type UpdateTaskStatusData = {
     board_column_id: number;
 };

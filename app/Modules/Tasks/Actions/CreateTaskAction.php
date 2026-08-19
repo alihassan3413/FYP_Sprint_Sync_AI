@@ -38,6 +38,7 @@ final class CreateTaskAction
             'description' => $data->description,
             'assigned_to' => $data->assigned_to,
             'due_date' => $data->due_date,
+            'sprint_id' => $data->sprint_id,
             'board_column_id' => $defaultColumnId,
             'workspace_id' => $project->workspace_id,
         ]);

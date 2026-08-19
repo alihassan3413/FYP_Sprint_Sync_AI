@@ -6,6 +6,7 @@ namespace App\Modules\Tasks\Http\Requests;
 
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
 use App\UserRole;
@@ -28,12 +29,22 @@ final class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'assigned_to' => ['nullable', 'integer'],
             'due_date' => ['nullable', 'date'],
+            'sprint_id' => ['nullable', 'integer'],
         ];
     }
 
     public function withValidator(mixed $validator): void
     {
         $validator->after(function ($validator) {
+            $sprintId = $this->input('sprint_id');
+
+            if ($sprintId !== null && ! Sprint::query()
+                ->whereKey((int) $sprintId)
+                ->where('project_id', $this->project()->id)
+                ->exists()) {
+                $validator->errors()->add('sprint_id', 'That sprint does not belong to this project.');
+            }
+
             $assignedTo = $this->input('assigned_to');
 
             if ($assignedTo === null) {

@@ -30,6 +30,7 @@ declare global {
   const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
+  const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
@@ -77,6 +78,7 @@ declare global {
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const sprintStatusLabel: typeof import('../lib/sprints').sprintStatusLabel
   const storeToRefs: typeof import('pinia').storeToRefs
   const timezoneAbbreviation: typeof import('../lib/timezones').timezoneAbbreviation
   const timezoneOffsetLabel: typeof import('../lib/timezones').timezoneOffsetLabel
@@ -109,6 +111,7 @@ declare global {
   const useModel: typeof import('vue').useModel
   const useNotificationStore: typeof import('../stores/notification.store').useNotificationStore
   const usePage: typeof import('@inertiajs/vue3').usePage
+  const useProjectTaskStream: typeof import('../composables/useProjectTaskStream').useProjectTaskStream
   const useRemember: typeof import('@inertiajs/vue3').useRemember
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
@@ -128,13 +131,16 @@ declare global {
   export type { AssistantState, PendingTool, AssistantMessage } from '../composables/useAiAssitant'
   import('../composables/useAiAssitant')
   // @ts-ignore
+  export type { TaskStatusUpdatedPayload } from '../composables/useProjectTaskStream'
+  import('../composables/useProjectTaskStream')
+  // @ts-ignore
   export type { ActivityKind, ActivityEntry } from '../lib/activity'
   import('../lib/activity')
   // @ts-ignore
   export type { AIContext } from '../lib/ai-suggestions'
   import('../lib/ai-suggestions')
   // @ts-ignore
-  export type { TaskColumnBreakdown, TaskAssigneeBreakdown, ProjectSummary, Analytics, AnalyticsProjectOption, AnalyticsFilters } from '../lib/analytics'
+  export type { TaskColumnBreakdown, TaskAssigneeBreakdown, ProjectSummary, Analytics, SprintRef, SprintProgress, AnalyticsSprintOption, AnalyticsProjectOption, AnalyticsFilters } from '../lib/analytics'
   import('../lib/analytics')
   // @ts-ignore
   export type { ArchiveRecordType, ArchiveRecord, ArchiveProjectOption, ArchiveAssigneeOption, ArchiveFilters, ArchivePage } from '../lib/archive'
@@ -143,7 +149,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { MeetingParticipant, Meeting } from '../lib/meetings'
+  export type { MeetingParticipant, MeetingTranscript, Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
   export type { MemberStatus, MemberRole, WorkspaceRoleOption, Member } from '../lib/members'
@@ -151,6 +157,9 @@ declare global {
   // @ts-ignore
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
+  // @ts-ignore
+  export type { Sprint } from '../lib/sprints'
+  import('../lib/sprints')
   // @ts-ignore
   export type { Task, TaskComment, TaskMember, BoardColumn } from '../lib/tasks'
   import('../lib/tasks')
@@ -188,6 +197,7 @@ declare module 'vue' {
     readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
+    readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
@@ -235,6 +245,7 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly sprintStatusLabel: UnwrapRef<typeof import('../lib/sprints')['sprintStatusLabel']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly timezoneAbbreviation: UnwrapRef<typeof import('../lib/timezones')['timezoneAbbreviation']>
     readonly timezoneOffsetLabel: UnwrapRef<typeof import('../lib/timezones')['timezoneOffsetLabel']>
@@ -267,6 +278,7 @@ declare module 'vue' {
     readonly useModel: UnwrapRef<typeof import('vue')['useModel']>
     readonly useNotificationStore: UnwrapRef<typeof import('../stores/notification.store')['useNotificationStore']>
     readonly usePage: UnwrapRef<typeof import('@inertiajs/vue3')['usePage']>
+    readonly useProjectTaskStream: UnwrapRef<typeof import('../composables/useProjectTaskStream')['useProjectTaskStream']>
     readonly useRemember: UnwrapRef<typeof import('@inertiajs/vue3')['useRemember']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>

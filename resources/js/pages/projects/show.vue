@@ -4,6 +4,7 @@ import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, 
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Meeting } from '@/lib/meetings';
 import type { Project, ProjectMember } from '@/lib/projects';
+import type { Sprint } from '@/lib/sprints';
 import type { BoardColumn, Task, TaskMember } from '@/lib/tasks';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 
@@ -15,6 +16,8 @@ const props = defineProps<{
     canManageMeetings: boolean;
     canManageProjectMembers: boolean;
     canManageBoardColumns: boolean;
+    canManageSprints: boolean;
+    sprints: Sprint[];
     tasks: Task[];
     boardColumns: BoardColumn[];
     meetings: Meeting[];
@@ -131,6 +134,7 @@ function onDeleted() {
                 <Tabs default-value="board">
                     <TabsList>
                         <TabsTrigger value="board">Board</TabsTrigger>
+                        <TabsTrigger value="sprints">Sprints</TabsTrigger>
                         <TabsTrigger value="meetings">Meetings</TabsTrigger>
                         <TabsTrigger value="activity">Activity</TabsTrigger>
                         <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -163,6 +167,7 @@ function onDeleted() {
 
                         <KanbanBoard
                             v-if="tasks.length > 0 || canManageTasks"
+                            :project-id="project.id"
                             :tasks="tasks"
                             :board-columns="boardColumns"
                             :current-user-id="currentUserId"
@@ -184,6 +189,10 @@ function onDeleted() {
                     </TabsContent>
 
                     <!-- Meetings -->
+                    <TabsContent value="sprints">
+                        <SprintPanel :project-id="project.id" :sprints="sprints" :can-manage="canManageSprints" />
+                    </TabsContent>
+
                     <TabsContent value="meetings">
                         <MeetingsList
                             :meetings="meetings"
@@ -331,6 +340,7 @@ function onDeleted() {
         :open="isCreateTaskModalOpen"
         :project-id="project.id"
         :members="members"
+        :sprints="sprints"
         @update:open="(value) => (isCreateTaskModalOpen = value)"
     />
 
@@ -338,6 +348,7 @@ function onDeleted() {
         :open="taskModalTarget !== null"
         :task="taskModalTarget"
         :members="members"
+        :sprints="sprints"
         :board-columns="boardColumns"
         :project-name="project.name"
         :can-manage="canManageTasks"

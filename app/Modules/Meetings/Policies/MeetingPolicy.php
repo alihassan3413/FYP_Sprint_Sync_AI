@@ -48,6 +48,16 @@ final class MeetingPolicy
         return $meeting->project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 
+    public function manageTranscript(User $user, Meeting $meeting): bool
+    {
+        return $this->update($user, $meeting);
+    }
+
+    public function viewTranscript(User $user, Meeting $meeting): bool
+    {
+        return $this->view($user, $meeting);
+    }
+
     public function delete(User $user, Meeting $meeting): bool
     {
         if ($meeting->workspace->userHasAtLeast($user, UserRole::ADMIN)) {

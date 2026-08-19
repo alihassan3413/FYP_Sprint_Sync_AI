@@ -160,7 +160,9 @@ function handleClose(value: boolean) {
                     <p class="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">Date & time</p>
                     <div class="mt-1.5 flex items-center gap-1.5">
                         <CalendarClock class="text-muted-foreground size-3.5" />
-                        <span class="text-sm">{{ formatMeetingDate(meeting.scheduled_at, timeZone) }} · {{ formatMeetingTime(meeting.scheduled_at, timeZone) }}</span>
+                        <span class="text-sm"
+                            >{{ formatMeetingDate(meeting.scheduled_at, timeZone) }} · {{ formatMeetingTime(meeting.scheduled_at, timeZone) }}</span
+                        >
                     </div>
                 </div>
 
@@ -214,6 +216,10 @@ function handleClose(value: boolean) {
                     <span v-if="participant.is_external" class="text-muted-foreground shrink-0 text-[10.5px] uppercase">Guest</span>
                 </li>
             </ul>
+        </div>
+
+        <div v-if="meeting && past" class="pt-4">
+            <MeetingTranscriptPanel :meeting="meeting" :can-manage="canManage" />
         </div>
 
         <template #footer>

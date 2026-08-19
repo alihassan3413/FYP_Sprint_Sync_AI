@@ -28,6 +28,7 @@ final class AnalyticsData extends Data
         public int $past_meetings,
         public int $total_projects,
         public array $projects,
+        public SprintProgressData $sprint_progress,
         public string $scope,
     ) {}
 }
