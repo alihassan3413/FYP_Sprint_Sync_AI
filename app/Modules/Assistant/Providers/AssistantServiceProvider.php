@@ -17,6 +17,7 @@ use App\Modules\Assistant\Tools\CreateProjectTool;
 use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
 use App\Modules\Assistant\Tools\EditMeetingTool;
+use App\Modules\Assistant\Tools\FindTasksTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
 use App\Modules\Assistant\Tools\ListMeetingsTool;
@@ -25,6 +26,7 @@ use App\Modules\Assistant\Tools\ManageSprintTool;
 use App\Modules\Assistant\Tools\ScheduleMeetingTool;
 use App\Modules\Assistant\Tools\SprintReportTool;
 use App\Modules\Assistant\Tools\ToolRegistry;
+use App\Modules\Assistant\Tools\UpdateTaskTool;
 use App\Support\Modules\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -45,6 +47,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         ListMeetingsTool::class,
         CreateProjectTool::class,
         CreateTaskTool::class,
+        FindTasksTool::class,
+        UpdateTaskTool::class,
         ScheduleMeetingTool::class,
         EditMeetingTool::class,
         CancelMeetingTool::class,

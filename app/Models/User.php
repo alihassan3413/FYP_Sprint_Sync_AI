@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
  * @property int|null $current_workspace_id
  * @property string|null $avatar_path
  * @property string|null $timezone
+ * @property bool $is_super_admin
  */
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -51,6 +52,17 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
+     * Mirrors the column default so a freshly created model can answer
+     * isSuperAdmin() without re-reading the row. Without it, strict models
+     * throw on the missing attribute.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_super_admin' => false,
+    ];
+
+    /**
      * @var list<string>
      */
     protected $appends = [
@@ -65,7 +77,19 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_super_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Platform administrator, not a workspace role.
+     *
+     * Grants read access to the cross-tenant admin panel only. Workspace
+     * membership and workspace policies are unaffected.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_super_admin === true;
     }
 
     public function resolvedTimezone(): string

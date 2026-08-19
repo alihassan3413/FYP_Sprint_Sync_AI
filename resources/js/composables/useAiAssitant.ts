@@ -148,8 +148,22 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
 
             return `Invite ${args.email ?? 'someone'}${roleLabels.length > 0 ? ` as ${roleLabels.join(' · ')}` : ''}`;
         }
-        case 'create_task':
-            return `Create task "${args.title ?? 'untitled'}"${args.assignee_email ? ` for ${args.assignee_email}` : ''}`;
+        case 'create_task': {
+            const person = args.assignee ?? args.assignee_email;
+
+            return `Create task "${args.title ?? 'untitled'}"${person ? ` for ${person}` : ''}`;
+        }
+        case 'update_task': {
+            const parts: string[] = [];
+
+            if (args.assignee) parts.push(args.assignee === 'unassigned' ? 'unassign it' : `assign to ${args.assignee}`);
+            if (args.column) parts.push(`move to ${args.column}`);
+            if (args.sprint) parts.push(`sprint: ${args.sprint}`);
+            if (args.due_date) parts.push(args.due_date === 'none' ? 'clear the due date' : `due ${args.due_date}`);
+            if (args.title) parts.push(`rename to "${args.title}"`);
+
+            return `Update task — ${parts.length > 0 ? parts.join(', ') : 'edit details'}`;
+        }
         case 'create_project':
             return `Create project "${args.name ?? 'untitled'}"`;
         case 'manage_sprint': {
@@ -190,6 +204,9 @@ function getToolIntro(name: string): string {
 
         case 'manage_sprint':
             return 'I can make this change to the sprint. Completing one freezes its numbers, so please check first.';
+
+        case 'update_task':
+            return 'I can make this change to the task. Please check it is the right one first.';
 
         default:
             return 'I’m ready to perform this action. Please confirm.';

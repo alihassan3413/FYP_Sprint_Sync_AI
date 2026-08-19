@@ -26,6 +26,16 @@ export type ArchiveRecordData = {
     occurred_at: string;
     url: string;
 };
+export type AssistantUsageData = {
+    conversations_total: number;
+    messages_total: number;
+    input_tokens: number;
+    output_tokens: number;
+    estimated_cost_cents: number;
+    cost_today_cents: number;
+    by_model: Array<ModelUsageData>;
+    top_users: Array<TopAssistantUserData>;
+};
 export enum AuditAction {
     WORKSPACE_CREATED = 'workspace.created',
     WORKSPACE_RENAMED = 'workspace.renamed',
@@ -117,6 +127,14 @@ export type MeetingData = {
     created_at: string;
     updated_at: string;
 };
+export type ModelUsageData = {
+    model: string;
+    provider?: string;
+    messages: number;
+    input_tokens: number;
+    output_tokens: number;
+    estimated_cost_cents: number;
+};
 export enum NotificationChannel {
     IN_APP = 'in_app',
     EMAIL = 'email',
@@ -129,6 +147,19 @@ export enum NotificationType {
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
 }
+export type PlatformMetricsData = {
+    users_total: number;
+    users_verified: number;
+    users_new_30d: number;
+    workspaces_total: number;
+    workspaces_active: number;
+    projects_total: number;
+    tasks_total: number;
+    tasks_completed: number;
+    sprints_total: number;
+    meetings_total: number;
+    signups: Array<SignupPointData>;
+};
 export type ProjectData = {
     id: number;
     name: string;
@@ -147,6 +178,10 @@ export type ProjectSummaryData = {
     total_tasks: number;
     completed_tasks: number;
     completion_percentage: number;
+};
+export type SignupPointData = {
+    date: string;
+    count: number;
 };
 export enum SprintCarryOver {
     Backlog = 'backlog',
@@ -302,6 +337,15 @@ export type TaskData = {
     comments: Array<TaskCommentData>;
     created_at: string;
     updated_at: string;
+};
+export type TopAssistantUserData = {
+    id: number;
+    name: string;
+    email: string;
+    messages: number;
+    input_tokens: number;
+    output_tokens: number;
+    estimated_cost_cents: number;
 };
 export enum TranscriptSource {
     Recording = 'recording',

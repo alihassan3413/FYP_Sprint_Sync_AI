@@ -16,6 +16,14 @@ const MAX_RECORDING_MS = 60_000;
 /** Below this a WebM clip is header-only — the user tapped rather than spoke. */
 const MIN_BLOB_BYTES = 1200;
 
+/** How long the mic must stay quiet after speech before the clip is sent. */
+const SILENCE_HOLD_MS = 2_500;
+
+/** Root-mean-square level below which a frame counts as silence. */
+const SPEECH_RMS_THRESHOLD = 0.015;
+
+const SILENCE_POLL_MS = 100;
+
 const MIME_PREFERENCES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
 
 export interface VoiceInputOptions {
@@ -73,11 +81,81 @@ export function useVoiceInput(options: VoiceInputOptions) {
     let stream: MediaStream | null = null;
     let chunks: Blob[] = [];
     let maxDurationTimer: ReturnType<typeof setTimeout> | null = null;
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let silenceTimer: ReturnType<typeof setInterval> | null = null;
+    let lastSpeechAt = 0;
+    let hasHeardSpeech = false;
     // Set when the user cancels, so the stop handler discards the audio
     // instead of transcribing it.
     let discardRecording = false;
 
+    function stopSilenceDetection() {
+        if (silenceTimer !== null) {
+            clearInterval(silenceTimer);
+            silenceTimer = null;
+        }
+
+        analyser = null;
+        hasHeardSpeech = false;
+
+        void audioContext?.close().catch(() => undefined);
+        audioContext = null;
+    }
+
+    /**
+     * Watches the live input level and stops the recording once the user has
+     * spoken and then gone quiet, so they do not have to press stop themselves.
+     * Silence before the first word is ignored — otherwise it would cut off
+     * someone still gathering their thoughts.
+     */
+    function startSilenceDetection(source: MediaStream) {
+        const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+        if (!AudioContextCtor) return;
+
+        try {
+            audioContext = new AudioContextCtor();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            audioContext.createMediaStreamSource(source).connect(analyser);
+        } catch (e) {
+            console.error('[assistant] silence detection unavailable:', e);
+            stopSilenceDetection();
+
+            return;
+        }
+
+        const samples = new Float32Array(analyser.fftSize);
+        hasHeardSpeech = false;
+        lastSpeechAt = Date.now();
+
+        silenceTimer = setInterval(() => {
+            if (!analyser) return;
+
+            analyser.getFloatTimeDomainData(samples);
+
+            let sum = 0;
+            for (let i = 0; i < samples.length; i++) {
+                sum += samples[i] * samples[i];
+            }
+
+            if (Math.sqrt(sum / samples.length) >= SPEECH_RMS_THRESHOLD) {
+                hasHeardSpeech = true;
+                lastSpeechAt = Date.now();
+
+                return;
+            }
+
+            if (hasHeardSpeech && Date.now() - lastSpeechAt >= SILENCE_HOLD_MS) {
+                stopRecording();
+            }
+        }, SILENCE_POLL_MS);
+    }
+
     function releaseMicrophone() {
+        stopSilenceDetection();
+
         if (maxDurationTimer !== null) {
             clearTimeout(maxDurationTimer);
             maxDurationTimer = null;
@@ -155,6 +233,8 @@ export function useVoiceInput(options: VoiceInputOptions) {
 
         recorder.start();
         isRecording.value = true;
+
+        startSilenceDetection(stream);
 
         maxDurationTimer = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
     }

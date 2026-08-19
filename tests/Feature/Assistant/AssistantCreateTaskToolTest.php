@@ -126,7 +126,8 @@ final class AssistantCreateTaskToolTest extends TestCase
         ]);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('assignee_not_assignable', $result['error_code']);
+        $this->assertSame('assignee_not_on_project', $result['error_code']);
+        $this->assertStringContainsString('add_project_member', $result['next_step']);
         $this->assertSame(0, Task::query()->count());
     }
 
@@ -139,7 +140,7 @@ final class AssistantCreateTaskToolTest extends TestCase
         ]);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('assignee_not_assignable', $result['error_code']);
+        $this->assertSame('assignee_not_found', $result['error_code']);
         $this->assertSame(0, Task::query()->count());
     }
 
@@ -173,7 +174,7 @@ final class AssistantCreateTaskToolTest extends TestCase
         $result = $this->create($outsider, ['project_id' => $this->project->id, 'title' => 'Nope']);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('project_not_found', $result['error_code']);
+        $this->assertSame('no_projects', $result['error_code']);
         $this->assertSame(0, Task::query()->count());
     }
 

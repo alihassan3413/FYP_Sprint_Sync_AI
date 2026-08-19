@@ -89,8 +89,8 @@ final class AssistantAddProjectMemberToolTest extends TestCase
         ], $this->contextFor($this->owner));
 
         $this->assertFalse($failure['success']);
-        $this->assertSame('assignee_not_assignable', $failure['error_code']);
-        $this->assertStringContainsString('add_project_member', $failure['error']);
+        $this->assertSame('assignee_not_on_project', $failure['error_code']);
+        $this->assertStringContainsString('add_project_member', $failure['next_step']);
         $this->assertSame(0, Task::query()->count());
 
         $this->assertTrue($this->add($this->owner)['success']);

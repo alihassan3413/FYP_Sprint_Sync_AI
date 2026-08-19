@@ -75,6 +75,8 @@ export interface User {
     email: string;
     avatar_url: string | null;
     email_verified_at: string | null;
+    /** Platform administrator. Unrelated to workspace roles. */
+    is_super_admin: boolean;
     timezone: string | null;
     created_at: string;
     updated_at: string;

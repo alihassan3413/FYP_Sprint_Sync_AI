@@ -4,7 +4,7 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Archive, BarChart3, BookOpen, Folder, FolderKanban, LayoutGrid, Users2 } from 'lucide-vue-next';
+import { Archive, BarChart3, BookOpen, Folder, FolderKanban, LayoutGrid, ShieldCheck, Users2 } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
@@ -49,6 +49,16 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Archive',
             href: workspaceRoute('workspace.archive.index'),
             icon: Archive,
+        });
+    }
+
+    // Platform-wide, so it sits outside the workspace-scoped links above and
+    // is driven by the user flag rather than workspace capabilities.
+    if (page.props.auth.user?.is_super_admin) {
+        items.push({
+            title: 'Admin',
+            href: '/admin',
+            icon: ShieldCheck,
         });
     }
 

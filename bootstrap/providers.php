@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Modules\Admin\Providers\AdminServiceProvider;
 use App\Modules\Analytics\Providers\AnalyticsServiceProvider;
 use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
@@ -23,4 +24,5 @@ return [
     ArchiveServiceProvider::class,
     AnalyticsServiceProvider::class,
     AuditServiceProvider::class,
+    AdminServiceProvider::class,
 ];
