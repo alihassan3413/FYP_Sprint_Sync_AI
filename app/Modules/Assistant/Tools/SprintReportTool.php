@@ -39,7 +39,8 @@ final class SprintReportTool implements AssistantTool
             .'the team is on track, what is left, sprint progress, velocity, or asks for a standup or status summary. '
             .'Defaults to the active sprint of every project the user can see. Pass project_id from list_projects to '
             .'narrow it, sprint_id for one specific sprint, or status to look at planned or completed sprints. '
-            .'Never guess sprint numbers — read them from here.';
+            .'Never guess sprint numbers — read them from here. '
+            .'Do not call this for a question about one task; use find_tasks for that.';
     }
 
     /**

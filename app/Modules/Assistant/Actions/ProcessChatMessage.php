@@ -38,6 +38,7 @@ final class ProcessChatMessage
         string $userMessage,
         array $pageContext = [],
         ?string $model = null,
+        bool $synthetic = false,
     ): Generator {
         $model ??= (string) config('assistant.default_model');
 
@@ -45,6 +46,12 @@ final class ProcessChatMessage
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $userMessage,
+            /*
+             * Synthetic turns are the system talking to the model on the user's
+             * behalf after a confirmation. They must not reset the turn boundary,
+             * or the duplicate-action guard below loses its reference point.
+             */
+            'metadata' => $synthetic ? ['synthetic' => true] : null,
         ]);
 
         yield ['type' => 'user_message_saved', 'id' => $userMsg->id];
@@ -190,8 +197,26 @@ final class ProcessChatMessage
             return;
         }
 
+        $skipped = 0;
+
         foreach ($toolCalls as $toolCall) {
-            yield from $this->handleToolCall($conversation, $toolContext, $toolCall, $supersededIdsByName);
+            foreach ($this->handleToolCall($conversation, $toolContext, $toolCall, $supersededIdsByName) as $event) {
+                if (($event['type'] ?? null) === 'tool_skipped') {
+                    $skipped++;
+                }
+
+                yield $event;
+            }
+        }
+
+        /*
+         * Every call in this round had already been carried out. Going round again
+         * only invites the same repeat, which is the loop we are here to prevent.
+         */
+        if ($skipped === count($toolCalls)) {
+            yield ['type' => 'done', 'message_id' => $assistantMsg->id];
+
+            return;
         }
 
         $awaitingConfirmation = $conversation->messages()
@@ -307,6 +332,27 @@ final class ProcessChatMessage
             return;
         }
 
+        $alreadyRun = $this->alreadyRanThisTurn($conversation, $name, $args);
+
+        if ($alreadyRun !== null) {
+            /*
+             * The model re-issued an action that already went through in this turn.
+             * Most often after a confirmation: it sees its own request still standing
+             * and asks again, which would loop the user through the same card forever.
+             */
+            $this->recordToolResult($conversation, $toolCall['id'], $name, [
+                'success' => false,
+                'error_code' => 'already_done',
+                'error' => 'This exact action already ran a moment ago in this turn, so it was not repeated.',
+                'previous_result' => json_decode((string) $alreadyRun->content, true),
+                'next_step' => 'Tell the user what the earlier result was. Do not call this tool again for the same request.',
+            ], Message::STATUS_FAILED);
+
+            yield ['type' => 'tool_skipped', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+
+            return;
+        }
+
         if ($tool->requiresConfirmation()) {
             $pendingMsg = Message::create([
                 'conversation_id' => $conversation->id,
@@ -341,7 +387,7 @@ final class ProcessChatMessage
 
         $this->workspaceResolver->syncFromUser($conversation, $toolContext->user);
 
-        $this->recordToolResult($conversation, $toolCall['id'], $name, $result, Message::STATUS_EXECUTED);
+        $this->recordToolResult($conversation, $toolCall['id'], $name, $result, Message::STATUS_EXECUTED, $args);
 
         yield [
             'type' => 'tool_executed',
@@ -349,6 +395,71 @@ final class ProcessChatMessage
             'name' => $name,
             'result' => $result,
         ];
+    }
+
+    /**
+     * Has this exact tool call already been carried out since the user last spoke?
+     *
+     * Scoped to the current turn on purpose: asking for the same thing twice in one
+     * breath is always a mistake, while asking again later is a legitimate repeat.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    private function alreadyRanThisTurn(Conversation $conversation, string $name, array $args): ?Message
+    {
+        $turnStartId = $this->turnStartId($conversation);
+
+        return $conversation->messages()
+            ->where('role', 'tool')
+            ->where('tool_status', Message::STATUS_EXECUTED)
+            ->where('id', '>', $turnStartId)
+            ->get()
+            ->first(function (Message $message) use ($name, $args) {
+                if (($message->metadata['name'] ?? null) !== $name) {
+                    return false;
+                }
+
+                $previousArgs = $message->metadata['args'] ?? null;
+
+                /*
+                 * Results recorded straight from an auto-executed call keep no args,
+                 * so a name match within the same turn is enough to treat as a repeat.
+                 */
+                return $previousArgs === null || $this->sameArguments($previousArgs, $args);
+            });
+    }
+
+    /**
+     * The id of the last message the user actually typed, ignoring the synthetic
+     * turns the confirmation flow inserts.
+     */
+    private function turnStartId(Conversation $conversation): int
+    {
+        $messages = $conversation->messages()
+            ->where('role', 'user')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get();
+
+        foreach ($messages as $message) {
+            if (($message->metadata['synthetic'] ?? false) !== true) {
+                return $message->id;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param  array<string, mixed>  $a
+     * @param  array<string, mixed>  $b
+     */
+    private function sameArguments(array $a, array $b): bool
+    {
+        ksort($a);
+        ksort($b);
+
+        return json_encode($a) === json_encode($b);
     }
 
     /**
@@ -360,6 +471,7 @@ final class ProcessChatMessage
         string $name,
         array $result,
         string $status,
+        ?array $args = null,
     ): void {
         Message::create([
             'conversation_id' => $conversation->id,
@@ -367,7 +479,7 @@ final class ProcessChatMessage
             'tool_call_id' => $toolCallId,
             'tool_status' => $status,
             'content' => ToolResultEnvelope::wrap($result),
-            'metadata' => ['name' => $name],
+            'metadata' => $args === null ? ['name' => $name] : ['name' => $name, 'args' => $args],
         ]);
     }
 

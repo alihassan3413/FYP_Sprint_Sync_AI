@@ -27,7 +27,8 @@ final class ListMeetingsTool implements AssistantTool
             .'Use this whenever the user asks about meetings, standups, retros, "my meetings", "what is coming up", '
             .'or names a meeting. Defaults to upcoming meetings; pass scope to look at past or all meetings, '
             .'project_id to narrow to one project, and search to find a meeting by title. '
-            .'Never guess a meeting ID — always take it from this tool.';
+            .'Never guess a meeting ID — always take it from this tool. '
+            .'Do not call this when the user is asking about tasks, sprints or people — it only knows about meetings.';
     }
 
     /**

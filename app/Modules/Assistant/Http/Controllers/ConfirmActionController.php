@@ -48,10 +48,22 @@ final class ConfirmActionController
                 ? $this->execute($stream, $registry, $executor, $argumentValidator, $workspaceResolver, $pendingMessage, $conversation, $user)
                 : $this->reject($stream, $pendingMessage);
 
+            /*
+             * The model still needs a turn to tell the user how it went, but it must
+             * not treat this as a fresh instruction: without saying so plainly it
+             * re-proposes the action it just carried out.
+             */
             $events = $processor->handle(
                 user: $user,
                 conversation: $conversation,
-                userMessage: '[User responded via confirmation UI]',
+                userMessage: $confirmed
+                    ? '[System] The user confirmed the action above and it has already been carried out. '
+                        .'Its result is in the tool message. Reply with one short sentence telling them what happened. '
+                        .'Do not call that tool again, and do not propose the same action.'
+                    : '[System] The user canceled the action above and nothing was done. '
+                        .'Acknowledge that in one short sentence and wait for their next instruction. '
+                        .'Do not propose the same action again.',
+                synthetic: true,
             );
 
             foreach ($events as $event) {

@@ -16,6 +16,7 @@ use App\Modules\Assistant\Tools\CancelMeetingTool;
 use App\Modules\Assistant\Tools\CreateProjectTool;
 use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
+use App\Modules\Assistant\Tools\DeleteTaskTool;
 use App\Modules\Assistant\Tools\EditMeetingTool;
 use App\Modules\Assistant\Tools\FindTasksTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
@@ -49,6 +50,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         CreateTaskTool::class,
         FindTasksTool::class,
         UpdateTaskTool::class,
+        DeleteTaskTool::class,
         ScheduleMeetingTool::class,
         EditMeetingTool::class,
         CancelMeetingTool::class,

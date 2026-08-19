@@ -29,7 +29,8 @@ final class GetWorkspaceInfoTool implements AssistantTool
         return 'Gets information about the current workspace. Use this when the user asks about the workspace, '
             .'member count, the member list, admins, clients, pending invitations, custom roles and what they can do, '
             .'or their own role. Also use it with include_roles=true to resolve a custom role name before inviting '
-            .'someone with that role, and to see which client permissions a role grants.';
+            .'someone with that role, and to see which client permissions a role grants. '
+            .'Do not call this for task questions — find_tasks already returns the assignee of each task.';
     }
 
     /**

@@ -153,6 +153,8 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
 
             return `Create task "${args.title ?? 'untitled'}"${person ? ` for ${person}` : ''}`;
         }
+        case 'delete_task':
+            return 'Delete this task permanently';
         case 'update_task': {
             const parts: string[] = [];
 
@@ -207,6 +209,9 @@ function getToolIntro(name: string): string {
 
         case 'update_task':
             return 'I can make this change to the task. Please check it is the right one first.';
+
+        case 'delete_task':
+            return 'I can delete this task. It cannot be undone, so please check it is the right one.';
 
         default:
             return 'I’m ready to perform this action. Please confirm.';

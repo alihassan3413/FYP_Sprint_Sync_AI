@@ -13,8 +13,15 @@ final class EventStream
     {
         return new StreamedResponse(
             function () use ($callback) {
-                while (ob_get_level() > 0) {
-                    ob_end_flush();
+                /*
+                 * Draining the buffers is what makes the stream arrive chunk by chunk
+                 * behind PHP-FPM, but under test it would close the buffer the test
+                 * harness is capturing with.
+                 */
+                if (! app()->runningUnitTests()) {
+                    while (ob_get_level() > 0) {
+                        ob_end_flush();
+                    }
                 }
 
                 ignore_user_abort(true);
