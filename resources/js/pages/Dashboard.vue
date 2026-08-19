@@ -34,10 +34,17 @@ const props = defineProps<{
         canInviteMembers: boolean;
         canCreateProjects: boolean;
         canManageWorkspace: boolean;
+        canManageMembers: boolean;
+        canManageRoles: boolean;
+        canViewAnalytics: boolean;
+        canViewAudit: boolean;
+        permissions: string[];
     };
 }>();
 
 const isPersonalScope = computed(() => props.scope === 'personal');
+
+const showWorkspaceOverview = computed(() => props.capabilities.canManageMembers);
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -146,8 +153,12 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
             <!-- =========================================================== -->
             <!-- Stat cards — every number is real, no fake data               -->
             <!-- =========================================================== -->
-            <div v-if="isPersonalScope" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <AppStatCard label="My tasks" :value="taskProgress.total" :hint="taskProgress.total === 1 ? 'assigned' : 'assigned'">
+            <div v-if="!showWorkspaceOverview" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <AppStatCard
+                    :label="isPersonalScope ? 'My tasks' : 'Team tasks'"
+                    :value="taskProgress.total"
+                    :hint="taskProgress.total === 1 ? 'assigned' : 'assigned'"
+                >
                     <template #icon><ListTodo class="size-3.5" /></template>
                 </AppStatCard>
 
@@ -197,7 +208,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     <OnBoardingCheckList v-if="capabilities.canManageWorkspace" :steps="onboardingSteps" />
 
                     <!-- Activity feed -->
-                    <div class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
+                    <div v-if="showWorkspaceOverview" class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
                         <div class="mb-4 flex items-center justify-between">
                             <h3 class="text-[15px] font-semibold tracking-tight">Recent workspace activity</h3>
                             <button type="button" class="text-muted-foreground hover:text-foreground text-[11.5px] font-medium transition-colors">
@@ -214,7 +225,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                 <div class="flex flex-col gap-4">
                     <UpcomingMeetingsCard :upcoming="upcomingMeetings" :past="pastMeetings" />
 
-                    <OnlineNowCard :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
+                    <OnlineNowCard v-if="showWorkspaceOverview" :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
 
                     <!-- Tip card — small, only shows when relevant -->
                     <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-xl border border-dashed p-4 text-xs">

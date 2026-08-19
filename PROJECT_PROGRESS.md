@@ -19,6 +19,13 @@ Strict completion: **16 / 35 (45.7%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **18 / 35 (51.4%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **70.0%**.
 
+Entry #49 closed FR35-01, FR35-02, FR35-03, FR35-05, FR35-06 and FR04-01.
+**FR04 and FR35 both stay Partial, but their counts do not move**: each has
+exactly one open sub-requirement left (FR04-04 and the summary-approval half
+of FR35-04) and both are Blocked by FR10–FR13. Entry #49 also found that
+custom workspace-role permissions were stored but never read anywhere, and
+wired the six feature-backed ones into the real policies.
+
 Entry #27 closed FR04-03, FR04-05, FR06-01 and FR32-05, moving FR32 to
 Complete and FR04 into the blocked-only group. Entry #28 closed FR14-04,
 moving FR14 to Complete (its only remaining verdict is the FR14-02 design
@@ -4795,7 +4802,163 @@ The timezone feature is now complete end to end: captured at registration,
 editable in settings, authoritative on the backend, converted on input,
 and rendered per recipient in both email and in-app notifications.
 
-## Next recommended task (updated 2026-08-19, after entry #48)
+### 49. FR35 — role and permission aware dashboard, navigation and policies
+
+The headline finding came before any code: **`WorkspaceRole::grants()` was
+called nowhere in the application.** Custom workspace roles could be
+created, edited, assigned to members and rendered in the roles UI, and the
+permission checkboxes were persisted faithfully — but nothing ever read
+them back. Every stored permission was decorative. Entry #39 suspected
+this; a grep for `grants(` confirmed it, returning only the model
+definition and three assertions in `WorkspaceRoleTest` that tested the
+accessor in isolation.
+
+**Permission audit, as classified before wiring anything:**
+
+| Permission | Before | Action taken |
+|---|---|---|
+| `projects.view` | stored, never enforced | now widens `accessibleProjectsFor()` and `ProjectPolicy::view` |
+| `projects.create` | stored, never enforced | now grants `ProjectPolicy::create` |
+| `projects.delete` | stored, never enforced | now grants `ProjectPolicy::delete` |
+| `members.invite` | stored, never enforced | now grants `WorkspacePolicy::invite` |
+| `members.remove` | stored, never enforced | now grants `WorkspacePolicy::manageMembers` |
+| `members.roles` | stored, never enforced | now grants `WorkspacePolicy::manageRoles` |
+| `billing.view`, `billing.manage` | stored, never enforced | **left unenforced — SprintSync has no billing feature** |
+| `integrations.view/manage/deploy` | stored, never enforced | **left unenforced — SprintSync has no integrations feature** |
+
+Only six of the eleven were wired. The other five describe features that do
+not exist, so enforcing them would have meant inventing behaviour to gate.
+They are the genuinely fabricated entries in the catalogue and are now
+documented as such rather than quietly wired into unrelated policies.
+
+**No analytics, archive or audit permission exists in the catalogue.** The
+task listed those as candidate areas, but `WorkspacePermission` has no case
+for them, and the instruction not to invent permissions applies. Their
+visibility is therefore still derived from the real authorization model —
+project access for analytics and archive, `AuditLogPolicy` for audit —
+which is what FR35-02 needs functionally. Adding
+`analytics.view`/`archive.view`/`audit.view` cases is a product decision
+worth making deliberately; it is flagged here rather than taken
+unilaterally.
+
+**One resolver, not scattered conditionals.** `Workspace::allows(User,
+WorkspacePermission)` is the single answer to "can this user do X here".
+It is **additive**: owner and admin short-circuit to true, and a custom
+role can only grant beyond the base role, never revoke. That is what let
+all 666 pre-existing tests stay green through the policy rewiring — no
+existing authority changed, only new authority became reachable. Membership
+and custom-role lookups are memoised per model instance, so wiring
+`allows()` into `accessibleProjectsFor()` did not introduce an N+1.
+`WorkspacePermission` moved from the private `Support` segment to the
+public `Data` segment so other modules' policies can reference it without
+violating `ModuleBoundaryTest`.
+
+`ResolveWorkspaceCapabilities` returns a `WorkspaceCapabilities` DTO used by
+**both** the shared navigation prop and the dashboard, so the two cannot
+drift. Vue receives booleans and a granted-permission list; it never sees a
+role name and never decides authority.
+
+**Two real defects surfaced and were fixed:**
+
+1. **Analytics and Archive had no authorization gate at all.** Only
+   `EnsureWorkspaceMember` stood in front of them. Their data was correctly
+   scoped, so nothing leaked, but a user whose navigation hid those
+   destinations could still reach them and get an empty page. Both now
+   `abort_unless` on the same capability the navigation uses — hidden now
+   genuinely means denied, which is FR35-06.
+2. **Navigation was computed from `current_workspace_id`, not the workspace
+   in the route.** A user viewing `/workspace-b/dashboard` could get
+   navigation resolved for workspace A. `HandleInertiaRequests` now prefers
+   the route workspace when the user belongs to it. This is FR35-05's actual
+   requirement, and a test switches between two workspaces with different
+   roles and asserts the audit entry point appears and disappears.
+
+**Three existing tests were updated deliberately.**
+`test_an_unassigned_workspace_member_sees_nothing`,
+`test_unassigned_workspace_member_sees_empty_state_analytics` and
+`test_an_unassigned_workspace_member_cannot_see_the_projects_archive` all
+asserted the old "reachable but empty" behaviour. They now assert 403. The
+requirement moved; the tests were not bent to fit the code.
+
+**Dashboard composition is now permission-driven, not scope-driven.**
+Members, pending invites and the activity feed are only queried when
+`canManageMembers` is true — a project manager with team analytics scope no
+longer receives the workspace roster. Vue gates the workspace stat row, the
+activity feed and the online-members card on the same flag, so a project
+manager sees task-oriented stats rather than four zeroes.
+
+**FR sub-requirement status after this entry:**
+
+- **FR35-01** Complete — layout differs by role and permissions.
+- **FR35-02** Complete — navigation, widgets and actions all derive from
+  server-resolved capabilities.
+- **FR35-03** Complete — task visibility follows `accessibleProjectsFor()`,
+  which now honours `projects.view`.
+- **FR35-04** **Partially blocked by FR10–FR13.** Meeting scheduling is
+  restricted by `MeetingPolicy::create` and enforced in both the UI and the
+  Assistant. Summary approval does not exist because the summary feature
+  does not exist; no button was fabricated to claim it.
+- **FR35-05** Complete — switcher present, and navigation now re-resolves
+  against the selected workspace.
+- **FR35-06** Complete — 403 on analytics, archive and audit when denied.
+- **FR04-01** Complete — the dashboard is genuinely role-appropriate.
+- **FR04-04** Still blocked by FR10–FR13, untouched.
+
+**Tests**: 25 new across two files. `RoleBasedDashboardTest` (14) covers
+owner, admin, project-manager mixed scope, plain member, zero state, custom
+roles with and without each permission, immediate effect of a permission
+change without re-login, owner authority surviving an empty custom role,
+and cross-workspace isolation. `PermissionAwareNavigationTest` (11) covers
+every navigation destination per role, hidden-nav-matches-backend-denial
+for analytics, archive and audit, and the workspace-switch re-resolution.
+
+**Verification**: `php artisan test --compact` → **691 passed, 3504
+assertions** (666 → 691, +25). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded.
+`php artisan typescript:transform` regenerated `generated.ts` after the
+enum move. `npx vue-tsc --noEmit` → exactly the two pre-existing `TS2688`
+`tsconfig.json` errors from entry #24, unchanged and unrelated.
+`ModuleBoundaryTest` passes.
+
+## Next recommended task (updated 2026-08-19, after entry #49)
+
+**FR16-02 — realtime propagation**, or the analytics/archive/audit
+permission decision, depending on appetite.
+
+The cheaper and more valuable of the two is the **permission catalogue
+decision** surfaced in entry #49. `WorkspacePermission` has no
+`analytics.view`, `archive.view` or `audit.view` case, so those three
+destinations are gated by the base role model rather than by custom roles.
+Adding them is a small, well-understood change now that
+`Workspace::allows()` and `ResolveWorkspaceCapabilities` exist — the wiring
+is already in place and would need only the enum cases plus the capability
+lookups. It is listed as a decision rather than a task because it changes
+what workspace admins can express, which is a product call.
+
+The same entry recommends removing `billing.*` and `integrations.*` from
+the catalogue, or building those features. Today they are checkboxes that
+grant nothing, which is misleading in the roles UI.
+
+**FR16-02** remains the largest genuinely unblocked build item and needs
+new infrastructure (broadcasting, a driver, client subscriptions). It has
+no dependency on FR10–FR13.
+
+- **FR20-02** — "current sprint" still needs a sprint entity.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Entry #49 has
+  now built permission-aware visibility directly on that per-workspace
+  model, which strengthens the case further. Recommended: amend the report.
+
+## Superseded next-task note (after entry #48)
 
 **FR35 — role-aware dashboard.**
 

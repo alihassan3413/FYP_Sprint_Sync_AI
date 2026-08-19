@@ -11,6 +11,7 @@ export type AnalyticsData = {
     past_meetings: number;
     total_projects: number;
     projects: Array<ProjectSummaryData>;
+    scope: string;
 };
 export type ArchiveRecordData = {
     id: string;
@@ -31,6 +32,9 @@ export enum AuditAction {
     MEMBER_INVITED = 'member.invited',
     MEMBER_REMOVED = 'member.removed',
     MEMBER_ROLE_CHANGED = 'member.role_changed',
+    INVITE_LINK_GENERATED = 'invite_link.generated',
+    INVITE_LINK_REVOKED = 'invite_link.revoked',
+    INVITE_LINK_JOINED = 'invite_link.joined',
     PROJECT_CREATED = 'project.created',
     PROJECT_UPDATED = 'project.updated',
     PROJECT_DELETED = 'project.deleted',
@@ -48,6 +52,11 @@ export enum AuditAction {
     MEETING_SCHEDULED = 'meeting.scheduled',
     MEETING_UPDATED = 'meeting.updated',
     MEETING_CANCELLED = 'meeting.cancelled',
+    ACCOUNT_PROFILE_UPDATED = 'account.profile_updated',
+    ACCOUNT_PASSWORD_CHANGED = 'account.password_changed',
+    ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated',
+    ACCOUNT_AVATAR_REMOVED = 'account.avatar_removed',
+    ACCOUNT_DELETED = 'account.deleted',
 }
 export type AuditLogEntryData = {
     id: number;
@@ -67,6 +76,17 @@ export type BoardColumnData = {
     is_done: boolean;
     project_id: number;
 };
+export type DashboardMeetingData = {
+    id: number;
+    title: string;
+    project_id: number;
+    project_name: string;
+    scheduled_at: string;
+    duration_minutes: number;
+    join_url?: string;
+    is_past: boolean;
+    url: string;
+};
 export type MeetingData = {
     id: number;
     title: string;
@@ -78,6 +98,8 @@ export type MeetingData = {
     workspace_id: number;
     created_by: number;
     creator_name?: string;
+    join_url?: string;
+    participants: { [key: number]: { [key: string]: any } };
     created_at: string;
     updated_at: string;
 };
@@ -118,6 +140,8 @@ export type StoreMeetingData = {
     scheduled_at: string;
     duration_minutes: number;
     meeting_link?: string;
+    participant_user_ids: { [key: number]: number };
+    participant_emails: { [key: number]: string };
 };
 export type StoreProjectData = {
     name: string;

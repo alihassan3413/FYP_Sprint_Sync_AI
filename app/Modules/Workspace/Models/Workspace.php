@@ -6,6 +6,7 @@ namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Database\Factories\WorkspaceFactory;
 use App\UserRole;
 use Illuminate\Database\Eloquent\Builder;
@@ -93,6 +94,16 @@ final class Workspace extends Model
         return $this->hasMany(Project::class);
     }
 
+    /**
+     * @var array<int, User|null>
+     */
+    private array $resolvedMemberships = [];
+
+    /**
+     * @var array<int, WorkspaceRole|null>
+     */
+    private array $resolvedCustomRoles = [];
+
     public function hasMember(User $user): bool
     {
         return $this->users()->whereKey($user->getKey())->exists();
@@ -100,7 +111,7 @@ final class Workspace extends Model
 
     public function roleFor(User $user): ?UserRole
     {
-        $membership = $this->users()->whereKey($user->getKey())->first();
+        $membership = $this->membershipFor($user);
 
         return $membership === null
             ? null
@@ -112,11 +123,70 @@ final class Workspace extends Model
         return $this->roleFor($user)?->atLeast($minimum) ?? false;
     }
 
+    public function allows(User $user, WorkspacePermission $permission): bool
+    {
+        if ($this->userHasAtLeast($user, UserRole::ADMIN)) {
+            return true;
+        }
+
+        return $this->customRoleFor($user)?->grants($permission->value) ?? false;
+    }
+
+    public function customRoleFor(User $user): ?WorkspaceRole
+    {
+        $membership = $this->membershipFor($user);
+        $roleId = $membership?->pivot->workspace_role_id;
+
+        if ($roleId === null) {
+            return null;
+        }
+
+        return $this->resolvedCustomRoles[$roleId] ??= $this->roles()->whereKey($roleId)->first();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function grantedPermissionsFor(User $user): array
+    {
+        if ($this->userHasAtLeast($user, UserRole::ADMIN)) {
+            return WorkspacePermission::values();
+        }
+
+        $customRole = $this->customRoleFor($user);
+
+        if ($customRole === null) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            WorkspacePermission::values(),
+            fn (string $permission) => $customRole->grants($permission),
+        ));
+    }
+
+    private function membershipFor(User $user): ?User
+    {
+        $key = $user->getKey();
+
+        if (array_key_exists($key, $this->resolvedMemberships)) {
+            return $this->resolvedMemberships[$key];
+        }
+
+        return $this->resolvedMemberships[$key] = $this->users()->whereKey($key)->first();
+    }
+
+    public function forgetResolvedMembership(): void
+    {
+        $this->resolvedMemberships = [];
+        $this->resolvedCustomRoles = [];
+    }
+
     public function accessibleProjectsFor(User $user): HasMany
     {
         $query = $this->projects();
 
-        if (! $this->userHasAtLeast($user, UserRole::ADMIN)) {
+        if (! $this->userHasAtLeast($user, UserRole::ADMIN) && ! $this->allows($user, WorkspacePermission::ProjectsView)) {
             $query->whereHas('members', fn (Builder $members) => $members->whereKey($user->id));
         }
 

@@ -223,7 +223,7 @@ final class AnalyticsScopeTest extends TestCase
                 ->where('analytics.projects.0.total_tasks', 0));
     }
 
-    public function test_an_unassigned_workspace_member_sees_nothing(): void
+    public function test_an_unassigned_workspace_member_is_denied_analytics(): void
     {
         $outsider = $this->memberOf(UserRole::MEMBER);
 
@@ -231,11 +231,7 @@ final class AnalyticsScopeTest extends TestCase
 
         $this->actingAs($outsider)
             ->get($this->route())
-            ->assertInertia(fn ($page) => $page
-                ->where('analytics.scope', 'personal')
-                ->where('analytics.total_tasks', 0)
-                ->where('analytics.total_projects', 0)
-                ->where('analytics.projects', []));
+            ->assertForbidden();
     }
 
     public function test_managed_projects_in_another_workspace_never_leak(): void

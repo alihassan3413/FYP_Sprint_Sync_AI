@@ -6,6 +6,7 @@ namespace App\Modules\Archive\Http\Controllers;
 
 use App\Modules\Archive\Actions\SearchArchiveAction;
 use App\Modules\Archive\Data\ArchiveRecordData;
+use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,9 +15,15 @@ use Inertia\Response;
 
 final class ArchiveController
 {
-    public function index(Request $request, Workspace $workspace, SearchArchiveAction $action): Response
-    {
+    public function index(
+        Request $request,
+        Workspace $workspace,
+        SearchArchiveAction $action,
+        ResolveWorkspaceCapabilities $resolveCapabilities,
+    ): Response {
         $user = $request->user();
+
+        abort_unless($resolveCapabilities->handle($workspace, $user)->viewArchive, 403);
 
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],

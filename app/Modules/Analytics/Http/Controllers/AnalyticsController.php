@@ -6,6 +6,7 @@ namespace App\Modules\Analytics\Http\Controllers;
 
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
 use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
+use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,8 +19,11 @@ final class AnalyticsController
         Workspace $workspace,
         BuildAnalyticsAction $action,
         ResolveAnalyticsScope $resolveScope,
+        ResolveWorkspaceCapabilities $resolveCapabilities,
     ): Response {
         $user = $request->user();
+
+        abort_unless($resolveCapabilities->handle($workspace, $user)->viewAnalytics, 403);
 
         $filters = $request->validate([
             'project_id' => ['nullable', 'integer'],

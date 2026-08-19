@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Workspace\Support;
+namespace App\Modules\Workspace\Data;
 
 enum WorkspacePermission: string
 {

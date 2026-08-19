@@ -203,17 +203,13 @@ final class AnalyticsTest extends TestCase
                 ->where('analytics.total_projects', 1));
     }
 
-    public function test_unassigned_workspace_member_sees_empty_state_analytics(): void
+    public function test_unassigned_workspace_member_is_denied_analytics(): void
     {
         Task::factory()->forProject($this->project)->forColumn($this->doneColumn)->count(4)->create();
 
         $this->actingAs($this->unrelatedMember)
             ->get($this->analyticsRoute())
-            ->assertInertia(fn ($page) => $page
-                ->where('analytics.total_tasks', 0)
-                ->where('analytics.total_projects', 0)
-                ->where('analytics.task_completion_percentage', 0)
-                ->where('projects', []));
+            ->assertForbidden();
     }
 
     public function test_cross_workspace_data_never_appears(): void

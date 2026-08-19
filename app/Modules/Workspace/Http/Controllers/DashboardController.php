@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
 use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Meetings\Models\Meeting;
-use App\Modules\Projects\Models\Project;
+use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
 use App\Modules\Workspace\Data\DashboardMeetingData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
@@ -25,9 +25,11 @@ final class DashboardController
         Workspace $workspace,
         BuildAnalyticsAction $analytics,
         ResolveAnalyticsScope $resolveScope,
+        ResolveWorkspaceCapabilities $resolveCapabilities,
     ): Response {
         $user = $request->user();
 
+        $capabilities = $resolveCapabilities->handle($workspace, $user);
         $scope = $resolveScope->handle($workspace, $user);
         $accessibleProjectIds = $scope->accessibleProjects->pluck('id');
 
@@ -42,9 +44,9 @@ final class DashboardController
                 'name' => $workspace->name,
                 'created_at' => $workspace->created_at->toIso8601String(),
             ],
-            'members' => $this->members($workspace, $user),
-            'pendingInvitesCount' => $workspace->pendingInvitations()->count(),
-            'activity' => $this->activity($workspace, $user),
+            'members' => $capabilities->manageMembers ? $this->members($workspace, $user) : collect(),
+            'pendingInvitesCount' => $capabilities->manageMembers ? $workspace->pendingInvitations()->count() : 0,
+            'activity' => $capabilities->manageMembers ? $this->activity($workspace, $user) : collect(),
             'onboarding' => $this->onboarding($workspace),
             'upcomingMeetings' => $this->meetings($workspace, $accessibleProjectIds, false),
             'pastMeetings' => $this->meetings($workspace, $accessibleProjectIds, true),
@@ -58,11 +60,7 @@ final class DashboardController
             ],
             'projects' => $summary->projects,
             'scope' => $summary->scope,
-            'capabilities' => [
-                'canInviteMembers' => $user->can('invite', $workspace),
-                'canCreateProjects' => $user->can('create', [Project::class, $workspace]),
-                'canManageWorkspace' => $user->can('update', $workspace),
-            ],
+            'capabilities' => $capabilities->forDashboard(),
         ]);
     }
 

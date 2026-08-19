@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Http\Requests;
 
+use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Data\WorkspaceRoleData;
 use App\Modules\Workspace\Models\Workspace;
-use App\Modules\Workspace\Support\WorkspacePermission;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class StoreWorkspaceRoleRequest extends FormRequest

@@ -159,13 +159,13 @@ final class ArchiveSearchTest extends TestCase
                 ->where('results.data.0.assignee_name', $this->projectMember->name));
     }
 
-    public function test_an_unassigned_workspace_member_cannot_see_the_projects_archive(): void
+    public function test_an_unassigned_workspace_member_is_denied_the_archive(): void
     {
         Task::factory()->forProject($this->project)->forColumn($this->doneColumn)->create(['title' => 'Private task']);
 
         $this->actingAs($this->unrelatedMember)
             ->get($this->archiveRoute())
-            ->assertInertia(fn ($page) => $page->where('results.total', 0)->where('projects', []));
+            ->assertForbidden();
     }
 
     public function test_a_project_member_only_sees_their_own_projects_archive(): void

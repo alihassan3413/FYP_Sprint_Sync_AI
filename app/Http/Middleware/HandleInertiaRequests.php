@@ -2,8 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Modules\Audit\Models\AuditLog;
-use App\Modules\Projects\Models\Project;
+use App\Models\User;
+use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
+use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Services\WorkspaceService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -83,27 +84,23 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $workspace = app(WorkspaceService::class)->currentFor($user);
+        $workspace = $this->workspaceInContext($request, $user);
 
         if ($workspace === null) {
             return null;
         }
 
-        $hasAccessibleProjects = $workspace->accessibleProjectsFor($user)->exists();
-        $canViewAuditLog = $user->can('viewAny', [AuditLog::class, $workspace]);
+        return app(ResolveWorkspaceCapabilities::class)->handle($workspace, $user)->navigation();
+    }
 
-        return [
-            'projects' => $hasAccessibleProjects || $user->can('create', [Project::class, $workspace]),
-            'team' => true,
-            'analytics' => $hasAccessibleProjects,
-            'archive' => $hasAccessibleProjects,
-            'audit' => $canViewAuditLog,
-            'workspaceSettings' => $canViewAuditLog
-                || $user->can('update', $workspace)
-                || $user->can('delete', $workspace)
-                || $user->can('manageMembers', $workspace)
-                || $user->can('manageRoles', $workspace)
-                || $user->can('invite', $workspace),
-        ];
+    private function workspaceInContext(Request $request, User $user): ?Workspace
+    {
+        $routeWorkspace = $request->route('workspace');
+
+        if ($routeWorkspace instanceof Workspace && $routeWorkspace->hasMember($user)) {
+            return $routeWorkspace;
+        }
+
+        return app(WorkspaceService::class)->currentFor($user);
     }
 }
