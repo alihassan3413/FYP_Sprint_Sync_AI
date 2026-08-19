@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Http\Requests;
 
+use App\Support\Time\UserTime;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
@@ -26,6 +27,7 @@ final class AcceptWorkspaceInvitationRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'timezone' => UserTime::rules(),
         ];
     }
 }

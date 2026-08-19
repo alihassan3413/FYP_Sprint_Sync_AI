@@ -18,10 +18,13 @@ const props = withDefaults(
     { requiresRegistration: true },
 );
 
+const detectedTimezone = detectTimezone();
+
 const form = useForm({
     name: '',
     password: '',
     password_confirmation: '',
+    timezone: detectedTimezone,
 });
 
 const submit = () => {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Workspace\Actions\CreateWorkspaceAction;
+use App\Support\Time\UserTime;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,18 +34,20 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request, CreateWorkspaceAction $createWorkspace): RedirectResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'workspace_name' => 'nullable|string|max:60',
+            'timezone' => UserTime::rules(),
         ]);
 
-        $user = DB::transaction(function () use ($request, $createWorkspace) {
+        $user = DB::transaction(function () use ($request, $validated, $createWorkspace) {
             $user = User::create([
                 'name' => $request->string('name')->toString(),
                 'email' => $request->string('email')->toString(),
                 'password' => Hash::make($request->string('password')->toString()),
+                'timezone' => $validated['timezone'] ?? null,
             ]);
 
             $createWorkspace->handleForUser(

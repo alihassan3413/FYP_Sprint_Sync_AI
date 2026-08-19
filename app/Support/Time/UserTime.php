@@ -9,6 +9,14 @@ use Illuminate\Support\Carbon;
 
 final class UserTime
 {
+    /**
+     * @return array<int, string>
+     */
+    public static function rules(): array
+    {
+        return ['nullable', 'string', 'timezone'];
+    }
+
     public static function isValid(?string $timezone): bool
     {
         return $timezone !== null && in_array($timezone, DateTimeZone::listIdentifiers(), true);

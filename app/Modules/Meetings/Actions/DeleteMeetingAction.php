@@ -36,6 +36,7 @@ final class DeleteMeetingAction
         $projectName = $project->name;
         $meetingTitle = $meeting->title;
         $scheduledAt = UserTime::format($meeting->scheduled_at, $actor->timezone);
+        $scheduledAtUtc = $meeting->scheduled_at->toDateTimeString();
         $url = route('workspace.projects.show', ['workspace' => $project->workspace->slug, 'project' => $meeting->project_id]);
 
         $this->auditLogger->handle(
@@ -49,14 +50,14 @@ final class DeleteMeetingAction
 
         $meeting->delete();
 
-        $this->notify($recipients, $externalEmails, $projectName, $meetingTitle, $scheduledAt, $url, $actor);
+        $this->notify($recipients, $externalEmails, $projectName, $meetingTitle, $scheduledAt, $scheduledAtUtc, $url, $actor);
     }
 
     /**
      * @param  Collection<int, User>  $recipients
      * @param  Collection<int, string>  $externalEmails
      */
-    private function notify(Collection $recipients, Collection $externalEmails, string $projectName, string $meetingTitle, string $scheduledAt, string $url, User $actor): void
+    private function notify(Collection $recipients, Collection $externalEmails, string $projectName, string $meetingTitle, string $scheduledAt, string $scheduledAtUtc, string $url, User $actor): void
     {
         if ($recipients->isEmpty() && $externalEmails->isEmpty()) {
             return;
@@ -88,6 +89,7 @@ final class DeleteMeetingAction
             Notification::send($inAppRecipients, new MeetingCancelledNotification(
                 projectName: $projectName,
                 meetingTitle: $meetingTitle,
+                scheduledAtUtc: $scheduledAtUtc,
                 cancelledByName: $actor->name,
                 url: $url,
             ));

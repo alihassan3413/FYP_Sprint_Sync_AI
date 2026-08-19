@@ -6,12 +6,15 @@ import { Eye, EyeOff, LoaderCircle } from 'lucide-vue-next';
 const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
 
+const detectedTimezone = detectTimezone();
+
 const form = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
     workspace_name: '',
+    timezone: detectedTimezone,
 });
 
 const submit = () => {
@@ -141,6 +144,12 @@ watch(
                 />
                 <InputError :message="form.errors.workspace_name" />
             </div>
+
+            <p class="text-[11px] text-zinc-500">
+                Timezone: <span class="font-semibold text-zinc-700">{{ detectedTimezone }}</span> — meeting times will use this. You can change it in
+                settings.
+            </p>
+            <InputError :message="form.errors.timezone" />
 
             <Button
                 type="submit"

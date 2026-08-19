@@ -136,6 +136,7 @@ final class WorkspaceInvitationController
             'name' => $request->string('name')->toString(),
             'email' => $invitation->email,
             'password' => Hash::make($request->string('password')->toString()),
+            'timezone' => $request->validated('timezone'),
         ]));
 
         $user->markEmailAsVerified();

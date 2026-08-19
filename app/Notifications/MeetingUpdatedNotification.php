@@ -10,12 +10,12 @@ use Illuminate\Notifications\Notification;
 
 final class MeetingUpdatedNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use FormatsMeetingTime, Queueable;
 
     public function __construct(
         private readonly string $projectName,
         private readonly string $meetingTitle,
-        private readonly string $scheduledAt,
+        private readonly string $scheduledAtUtc,
         private readonly string $updatedByName,
         private readonly string $url,
     ) {}
@@ -33,10 +33,12 @@ final class MeetingUpdatedNotification extends Notification implements ShouldQue
      */
     public function toArray(object $notifiable): array
     {
+        $scheduledAt = $this->localScheduledAt($notifiable, $this->scheduledAtUtc);
+
         return [
             'type' => 'meeting_updated',
             'title' => 'Meeting updated',
-            'message' => "{$this->updatedByName} updated \"{$this->meetingTitle}\" in {$this->projectName}. Now scheduled for {$this->scheduledAt}.",
+            'message' => "{$this->updatedByName} updated \"{$this->meetingTitle}\" in {$this->projectName}. Now scheduled for {$scheduledAt}.",
             'url' => $this->url,
         ];
     }

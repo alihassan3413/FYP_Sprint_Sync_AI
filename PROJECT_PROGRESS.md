@@ -4645,7 +4645,243 @@ tool imports only from `Actions` and `Models`.
 `cancel_meeting` (write, confirmation-gated). The meeting lifecycle is
 complete.
 
-## Next recommended task (updated 2026-08-18, after entry #46)
+### 47. Per-recipient timezones for in-app meeting notifications
+
+Closes the first of the two follow-ups entry #44 left open. Meeting
+**emails** were already formatted in each recipient's own zone; in-app
+notifications were not, because all three actions sent one
+`Notification::send($inAppRecipients, ...)` call carrying a single string
+pre-formatted in the *actor's* zone.
+
+**Formatting moved into the notification layer, where the notifiable is
+known.** Each notification now receives the raw UTC datetime and formats
+itself in `toArray($notifiable)`:
+
+```
+UserTime::format(Carbon::parse($this->scheduledAtUtc, 'UTC'), $notifiable->timezone)
+```
+
+That resolution lives in a small `FormatsMeetingTime` trait shared by the
+three notifications, which also guards the `object $notifiable` signature —
+a non-`User` notifiable falls back to `app.timezone` via the null path
+`UserTime::format()` already had. One `Notification::send()` call now
+renders differently per recipient, which a test proves directly by
+capturing a single notification instance and calling `toArray()` twice with
+two different users.
+
+**Applied to all three**: `MeetingScheduledNotification`,
+`MeetingUpdatedNotification`, `MeetingCancelledNotification`. The
+`scheduledAt` constructor argument became `scheduledAtUtc` on each, and the
+actions pass `$meeting->scheduled_at->toDateTimeString()`. A UTC string
+rather than a `Carbon` keeps the queued payload unambiguous —
+these are all `ShouldQueue`, so the constructor arguments are serialised.
+`DeleteMeetingAction` captures the raw value alongside the formatted one
+before `$meeting->delete()`, since the row is gone by the time `notify()`
+runs.
+
+**One deliberate message change.** `MeetingCancelledNotification` never
+mentioned the meeting time at all, so there was nothing to localise. Since
+the task was to make all three per-recipient, and the cancellation *email*
+already states the time, its message gained
+`It was scheduled for {local time}.` Type, title and URL are unchanged on
+all three, and a test pins those three fields explicitly.
+
+**Nothing else moved.** Email formatting, meeting persistence, recipient
+resolution, actor exclusion, preference gating and queue behaviour are all
+untouched — asserted rather than assumed: an in-app opt-out still
+suppresses only the in-app channel, the actor still receives nothing, a
+member of another workspace still receives nothing, and external
+email-only participants still get no in-app notification at all
+(`Notification::assertCount(2)` with a third external participant present).
+
+**Worth flagging: cancellation *emails* are still actor-zone.**
+`DeleteMeetingAction` computes one formatted string and uses it for both
+the internal and external email loops, unlike `CreateMeetingAction` and
+`UpdateMeetingAction`, which format inside the internal loop per recipient.
+So the premise that "meeting emails are already per-recipient" holds for
+scheduled and updated mail but not for cancellations. This task was scoped
+to in-app notifications and explicitly not to email formatting, so it was
+left alone — but it is a real remaining inconsistency, and the fix is the
+same shape as entry #44's: move the `UserTime::format()` call inside the
+`$emailRecipients` loop.
+
+**Tests**: 10 new in `MeetingNotificationTimezoneTest` — Karachi and New
+York recipients reading the same instant as 3:00 PM PKT and 6:00 AM EDT for
+scheduled, updated and cancelled; a single notification instance rendering
+both; the null-timezone fallback to `app.timezone`; type/title/URL
+preserved; actor exclusion; external participants excluded from in-app;
+in-app preference opt-out; and cross-workspace isolation.
+
+**Verification**: `php artisan test --compact` → **653 passed, 3186
+assertions** (643 → 653, +10). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded. `npx vue-tsc
+--noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
+from entry #24, unchanged and unrelated.
+
+### 48. Registration timezone capture
+
+Closes the last open item from entry #44. New users no longer sit on
+`timezone = null` until they find profile settings.
+
+**Three registration paths, not one.** Inspecting the flow first mattered
+here: besides `RegisteredUserController::store`, users are also created by
+`WorkspaceInvitationController::registerInvitee` (email invitation) and
+`WorkspaceInviteLinkController::registerJoiner` (invite link). All three
+call `User::create()` and all three render a Vue form, so the same
+mechanism reaches all of them. Leaving the two invitation paths out would
+have meant invited users — the majority of a real workspace — keeping the
+old broken default.
+
+**No duplicated timezone list, and no duplicated rule.**
+`UserTime::rules()` now returns `['nullable', 'string', 'timezone']` as the
+single authoritative definition, and `ProfileUpdateRequest` was switched to
+use it rather than repeating the literal. Laravel's `timezone` rule is
+backed by `DateTimeZone::listIdentifiers()`, so validation stays tied to
+the same identifier set `UserTime::isValid()` checks. Detection reuses
+`detectTimezone()` from `resources/js/lib/timezones.ts` — a grep for
+`resolvedOptions()` across `resources/js` returns exactly one hit, in that
+file.
+
+**Validation contract: same as profile settings, deliberately.** A missing
+or empty timezone stores `null` and falls back through
+`resolvedTimezone()` to `app.timezone`, unchanged. An **invalid** timezone
+is rejected with a validation error rather than silently coerced. That is
+the smallest choice consistent with the existing architecture — profile
+settings already reject invalid input — and it is the correct one for
+security: the field is client-supplied, so accepting arbitrary strings
+would mean storing unvalidated data on a user record. The risk of blocking
+a real signup is negligible because `detectTimezone()` itself falls back to
+`'UTC'` if `Intl` throws, so a browser can only submit a valid identifier
+or nothing.
+
+**UI stayed clean.** No dropdown was added to any signup form. Registration
+shows one informational line — `Timezone: Asia/Karachi — meeting times will
+use this. You can change it in settings.` — plus an `InputError` for the
+tampered case. The two invitation forms submit the detected value silently,
+since both are already dense with workspace context and neither has room
+for another line.
+
+**Preserved and asserted, not assumed**: the `Registered` event still
+fires, the verification notification is still sent, a normally registered
+user is still unverified afterwards, an invited user is still
+pre-verified by `markEmailAsVerified()`, workspace creation and the
+dashboard redirect still work, and verifying an email does not overwrite
+the stored timezone. Existing users are untouched — this is capture at
+creation only, with no backfill.
+
+**Tests**: 13 new in `RegistrationTimezoneTest` — valid timezone stored,
+invalid rejected with no user created, missing and empty both falling back,
+the `Registered` event, the verification notification plus unverified
+state, workspace creation and authentication, invited user keeping their
+zone while staying verified, invited user with an invalid zone rejected,
+link joiner storing and falling back, verification not overwriting, and a
+check that timezone never lands on the workspace record.
+
+**One environment change was necessary.** `php artisan test --compact`
+began failing with `Allowed memory size of 134217728 bytes exhausted` in
+`Renderer.php` — not a test failure. PHPUnit itself peaks at 126.50 MB
+across the suite, and the 13 new tests pushed the renderer past PHP's 128M
+default; `vendor/bin/phpunit` ran green throughout. Fixed by adding
+`<ini name="memory_limit" value="512M"/>` to `phpunit.xml`, which is the
+conventional place for it and affects only the test process.
+
+**Verification**: `php artisan test --compact` → **666 passed, 3218
+assertions** (653 → 666, +13). `vendor/bin/pint --dirty` passed.
+`npm run lint:check` clean. `npm run build` succeeded. `npx vue-tsc
+--noEmit` → exactly the two pre-existing `TS2688` `tsconfig.json` errors
+from entry #24, unchanged and unrelated.
+
+The timezone feature is now complete end to end: captured at registration,
+editable in settings, authoritative on the backend, converted on input,
+and rendered per recipient in both email and in-app notifications.
+
+## Next recommended task (updated 2026-08-19, after entry #48)
+
+**FR35 — role-aware dashboard.**
+
+With the timezone work finished, the next item is back on the FR table.
+Entries #38 and #39 already did the load-bearing part: `ResolveAnalyticsScope`
+decides team-versus-personal scope server-side, and the dashboard derives
+its widget visibility from policies rather than duplicating authorization
+in Vue. What remains is the part entry #39 explicitly deferred — the custom
+workspace permissions that are *stored* but still not *enforced* anywhere.
+
+Re-read entry #39's closing note before starting: it documents the exact
+gap rather than a guess at it. The task is to decide whether those stored
+permissions should gate dashboard widgets, and if so to enforce them
+server-side through the existing policy layer — not to invent a second
+authorization mechanism alongside `UserRole` and `ProjectRole`.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
+
+## Superseded next-task note (after entry #47)
+
+**Capture a timezone at registration.**
+
+The last open item from entry #44. A new user has `timezone = null` until
+they visit profile settings, so every meeting time they enter or read is
+interpreted in `app.timezone` (UTC) rather than their own zone. Nothing is
+silently wrong — the meeting form names the zone it is using, and
+`UserTime::resolve()` falls back deliberately — but it is a poor first-run
+experience, and it is the last place where the timezone feature is
+incomplete rather than merely unconfigured.
+
+The shape: detect with `Intl.DateTimeFormat().resolvedOptions().timeZone`
+on the register form, post it as a hidden field, validate it with the same
+`timezone` rule `ProfileUpdateRequest` already uses, and persist it in
+`RegisteredUserController`. The value is client-supplied, so validation is
+not optional — but the `timezone` rule already rejects anything that is not
+a real IANA identifier, and a rejected value simply falls back to
+`app.timezone`.
+
+Optional cleanup while in there, from entry #47: cancellation **emails**
+are still formatted in the actor's zone for every recipient, unlike
+scheduled and updated emails. Moving the `UserTime::format()` call inside
+`DeleteMeetingAction`'s `$emailRecipients` loop makes all three consistent.
+
+Still needing your decision rather than code:
+
+**FR02 and FR27 — the two Design Mismatches.**
+
+These are the only remaining items that need *your* call rather than code,
+and they now gate a meaningful slice of the FR table. Both are cases where
+the implementation is better engineering than the report:
+
+- **FR02-04/05/06** asks for a 6-digit OTP reset; the app uses Laravel's
+  signed reset link, which has no brute-force surface and no code-reuse
+  window. Recommended: amend the report.
+- **FR27-01** asks for global Scrum Master / Developer / Team Lead roles
+  assigned at registration; the app uses per-workspace roles, which a
+  global role cannot express and which FR29–FR35 depend on. Recommended:
+  amend the report. Entry #38 has now mapped that same terminology onto
+  the real model a second time, which strengthens the case.
+
+Once decided, the remaining *unblocked* build work is:
+
+- **FR16-02** — realtime propagation (new infrastructure).
+- **FR20-02** — "current sprint" (needs a sprint entity).
+
+## Superseded next-task note (after entry #46)
 
 **Close the two timezone follow-ups, then pick up the FR table again.**
 

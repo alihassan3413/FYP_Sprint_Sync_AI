@@ -94,6 +94,7 @@ final class WorkspaceInviteLinkController
             'name' => $request->string('name')->toString(),
             'email' => $request->string('email')->toString(),
             'password' => Hash::make($request->string('password')->toString()),
+            'timezone' => $request->validated('timezone'),
         ]));
 
         Auth::login($user);

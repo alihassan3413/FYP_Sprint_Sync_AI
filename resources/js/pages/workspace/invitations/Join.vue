@@ -13,11 +13,14 @@ const props = withDefaults(
     { requiresRegistration: true },
 );
 
+const detectedTimezone = detectTimezone();
+
 const form = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
+    timezone: detectedTimezone,
 });
 
 const expiresLabel = computed(() => new Date(props.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }));

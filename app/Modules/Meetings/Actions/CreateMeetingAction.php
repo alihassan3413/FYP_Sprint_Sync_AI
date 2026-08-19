@@ -110,7 +110,7 @@ final class CreateMeetingAction
             Notification::send($inAppRecipients, new MeetingScheduledNotification(
                 projectName: $meeting->project->name,
                 meetingTitle: $meeting->title,
-                scheduledAt: UserTime::format($meeting->scheduled_at, $actor->timezone),
+                scheduledAtUtc: $meeting->scheduled_at->toDateTimeString(),
                 scheduledByName: $actor->name,
                 url: route('workspace.projects.show', ['workspace' => $meeting->project->workspace->slug, 'project' => $meeting->project_id]),
             ));

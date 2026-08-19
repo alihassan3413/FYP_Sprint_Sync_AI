@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Http\Requests;
 
 use App\Models\User;
+use App\Support\Time\UserTime;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -29,6 +30,7 @@ final class JoinWorkspaceByLinkRequest extends FormRequest
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email:rfc', 'max:255', Rule::unique(User::class, 'email')],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'timezone' => UserTime::rules(),
         ];
     }
 
