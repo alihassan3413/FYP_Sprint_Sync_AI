@@ -204,8 +204,24 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             ];
         }
 
-        $assignee = null;
+        $isClient = $workspace->isClient($user);
         $namedPerson = trim((string) ($args['assignee'] ?? $args['assignee_email'] ?? ''));
+
+        /*
+         * The same rule the web form enforces: a client raises a request, the team
+         * decides who picks it up and which sprint it lands in.
+         */
+        if ($isClient && ($namedPerson !== '' || ! empty($args['sprint']))) {
+            return [
+                'success' => false,
+                'error_code' => 'client_cannot_plan_work',
+                'error' => 'Clients can request work but cannot assign it to someone or put it in a sprint. '
+                    .'The request goes to the team to triage.',
+                'next_step' => 'Create the task again without an assignee or sprint, and tell the user the team will pick it up.',
+            ];
+        }
+
+        $assignee = null;
 
         if ($namedPerson !== '') {
             $assigneeResolution = $this->assigneeResolver->resolve($project, $namedPerson);

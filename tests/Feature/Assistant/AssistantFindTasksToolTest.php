@@ -251,6 +251,6 @@ final class AssistantFindTasksToolTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame([], $result['tasks']);
-        $this->assertStringContainsString('not on any project', $result['message']);
+        $this->assertStringContainsString('no project here whose tasks you can see', $result['message']);
     }
 }

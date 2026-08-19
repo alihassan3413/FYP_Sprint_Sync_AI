@@ -119,8 +119,15 @@ final class FindTasksTool implements AssistantTool
             return ['success' => false, 'error_code' => 'no_workspace', 'error' => 'No active workspace is selected.'];
         }
 
+        /*
+         * Only projects whose tasks this person may read. For a client that means
+         * their client role has to grant the board, not just project membership.
+         */
         /** @var Collection<int, Project> $projects */
-        $projects = $workspace->accessibleProjectsFor($user)->get(['id', 'name', 'workspace_id']);
+        $projects = $workspace->accessibleProjectsFor($user)
+            ->get(['id', 'name', 'workspace_id'])
+            ->filter(fn (Project $project) => $user->can('viewAny', [Task::class, $project]))
+            ->values();
 
         if ($projects->isEmpty()) {
             return [
@@ -128,7 +135,7 @@ final class FindTasksTool implements AssistantTool
                 'tasks' => [],
                 'total_matches' => 0,
                 'needs_disambiguation' => false,
-                'message' => 'You are not on any project in this workspace yet, so there are no tasks to search.',
+                'message' => 'There is no project here whose tasks you can see, so there is nothing to search.',
             ];
         }
 
