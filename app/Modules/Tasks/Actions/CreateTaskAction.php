@@ -28,10 +28,12 @@ final class CreateTaskAction
 
     public function handle(Project $project, User $creator, StoreTaskData $data): Task
     {
-        $defaultColumnId = $project->boardColumns()
+        $defaultColumn = $project->boardColumns()
             ->where('is_default', true)
             ->orderBy('position')
-            ->value('id');
+            ->first();
+
+        $defaultColumnId = $defaultColumn?->id;
 
         $task = $project->tasks()->create([
             'title' => $data->title,
@@ -40,6 +42,7 @@ final class CreateTaskAction
             'due_date' => $data->due_date,
             'sprint_id' => $data->sprint_id,
             'board_column_id' => $defaultColumnId,
+            'completed_at' => $defaultColumn?->is_done === true ? now() : null,
             'workspace_id' => $project->workspace_id,
         ]);
 

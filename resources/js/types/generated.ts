@@ -50,6 +50,8 @@ export enum AuditAction {
     SPRINT_CREATED = 'sprint.created',
     SPRINT_UPDATED = 'sprint.updated',
     SPRINT_DELETED = 'sprint.deleted',
+    SPRINT_STARTED = 'sprint.started',
+    SPRINT_COMPLETED = 'sprint.completed',
     BOARD_COLUMN_CREATED = 'board_column.created',
     BOARD_COLUMN_DELETED = 'board_column.deleted',
     BOARD_COLUMN_REORDERED = 'board_column.reordered',
@@ -146,17 +148,42 @@ export type ProjectSummaryData = {
     completed_tasks: number;
     completion_percentage: number;
 };
+export enum SprintCarryOver {
+    Backlog = 'backlog',
+    NextSprint = 'next_sprint',
+}
 export type SprintData = {
     id: number;
     name: string;
     goal?: string;
+    status: string;
+    status_label: string;
     starts_on: string;
     ends_on: string;
+    started_at?: string;
+    completed_at?: string;
     project_id: number;
     is_current: boolean;
     is_upcoming: boolean;
+    is_overdue: boolean;
     task_count: number;
+    completed_task_count: number;
+    completion_percentage: number;
+    time_elapsed_percentage: number;
+    total_days: number;
+    days_remaining: number;
+    committed_task_count?: number;
+    carried_over_task_count?: number;
 };
+export enum SprintHealth {
+    NotStarted = 'not_started',
+    Empty = 'empty',
+    OnTrack = 'on_track',
+    AtRisk = 'at_risk',
+    OffTrack = 'off_track',
+    Overdue = 'overdue',
+    Done = 'done',
+}
 export type SprintProgressData = {
     has_sprint: boolean;
     sprints: Array<SprintRefData>;
@@ -174,6 +201,44 @@ export type SprintRefData = {
     project_id: number;
     project_name: string;
 };
+export type SprintReportData = {
+    sprint_id: number;
+    name: string;
+    goal?: string;
+    status: string;
+    health: string;
+    health_label: string;
+    starts_on: string;
+    ends_on: string;
+    total_days: number;
+    days_elapsed: number;
+    days_remaining: number;
+    time_elapsed_percentage: number;
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    overdue_tasks: number;
+    unassigned_tasks: number;
+    completion_percentage: number;
+    expected_percentage: number;
+    pace_delta: number;
+    committed_task_count?: number;
+    scope_added: number;
+    carried_over_task_count?: number;
+    average_cycle_time_days?: number;
+    velocity_average?: number;
+    burndown: Array<any>;
+    workload: Array<any>;
+    blockers: Array<any>;
+    column_breakdown: { [key: string]: any };
+    recommendations: Array<string>;
+    summary: string;
+};
+export enum SprintStatus {
+    Planned = 'planned',
+    Active = 'active',
+    Completed = 'completed',
+}
 export type StoreMeetingData = {
     title: string;
     description?: string;

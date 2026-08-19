@@ -45,6 +45,16 @@ final class SprintPolicy
         return $this->create($user, $sprint->project);
     }
 
+    public function start(User $user, Sprint $sprint): bool
+    {
+        return $this->create($user, $sprint->project);
+    }
+
+    public function complete(User $user, Sprint $sprint): bool
+    {
+        return $this->create($user, $sprint->project);
+    }
+
     public function delete(User $user, Sprint $sprint): bool
     {
         return $this->create($user, $sprint->project);

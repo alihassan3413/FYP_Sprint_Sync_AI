@@ -30,12 +30,17 @@ final class UpdateTaskStatusAction
     public function handle(Task $task, User $actor, UpdateTaskStatusData $data): Task
     {
         $previousColumnId = $task->board_column_id;
+        $targetColumn = BoardColumn::query()->findOrFail($data->board_column_id);
 
-        $task->update(['board_column_id' => $data->board_column_id]);
+        $task->update([
+            'board_column_id' => $data->board_column_id,
+            /* Set on the first landing in a done column, cleared when it comes back out. */
+            'completed_at' => $targetColumn->is_done ? ($task->completed_at ?? now()) : null,
+        ]);
 
         if ($task->wasChanged('board_column_id')) {
             $previousColumnName = BoardColumn::query()->whereKey($previousColumnId)->value('name') ?? 'Unknown';
-            $newColumnName = $task->boardColumn->name;
+            $newColumnName = $targetColumn->name;
 
             $this->auditLogger->handle(
                 $task->project->workspace,

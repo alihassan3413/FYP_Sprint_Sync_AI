@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Projects\Data\SprintStatus;
 use App\Modules\Projects\Data\StoreSprintData;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Models\Sprint;
@@ -20,6 +21,8 @@ final class CreateSprintAction
         $sprint = $project->sprints()->create([
             'name' => $data->name,
             'goal' => $data->goal,
+            /* Sprints are always planned first — starting one is a deliberate act. */
+            'status' => SprintStatus::Planned,
             'starts_on' => $data->starts_on,
             'ends_on' => $data->ends_on,
             'workspace_id' => $project->workspace_id,

@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Projects\Exceptions\SprintException;
 use App\Modules\Projects\Models\Sprint;
 
 final class DeleteSprintAction
@@ -15,6 +16,10 @@ final class DeleteSprintAction
 
     public function handle(Sprint $sprint, User $actor): void
     {
+        if ($sprint->status->isCompleted()) {
+            throw SprintException::isCompleted($sprint->name);
+        }
+
         $project = $sprint->project;
         $name = $sprint->name;
 

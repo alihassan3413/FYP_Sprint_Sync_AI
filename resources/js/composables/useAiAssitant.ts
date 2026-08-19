@@ -152,6 +152,14 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
             return `Create task "${args.title ?? 'untitled'}"${args.assignee_email ? ` for ${args.assignee_email}` : ''}`;
         case 'create_project':
             return `Create project "${args.name ?? 'untitled'}"`;
+        case 'manage_sprint': {
+            const sprintAction = String(args.action ?? 'create');
+
+            if (sprintAction === 'create') return `Plan sprint "${args.name ?? 'untitled'}"`;
+            if (sprintAction === 'start') return 'Start this sprint';
+
+            return `Complete this sprint${args.carry_over === 'next_sprint' ? ', carrying work to the next one' : ''}`;
+        }
         case 'schedule_meeting': {
             const invitees = Array.isArray(args.participant_emails) ? args.participant_emails.length : 0;
 
@@ -179,6 +187,9 @@ function getToolIntro(name: string): string {
 
         case 'schedule_meeting':
             return 'I can schedule this meeting and email everyone below. Please check the details and recipients first.';
+
+        case 'manage_sprint':
+            return 'I can make this change to the sprint. Completing one freezes its numbers, so please check first.';
 
         default:
             return 'I’m ready to perform this action. Please confirm.';

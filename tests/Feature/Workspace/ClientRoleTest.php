@@ -277,7 +277,8 @@ final class ClientRoleTest extends TestCase
                 ->has('sprints', 0)
                 ->has('meetings', 0)
                 ->has('projectMembers', 0)
-                ->where('canViewBoard', false));
+                ->where('canViewBoard', false)
+                ->where('activeSprintReport', null));
     }
 
     public function test_a_client_cannot_open_analytics_or_the_archive(): void

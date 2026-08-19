@@ -34,6 +34,8 @@ enum AuditAction: string
     case SPRINT_CREATED = 'sprint.created';
     case SPRINT_UPDATED = 'sprint.updated';
     case SPRINT_DELETED = 'sprint.deleted';
+    case SPRINT_STARTED = 'sprint.started';
+    case SPRINT_COMPLETED = 'sprint.completed';
 
     case BOARD_COLUMN_CREATED = 'board_column.created';
     case BOARD_COLUMN_DELETED = 'board_column.deleted';
@@ -111,6 +113,8 @@ enum AuditAction: string
             self::SPRINT_CREATED => 'Sprint created',
             self::SPRINT_UPDATED => 'Sprint updated',
             self::SPRINT_DELETED => 'Sprint deleted',
+            self::SPRINT_STARTED => 'Sprint started',
+            self::SPRINT_COMPLETED => 'Sprint completed',
             self::BOARD_COLUMN_CREATED => 'Board column created',
             self::BOARD_COLUMN_DELETED => 'Board column deleted',
             self::BOARD_COLUMN_REORDERED => 'Board columns reordered',

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Assistant\Contracts\AssistantTool;
 use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
@@ -27,7 +28,9 @@ final class CreateTaskTool implements AssistantTool
         return 'Creates a task inside a project. Call list_projects first to get a real project_id — never guess one. '
             .'The task starts in the project\'s first default board column. '
             .'To assign it, pass the assignee\'s email address; call get_workspace_info with include_members=true '
-            .'to look up member emails. Leave assignee_email out when the user did not name an assignee.';
+            .'to look up member emails. Leave assignee_email out when the user did not name an assignee. '
+            .'Pass sprint="current" to put the work in the project\'s running sprint, or a sprint_id from '
+            .'get_sprint_report for a specific one; leave both out for the backlog.';
     }
 
     /**
@@ -62,6 +65,15 @@ final class CreateTaskTool implements AssistantTool
                     'type' => 'string',
                     'format' => 'date',
                     'description' => 'Optional due date in YYYY-MM-DD format.',
+                ],
+                'sprint' => [
+                    'type' => 'string',
+                    'enum' => ['current'],
+                    'description' => 'Pass "current" to add the task to the project\'s running sprint.',
+                ],
+                'sprint_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional sprint ID from get_sprint_report, for a specific sprint of this project.',
                 ],
             ],
             'required' => ['project_id', 'title'],
@@ -138,11 +150,24 @@ final class CreateTaskTool implements AssistantTool
             }
         }
 
+        $sprint = $this->resolveSprint($args, $project);
+
+        if ($sprint === false) {
+            return [
+                'success' => false,
+                'error_code' => 'sprint_not_found',
+                'error' => isset($args['sprint_id'])
+                    ? 'That sprint does not belong to this project. Use get_sprint_report to find the right one.'
+                    : "{$project->name} has no running sprint. Start one with manage_sprint, or leave the task in the backlog.",
+            ];
+        }
+
         $task = $this->action->handle($project, $user, StoreTaskData::from([
             'title' => trim((string) $args['title']),
             'description' => isset($args['description']) ? trim((string) $args['description']) : null,
             'assigned_to' => $assignee?->id,
             'due_date' => $args['due_date'] ?? null,
+            'sprint_id' => $sprint?->id,
         ]));
 
         return [
@@ -154,15 +179,36 @@ final class CreateTaskTool implements AssistantTool
                 'project_name' => $project->name,
                 'assignee_name' => $assignee?->name,
                 'due_date' => $task->due_date?->toDateString(),
+                'sprint_id' => $task->sprint_id,
+                'sprint_name' => $sprint?->name,
             ],
             'url' => route('workspace.projects.show', [
                 'workspace' => $workspace->slug,
                 'project' => $project->id,
             ])."?task={$task->id}",
-            'message' => $assignee === null
-                ? "Created \"{$task->title}\" in {$project->name}."
-                : "Created \"{$task->title}\" in {$project->name} and assigned it to {$assignee->name}.",
+            'message' => "Created \"{$task->title}\" in {$project->name}"
+                .($assignee === null ? '' : " and assigned it to {$assignee->name}")
+                .($sprint === null ? '.' : ", in sprint \"{$sprint->name}\"."),
         ];
+    }
+
+    /**
+     * Returns the sprint to file the task under, null for the backlog, or false when
+     * the caller asked for a sprint that cannot be used.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    private function resolveSprint(array $args, Project $project): Sprint|false|null
+    {
+        if (isset($args['sprint_id'])) {
+            return $project->sprints()->whereKey((int) $args['sprint_id'])->first() ?? false;
+        }
+
+        if (($args['sprint'] ?? null) !== 'current') {
+            return null;
+        }
+
+        return $project->sprints()->active()->first() ?? false;
     }
 
     private function resolveAssignee(string $email, Project $project): ?User

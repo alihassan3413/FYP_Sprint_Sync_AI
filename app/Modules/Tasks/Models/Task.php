@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $description
  * @property int $board_column_id
  * @property Carbon|null $due_date
+ * @property Carbon|null $completed_at
  * @property int $project_id
  * @property int|null $sprint_id
  * @property int $workspace_id
@@ -37,6 +38,7 @@ final class Task extends Model
         'description',
         'board_column_id',
         'due_date',
+        'completed_at',
         'project_id',
         'sprint_id',
         'workspace_id',
@@ -47,6 +49,7 @@ final class Task extends Model
     {
         return [
             'due_date' => 'date',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -91,6 +94,33 @@ final class Task extends Model
             ->whereNotNull('due_date')
             ->where('due_date', '<', now()->toDateString())
             ->whereHas('boardColumn', fn (Builder $column) => $column->where('is_done', false));
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->whereNotNull('completed_at');
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNull('completed_at');
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->completed_at !== null;
+    }
+
+    /**
+     * Days between the task appearing and landing in a done column.
+     */
+    public function cycleTimeInDays(): ?int
+    {
+        if ($this->completed_at === null || $this->created_at === null) {
+            return null;
+        }
+
+        return (int) $this->created_at->startOfDay()->diffInDays($this->completed_at->startOfDay());
     }
 
     protected static function newFactory(): TaskFactory

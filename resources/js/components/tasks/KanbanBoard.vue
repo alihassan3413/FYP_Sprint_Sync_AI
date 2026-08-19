@@ -12,9 +12,15 @@ const props = withDefaults(
         canManageTasks: boolean;
         canManageBoardColumns: boolean;
         scope?: 'mine' | 'all';
+        /** Sprint focus: a sprint id, 'backlog' for unplanned work, or 'all'. */
+        sprintFilter?: number | 'backlog' | 'all';
+        /** Sprint id → name, so a card can show which sprint it belongs to. */
+        sprintNames?: Record<number, string>;
     }>(),
     {
         scope: 'all',
+        sprintFilter: 'all',
+        sprintNames: () => ({}),
     },
 );
 
@@ -72,9 +78,21 @@ useProjectTaskStream(props.projectId, (payload) => {
     task.board_column_id = payload.board_column_id;
 });
 
-const visibleTasks = computed(() =>
-    props.scope === 'mine' ? localTasks.value.filter((task) => task.assigned_to === props.currentUserId) : localTasks.value,
-);
+const visibleTasks = computed(() => {
+    let tasks = localTasks.value;
+
+    if (props.scope === 'mine') {
+        tasks = tasks.filter((task) => task.assigned_to === props.currentUserId);
+    }
+
+    if (props.sprintFilter === 'backlog') {
+        tasks = tasks.filter((task) => task.sprint_id === null);
+    } else if (typeof props.sprintFilter === 'number') {
+        tasks = tasks.filter((task) => task.sprint_id === props.sprintFilter);
+    }
+
+    return tasks;
+});
 
 const columns = computed(() =>
     localColumnOrder.value.map((column) => ({
@@ -260,6 +278,7 @@ function reorderColumns(fromIndex: number, toIndex: number) {
                     :can-manage="canManageTasks"
                     :draggable="canDrag(task)"
                     :is-done="column.is_done"
+                    :sprint-name="sprintFilter === 'all' && task.sprint_id !== null ? sprintNames[task.sprint_id] : undefined"
                     :pending="task.id === pendingTaskId"
                     :has-error="task.id === errorTaskId"
                     @open="(t) => emit('open', t)"
@@ -273,6 +292,7 @@ function reorderColumns(fromIndex: number, toIndex: number) {
                 <p v-if="column.tasks.length === 0" class="text-muted-foreground px-1 py-6 text-center text-xs">
                     <template v-if="dragOverColumnId === column.id">Drop here</template>
                     <template v-else-if="scope === 'mine'">Nothing assigned to you.</template>
+                    <template v-else-if="sprintFilter !== 'all'">Nothing here in this sprint.</template>
                     <template v-else>No tasks here.</template>
                 </p>
             </div>

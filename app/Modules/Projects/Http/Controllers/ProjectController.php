@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Http\Controllers;
 use App\Models\User;
 use App\Modules\Meetings\Data\MeetingData;
 use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Projects\Actions\BuildSprintReport;
 use App\Modules\Projects\Actions\CreateProjectAction;
 use App\Modules\Projects\Actions\DeleteProjectAction;
 use App\Modules\Projects\Actions\UpdateProjectAction;
@@ -41,7 +42,7 @@ final class ProjectController
         ]);
     }
 
-    public function show(Request $request, Workspace $workspace, Project $project): Response
+    public function show(Request $request, Workspace $workspace, Project $project, BuildSprintReport $sprintReport): Response
     {
         $user = $request->user();
 
@@ -54,6 +55,7 @@ final class ProjectController
         $canViewSprints = $user->can('viewAny', [Sprint::class, $project]);
         $canViewMeetings = $user->can('viewAny', [Meeting::class, $project]);
         $isClient = $workspace->isClient($user);
+        $activeSprint = $project->sprints()->active()->first();
 
         return Inertia::render('projects/show', [
             'project' => ProjectData::fromModel($project),
@@ -65,11 +67,15 @@ final class ProjectController
             'canManageBoardColumns' => $user->can('create', [BoardColumn::class, $project]),
             'canManageSprints' => $user->can('create', [Sprint::class, $project]),
             'canViewBoard' => $canViewBoard,
+            /* The running sprint's report powers the burndown and health strip. */
+            'activeSprintReport' => $canViewSprints && $activeSprint !== null
+                ? $sprintReport->handle($activeSprint)
+                : null,
             'isClient' => $isClient,
             'clientPermissions' => $workspace->clientPermissionsFor($user),
             'sprints' => $canViewSprints
                 ? $project->sprints()
-                    ->withCount('tasks')
+                    ->withCount(['tasks', 'tasks as completed_tasks_count' => fn ($query) => $query->whereNotNull('completed_at')])
                     ->orderByDesc('starts_on')
                     ->get()
                     ->map(SprintData::fromModel(...))

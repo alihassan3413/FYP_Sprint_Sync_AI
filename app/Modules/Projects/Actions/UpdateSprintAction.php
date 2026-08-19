@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Projects\Data\StoreSprintData;
+use App\Modules\Projects\Exceptions\SprintException;
 use App\Modules\Projects\Models\Sprint;
 
 final class UpdateSprintAction
@@ -16,6 +17,10 @@ final class UpdateSprintAction
 
     public function handle(Sprint $sprint, User $actor, StoreSprintData $data): Sprint
     {
+        if ($sprint->status->isCompleted()) {
+            throw SprintException::isCompleted($sprint->name);
+        }
+
         $sprint->update([
             'name' => $data->name,
             'goal' => $data->goal,

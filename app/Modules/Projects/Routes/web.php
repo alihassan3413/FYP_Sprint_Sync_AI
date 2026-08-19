@@ -25,5 +25,7 @@ TenantRoute::prefixed('projects/{project}/members', 'workspace.projects.members.
 TenantRoute::prefixed('projects/{project}/sprints', 'workspace.projects.sprints.', function () {
     Route::post('/', [SprintController::class, 'store'])->name('store');
     Route::put('{sprint}', [SprintController::class, 'update'])->name('update');
+    Route::post('{sprint}/start', [SprintController::class, 'start'])->name('start');
+    Route::post('{sprint}/complete', [SprintController::class, 'complete'])->name('complete');
     Route::delete('{sprint}', [SprintController::class, 'destroy'])->name('destroy');
 });

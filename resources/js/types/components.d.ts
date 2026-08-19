@@ -193,6 +193,7 @@ declare module 'vue' {
     SidebarSeparator: typeof import('./../components/ui/sidebar/SidebarSeparator.vue')['default']
     SidebarTrigger: typeof import('./../components/ui/sidebar/SidebarTrigger.vue')['default']
     Skeleton: typeof import('./../components/ui/skeleton/Skeleton.vue')['default']
+    SprintBurndown: typeof import('./../components/projects/SprintBurndown.vue')['default']
     SprintPanel: typeof import('./../components/projects/SprintPanel.vue')['default']
     Tabs: typeof import('./../components/ui/tabs/Tabs.vue')['default']
     TabsContent: typeof import('./../components/ui/tabs/TabsContent.vue')['default']

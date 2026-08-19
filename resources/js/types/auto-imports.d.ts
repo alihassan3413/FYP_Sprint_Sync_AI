@@ -79,7 +79,10 @@ declare global {
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const sprintHealthStyles: typeof import('../lib/sprints').sprintHealthStyles
   const sprintStatusLabel: typeof import('../lib/sprints').sprintStatusLabel
+  const sprintStatusStyles: typeof import('../lib/sprints').sprintStatusStyles
+  const sprintTimingLabel: typeof import('../lib/sprints').sprintTimingLabel
   const storeToRefs: typeof import('pinia').storeToRefs
   const timezoneAbbreviation: typeof import('../lib/timezones').timezoneAbbreviation
   const timezoneOffsetLabel: typeof import('../lib/timezones').timezoneOffsetLabel
@@ -165,7 +168,7 @@ declare global {
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
   // @ts-ignore
-  export type { Sprint } from '../lib/sprints'
+  export type { SprintStatus, SprintHealth, SprintCarryOver, Sprint, SprintBurndownPoint, SprintReport } from '../lib/sprints'
   import('../lib/sprints')
   // @ts-ignore
   export type { Task, TaskComment, TaskMember, BoardColumn } from '../lib/tasks'
@@ -253,7 +256,10 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly sprintHealthStyles: UnwrapRef<typeof import('../lib/sprints')['sprintHealthStyles']>
     readonly sprintStatusLabel: UnwrapRef<typeof import('../lib/sprints')['sprintStatusLabel']>
+    readonly sprintStatusStyles: UnwrapRef<typeof import('../lib/sprints')['sprintStatusStyles']>
+    readonly sprintTimingLabel: UnwrapRef<typeof import('../lib/sprints')['sprintTimingLabel']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly timezoneAbbreviation: UnwrapRef<typeof import('../lib/timezones')['timezoneAbbreviation']>
     readonly timezoneOffsetLabel: UnwrapRef<typeof import('../lib/timezones')['timezoneOffsetLabel']>

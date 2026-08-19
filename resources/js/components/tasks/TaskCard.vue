@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, ArrowRightLeft, CalendarClock, Loader2 } from 'lucide-vue-next';
+import { AlertCircle, ArrowRightLeft, CalendarClock, CalendarRange, Loader2 } from 'lucide-vue-next';
 
 import { formatDueDate, isOverdue, type BoardColumn, type Task } from '@/lib/tasks';
 
@@ -9,6 +9,8 @@ const props = defineProps<{
     canManage: boolean;
     draggable: boolean;
     isDone: boolean;
+    /** Set only when the board is showing every sprint at once. */
+    sprintName?: string;
     pending?: boolean;
     hasError?: boolean;
 }>();
@@ -62,6 +64,14 @@ const moveItems = computed<DropdownEntry[]>(() =>
             {{ task.description }}
         </p>
 
+        <span
+            v-if="sprintName"
+            class="border-border text-muted-foreground mt-2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
+        >
+            <CalendarRange class="size-2.5" />
+            {{ sprintName }}
+        </span>
+
         <div class="mt-3 flex items-center justify-between gap-2">
             <div class="flex min-w-0 items-center gap-1.5">
                 <AppAvatar v-if="task.assignee_name" :name="task.assignee_name" size="xs" />
@@ -80,10 +90,7 @@ const moveItems = computed<DropdownEntry[]>(() =>
                 <div v-if="draggable && !pending && otherColumns.length > 0" @click.stop>
                     <AppDropDown :items="moveItems" heading="Move to" align="end" width="w-44" trigger-label="Move task to another column">
                         <template #trigger>
-                            <button
-                                type="button"
-                                class="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1 transition-colors"
-                            >
+                            <button type="button" class="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1 transition-colors">
                                 <ArrowRightLeft class="size-3.5" />
                             </button>
                         </template>

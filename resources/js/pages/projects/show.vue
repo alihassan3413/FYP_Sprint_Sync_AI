@@ -4,7 +4,7 @@ import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, 
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Meeting } from '@/lib/meetings';
 import type { Project, ProjectMember } from '@/lib/projects';
-import type { Sprint } from '@/lib/sprints';
+import type { Sprint, SprintReport } from '@/lib/sprints';
 import type { BoardColumn, Task, TaskMember } from '@/lib/tasks';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 
@@ -18,6 +18,7 @@ const props = defineProps<{
     canManageBoardColumns: boolean;
     canManageSprints: boolean;
     canViewBoard?: boolean;
+    activeSprintReport?: SprintReport | null;
     isClient?: boolean;
     clientPermissions?: string[];
     sprints: Sprint[];
@@ -54,6 +55,36 @@ const isDeleteDialogOpen = ref(false);
 const taskScope = ref<'mine' | 'all'>('mine');
 
 const myTaskCount = computed(() => props.tasks.filter((task) => task.assigned_to === currentUserId.value).length);
+
+const activeSprint = computed(() => props.sprints.find((sprint) => sprint.status === 'active') ?? null);
+
+const sprintNames = computed<Record<number, string>>(() => Object.fromEntries(props.sprints.map((sprint) => [sprint.id, sprint.name])));
+
+/** Default the board to the running sprint — that is the work the team committed to. */
+const sprintFilter = ref<number | 'backlog' | 'all'>(activeSprint.value?.id ?? 'all');
+
+watch(activeSprint, (sprint, previous) => {
+    if (sprint === null && typeof sprintFilter.value === 'number') {
+        sprintFilter.value = 'all';
+        return;
+    }
+
+    if (sprint !== null && previous === null && sprintFilter.value === 'all') {
+        sprintFilter.value = sprint.id;
+    }
+});
+
+const sprintFilterOptions = computed(() => [
+    { value: 'all' as const, label: 'All tasks', count: props.tasks.length },
+    ...props.sprints
+        .filter((sprint) => sprint.status !== 'completed')
+        .map((sprint) => ({
+            value: sprint.id,
+            label: sprint.status === 'active' ? `${sprint.name} (running)` : sprint.name,
+            count: props.tasks.filter((task) => task.sprint_id === sprint.id).length,
+        })),
+    { value: 'backlog' as const, label: 'Backlog', count: props.tasks.filter((task) => task.sprint_id === null).length },
+]);
 
 const taskScopeOptions = computed(() => [
     { value: 'mine', label: 'My tasks', count: myTaskCount.value },
@@ -146,9 +177,20 @@ function onDeleted() {
                     <!-- Board -->
                     <TabsContent value="board">
                         <div class="mb-4 flex min-h-9 items-center justify-between gap-3">
-                            <div class="flex min-w-0 flex-1 items-center overflow-x-auto">
+                            <div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
                                 <AppSegmentedControl v-if="tasks.length > 0" v-model="taskScope" :options="taskScopeOptions" />
                                 <p v-else class="text-muted-foreground text-xs">No tasks yet</p>
+
+                                <select
+                                    v-if="sprints.length > 0 && tasks.length > 0"
+                                    v-model="sprintFilter"
+                                    aria-label="Sprint"
+                                    class="border-input bg-background h-8 shrink-0 rounded-lg border px-2 text-xs"
+                                >
+                                    <option v-for="option in sprintFilterOptions" :key="String(option.value)" :value="option.value">
+                                        {{ option.label }} ({{ option.count }})
+                                    </option>
+                                </select>
                             </div>
 
                             <Button v-if="canManageTasks" size="sm" class="shrink-0 gap-1.5" @click="isCreateTaskModalOpen = true">
@@ -179,6 +221,8 @@ function onDeleted() {
                             :can-manage-tasks="canManageTasks"
                             :can-manage-board-columns="canManageBoardColumns"
                             :scope="taskScope"
+                            :sprint-filter="sprintFilter"
+                            :sprint-names="sprintNames"
                             @open="openTaskDetails"
                             @edit="openTaskEdit"
                             @delete="(task) => (deleteTaskTarget = task)"
@@ -205,7 +249,12 @@ function onDeleted() {
 
                     <!-- Meetings -->
                     <TabsContent value="sprints">
-                        <SprintPanel :project-id="project.id" :sprints="sprints" :can-manage="canManageSprints" />
+                        <SprintPanel
+                            :project-id="project.id"
+                            :sprints="sprints"
+                            :can-manage="canManageSprints"
+                            :active-sprint-report="activeSprintReport"
+                        />
                     </TabsContent>
 
                     <TabsContent value="meetings">
