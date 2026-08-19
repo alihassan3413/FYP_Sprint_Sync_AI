@@ -9,6 +9,7 @@ use App\Modules\Analytics\Actions\BuildAnalyticsAction;
 use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\DashboardMeetingData;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
@@ -35,6 +36,10 @@ final class DashboardController
 
         $summary = $analytics->handle($scope, []);
 
+        $isClient = $workspace->isClient($user);
+        $showsBoardData = ! $isClient || $workspace->allowsClient($user, ClientPermission::BoardView);
+        $showsMeetings = ! $isClient || $workspace->allowsClient($user, ClientPermission::MeetingsView);
+
         return Inertia::render('Dashboard', [
             'user' => [
                 'name' => $user->name,
@@ -48,15 +53,15 @@ final class DashboardController
             'pendingInvitesCount' => $capabilities->manageMembers ? $workspace->pendingInvitations()->count() : 0,
             'activity' => $capabilities->manageMembers ? $this->activity($workspace, $user) : collect(),
             'onboarding' => $this->onboarding($workspace),
-            'upcomingMeetings' => $this->meetings($workspace, $accessibleProjectIds, false),
-            'pastMeetings' => $this->meetings($workspace, $accessibleProjectIds, true),
+            'upcomingMeetings' => $showsMeetings ? $this->meetings($workspace, $accessibleProjectIds, false) : collect(),
+            'pastMeetings' => $showsMeetings ? $this->meetings($workspace, $accessibleProjectIds, true) : collect(),
             'taskProgress' => [
-                'total' => $summary->total_tasks,
-                'completed' => $summary->completed_tasks,
-                'open' => $summary->open_tasks,
-                'overdue' => $summary->overdue_tasks,
-                'completion_percentage' => $summary->task_completion_percentage,
-                'columns' => $summary->tasks_by_column,
+                'total' => $showsBoardData ? $summary->total_tasks : 0,
+                'completed' => $showsBoardData ? $summary->completed_tasks : 0,
+                'open' => $showsBoardData ? $summary->open_tasks : 0,
+                'overdue' => $showsBoardData ? $summary->overdue_tasks : 0,
+                'completion_percentage' => $showsBoardData ? $summary->task_completion_percentage : 0,
+                'columns' => $showsBoardData ? $summary->tasks_by_column : [],
             ],
             'projects' => $summary->projects,
             'scope' => $summary->scope,

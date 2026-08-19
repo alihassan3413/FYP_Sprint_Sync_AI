@@ -30,7 +30,7 @@ function shouldShowThinking(msg: { role: string; isLoading?: boolean; content?: 
 
 const { inputValue, messages, isStreaming, submit, openDock, collapse, clearConversation, confirmTool } = useAiAssistant();
 
-const inputRef = ref<InstanceType<typeof Input> | null>(null);
+const inputRef = ref<HTMLTextAreaElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
 const isFocused = ref(false);
 
@@ -38,14 +38,45 @@ const hasMessages = computed(() => messages.value.length > 0);
 const isActive = computed(() => isFocused.value || inputValue.value.trim().length > 0);
 
 function focusInput() {
-    const el = (inputRef.value as unknown as { $el?: HTMLInputElement })?.$el;
-    el?.focus();
+    inputRef.value?.focus();
 }
+const MAX_INPUT_HEIGHT = 132;
+
+function textareaEl(): HTMLTextAreaElement | null {
+    return inputRef.value;
+}
+
+function autoGrow() {
+    const el = textareaEl();
+    if (!el) return;
+
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+    el.style.overflowY = el.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
+}
+
+function insertNewline() {
+    const el = textareaEl();
+    if (!el) return;
+
+    const start = el.selectionStart ?? inputValue.value.length;
+    const end = el.selectionEnd ?? start;
+
+    inputValue.value = `${inputValue.value.slice(0, start)}\n${inputValue.value.slice(end)}`;
+
+    nextTick(() => {
+        el.selectionStart = el.selectionEnd = start + 1;
+        autoGrow();
+    });
+}
+
+watch(inputValue, () => nextTick(autoGrow));
 
 function onSubmitClick() {
     const prompt = inputValue.value.trim();
     if (!prompt || isStreaming.value) return;
     submit(prompt);
+    scrollToLatest(true);
 }
 
 function selectSuggestion(text: string) {
@@ -54,21 +85,47 @@ function selectSuggestion(text: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key !== 'Enter') return;
+
+    if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        onSubmitClick();
+        insertNewline();
+
+        return;
     }
+
+    if (e.shiftKey) return;
+
+    e.preventDefault();
+    onSubmitClick();
+}
+
+const stickToBottom = ref(true);
+
+function onScroll() {
+    const el = scrollRef.value;
+    if (!el) return;
+
+    stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= 120;
+}
+
+function scrollToLatest(force = false) {
+    if (!force && !stickToBottom.value) return;
+
+    nextTick(() => {
+        requestAnimationFrame(() => {
+            const el = scrollRef.value;
+            if (!el) return;
+
+            el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
+            stickToBottom.value = true;
+        });
+    });
 }
 
 watch(
-    () => messages.value.map((m) => m.content).join(''),
-    () => {
-        nextTick(() => {
-            if (scrollRef.value) {
-                scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
-            }
-        });
-    },
+    () => messages.value.map((m) => `${m.id}:${m.content.length}:${m.streaming ? 1 : 0}:${m.pendingTool ? 1 : 0}`).join('|'),
+    () => scrollToLatest(),
 );
 </script>
 
@@ -138,10 +195,16 @@ watch(
 
                 <span v-else class="block size-3.5 rounded-full bg-white/12 ring-1 ring-white/10" />
             </div>
+
+            <AssistantVoiceToggle />
         </div>
 
         <!-- Conversation area -->
-        <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+            ref="scrollRef"
+            class="flex-1 overflow-y-auto overscroll-contain px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            @scroll.passive="onScroll"
+        >
             <!-- Empty state -->
             <div v-if="!hasMessages" class="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
                 <div class="bg-custom-blue flex size-12 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(54,90,255,0.35)]">
@@ -260,7 +323,7 @@ watch(
 
         <!-- Input bar -->
         <div
-            class="flex items-center justify-between rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
+            class="flex items-center justify-between gap-2 rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
             @click="focusInput"
         >
             <motion.div
@@ -271,18 +334,20 @@ watch(
                 <Sparkles class="size-4 text-white" :stroke-width="2" />
             </motion.div>
 
-            <Input
+            <textarea
                 ref="inputRef"
                 v-model="inputValue"
-                type="text"
+                rows="1"
                 :placeholder="props.placeholder"
                 :disabled="isStreaming"
                 aria-label="Message the assistant"
-                class="h-auto! flex-1 border-0! bg-transparent! p-0! text-center text-[16px] font-normal tracking-tight text-white placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0! disabled:opacity-50"
+                class="h-auto! min-w-0 flex-1 resize-none border-0! bg-transparent! px-2! py-0! text-center text-[16px] font-normal tracking-tight text-white outline-none [scrollbar-width:none] placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0! disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
                 @keydown="onKeydown"
             />
+
+            <AssistantMicButton />
 
             <button
                 type="button"

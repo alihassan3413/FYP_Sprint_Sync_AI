@@ -90,9 +90,22 @@ final class Project extends Model
             : ProjectRole::tryFrom($membership->pivot->role);
     }
 
+    /**
+     * Clients never hold project-level authority, whatever their project role says.
+     * The workspace is only consulted once the project role itself passes, so a
+     * partially selected project (id + name) still answers the common case.
+     */
     public function userHasAtLeast(User $user, ProjectRole $minimum): bool
     {
-        return $this->roleFor($user)?->atLeast($minimum) ?? false;
+        if (($this->roleFor($user)?->atLeast($minimum) ?? false) === false) {
+            return false;
+        }
+
+        if (($this->attributes['workspace_id'] ?? null) === null) {
+            return true;
+        }
+
+        return ! $this->workspace->isClient($user);
     }
 
     protected static function newFactory(): ProjectFactory

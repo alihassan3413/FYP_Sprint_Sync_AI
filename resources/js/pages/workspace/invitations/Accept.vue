@@ -10,6 +10,7 @@ const props = withDefaults(
         invitation: {
             email: string;
             role: string;
+            custom_role?: string | null;
             workspace: {
                 name: string;
             };
@@ -65,8 +66,9 @@ const submit = () => {
                                 <span>
                                     Joining as
                                     <span class="text-foreground font-medium capitalize">
-                                        {{ invitation.role }}
+                                        {{ invitation.custom_role ?? invitation.role }}
                                     </span>
+                                    <span v-if="invitation.custom_role" class="text-muted-foreground"> ({{ invitation.role }}) </span>
                                 </span>
                             </div>
                         </div>

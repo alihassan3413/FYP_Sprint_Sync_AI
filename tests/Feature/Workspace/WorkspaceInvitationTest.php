@@ -6,8 +6,10 @@ namespace Tests\Feature\Workspace;
 
 use App\Mail\MemberInvitationMail;
 use App\Models\User;
+use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
+use App\Modules\Workspace\Models\WorkspaceRole;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -69,6 +71,108 @@ final class WorkspaceInvitationTest extends TestCase
         ]);
 
         $this->assertSame(0, $otherWorkspace->invitations()->count());
+    }
+
+    public function test_an_admin_can_invite_a_member_with_a_custom_role(): void
+    {
+        $role = WorkspaceRole::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'QA Lead']);
+
+        $this->actingAs($this->owner)
+            ->post(route('workspace.invitations.store', $this->workspace), [
+                'email' => 'qa@example.com',
+                'role' => UserRole::MEMBER->value,
+                'workspace_role_id' => $role->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('workspace_invitations', [
+            'workspace_id' => $this->workspace->id,
+            'email' => 'qa@example.com',
+            'role' => UserRole::MEMBER->value,
+            'workspace_role_id' => $role->id,
+        ]);
+
+        Mail::assertQueued(
+            MemberInvitationMail::class,
+            fn (MemberInvitationMail $mail) => $mail->role === 'QA Lead (Member)',
+        );
+    }
+
+    public function test_a_custom_role_from_another_workspace_cannot_be_used_in_an_invitation(): void
+    {
+        $otherWorkspace = Workspace::factory()->ownedBy(User::factory()->create())->create();
+        $foreignRole = WorkspaceRole::factory()->create(['workspace_id' => $otherWorkspace->id]);
+
+        $this->actingAs($this->owner)
+            ->post(route('workspace.invitations.store', $this->workspace), [
+                'email' => 'stranger@example.com',
+                'role' => UserRole::MEMBER->value,
+                'workspace_role_id' => $foreignRole->id,
+            ])
+            ->assertSessionHasErrors('workspace_role_id');
+
+        Mail::assertNothingQueued();
+    }
+
+    public function test_accepting_an_invitation_assigns_the_custom_role(): void
+    {
+        $role = WorkspaceRole::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'permissions' => ['projects.create' => true],
+        ]);
+
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+            'email' => 'invitee@example.com',
+            'workspace_role_id' => $role->id,
+        ]);
+
+        $this->post(route('workspace.invitations.accept.store', $invitation->token), [
+            'name' => 'New Person',
+            'password' => 'Password!2345',
+            'password_confirmation' => 'Password!2345',
+        ])->assertRedirect(route('dashboard', $this->workspace));
+
+        $user = User::query()->where('email', 'invitee@example.com')->firstOrFail();
+        $workspace = $this->workspace->fresh();
+
+        $this->assertDatabaseHas('workspace_users', [
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $user->id,
+            'workspace_role_id' => $role->id,
+        ]);
+        $this->assertTrue($workspace->allows($user, WorkspacePermission::ProjectsCreate));
+    }
+
+    public function test_accepting_an_invitation_whose_custom_role_was_deleted_still_works(): void
+    {
+        $role = WorkspaceRole::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $invitation = WorkspaceInvitation::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'invited_by' => $this->owner->id,
+            'email' => 'invitee@example.com',
+            'workspace_role_id' => $role->id,
+        ]);
+
+        $role->delete();
+
+        $this->post(route('workspace.invitations.accept.store', $invitation->token), [
+            'name' => 'New Person',
+            'password' => 'Password!2345',
+            'password_confirmation' => 'Password!2345',
+        ])->assertRedirect(route('dashboard', $this->workspace));
+
+        $user = User::query()->where('email', 'invitee@example.com')->firstOrFail();
+
+        $this->assertTrue($this->workspace->fresh()->hasMember($user));
+        $this->assertDatabaseHas('workspace_users', [
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $user->id,
+            'workspace_role_id' => null,
+        ]);
     }
 
     public function test_an_existing_member_cannot_be_invited_again(): void

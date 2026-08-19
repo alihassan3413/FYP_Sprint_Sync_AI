@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Http\Requests;
 
-use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Data\WorkspaceRoleData;
+use App\Modules\Workspace\Data\WorkspaceRolePermissions;
 use App\Modules\Workspace\Models\WorkspaceRole;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -33,7 +33,7 @@ final class UpdateWorkspaceRoleRequest extends FormRequest
         $validator->after(function ($validator) {
             $unknown = array_diff(
                 array_keys((array) $this->input('permissions', [])),
-                WorkspacePermission::values(),
+                WorkspaceRolePermissions::values(),
             );
 
             foreach ($unknown as $key) {
@@ -53,7 +53,7 @@ final class UpdateWorkspaceRoleRequest extends FormRequest
             'id' => $this->role()->id,
             'name' => (string) $this->input('name'),
             'slug' => $this->role()->slug,
-            'permissions' => WorkspacePermission::normalise($this->input('permissions')),
+            'permissions' => WorkspaceRolePermissions::normalise($this->input('permissions')),
         ]);
     }
 }

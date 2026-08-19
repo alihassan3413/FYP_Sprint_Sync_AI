@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Assistant\Providers;
 
 use App\Modules\Assistant\Contracts\AiProvider;
+use App\Modules\Assistant\Contracts\SpeechProvider;
+use App\Modules\Assistant\Drivers\AnthropicProvider;
 use App\Modules\Assistant\Drivers\OpenAiProvider;
+use App\Modules\Assistant\Drivers\OpenAiSpeechProvider;
 use App\Modules\Assistant\Exceptions\AiProviderException;
+use App\Modules\Assistant\Exceptions\SpeechException;
+use App\Modules\Assistant\Tools\AddProjectMemberTool;
 use App\Modules\Assistant\Tools\CancelMeetingTool;
 use App\Modules\Assistant\Tools\CreateProjectTool;
 use App\Modules\Assistant\Tools\CreateTaskTool;
@@ -41,16 +46,37 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         ScheduleMeetingTool::class,
         EditMeetingTool::class,
         CancelMeetingTool::class,
+        AddProjectMemberTool::class,
     ];
 
     public function register(): void
     {
         $this->app->bind(AiProvider::class, fn () => match (config('assistant.driver')) {
+            'anthropic' => new AnthropicProvider(
+                apiKey: (string) config('assistant.anthropic.api_key'),
+                baseUrl: (string) config('assistant.anthropic.base_url'),
+                maxTokens: (int) config('assistant.anthropic.max_tokens'),
+                effort: (string) config('assistant.anthropic.effort'),
+                thinking: (bool) config('assistant.anthropic.thinking'),
+            ),
             'openai' => new OpenAiProvider(
                 apiKey: (string) config('assistant.openai.api_key'),
                 baseUrl: (string) config('assistant.openai.base_url'),
             ),
             default => throw AiProviderException::unknownDriver((string) config('assistant.driver')),
+        });
+
+        $this->app->bind(SpeechProvider::class, fn () => match (config('assistant.speech.driver')) {
+            'openai' => new OpenAiSpeechProvider(
+                apiKey: (string) config('assistant.speech.openai.api_key'),
+                baseUrl: (string) config('assistant.speech.openai.base_url'),
+                model: (string) config('assistant.speech.openai.model'),
+                defaultVoice: (string) config('assistant.speech.openai.voice'),
+                format: (string) config('assistant.speech.openai.format'),
+                speed: (float) config('assistant.speech.openai.speed'),
+                timeout: (int) config('assistant.speech.openai.timeout'),
+            ),
+            default => throw SpeechException::notConfigured((string) config('assistant.speech.driver')),
         });
 
         $this->app->singleton(ToolRegistry::class, function ($app) {
@@ -70,6 +96,15 @@ final class AssistantServiceProvider extends ModuleServiceProvider
             Limit::perMinute((int) config('assistant.rate_limits.per_minute'))
                 ->by($request->user()?->id ?: $request->ip()),
             Limit::perDay((int) config('assistant.rate_limits.per_day'))
+                ->by($request->user()?->id ?: $request->ip()),
+        ]);
+
+        /*
+         * Transcription is cheap next to a chat round but a user speaks more
+         * often than they type, so it gets its own, looser bucket.
+         */
+        RateLimiter::for('assistant-voice', fn (Request $request) => [
+            Limit::perMinute((int) config('assistant.rate_limits.voice_per_minute'))
                 ->by($request->user()?->id ?: $request->ip()),
         ]);
     }

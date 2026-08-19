@@ -22,9 +22,14 @@ const { workspaceRoute } = useCurrentWorkspace();
 const roleOptions = [
     { value: 'admin', label: 'Admin', description: 'Can manage members, roles, and workspace settings.' },
     { value: 'member', label: 'Member', description: 'Standard access to projects and tasks.' },
+    {
+        value: 'client',
+        label: 'Client',
+        description: 'External guest. Sees only the projects they are added to, limited by their client role below.',
+    },
 ] as const;
 
-const selectedRole = ref<'admin' | 'member'>('member');
+const selectedRole = ref<'admin' | 'member' | 'client'>('member');
 const selectedWorkspaceRoleId = ref<number | null>(null);
 const processing = ref(false);
 const error = ref<string | null>(null);
@@ -34,7 +39,7 @@ watch(
     (member) => {
         error.value = null;
 
-        if (member?.role === 'admin' || member?.role === 'member') {
+        if (member?.role === 'admin' || member?.role === 'member' || member?.role === 'client') {
             selectedRole.value = member.role;
         }
 
@@ -127,7 +132,10 @@ function handleClose(value: boolean) {
                 </div>
 
                 <p class="text-muted-foreground text-[11px] leading-relaxed">
-                    Custom roles describe what someone does on the team. Access is granted by the system role above.
+                    <template v-if="selectedRole === 'client'">
+                        For clients, the custom role decides what they can do in their projects — comment, request tasks, close tasks.
+                    </template>
+                    <template v-else> Custom roles describe what someone does on the team, and can grant extra workspace permissions. </template>
                 </p>
             </div>
 

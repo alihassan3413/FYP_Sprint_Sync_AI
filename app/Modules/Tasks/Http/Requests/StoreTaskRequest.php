@@ -55,10 +55,25 @@ final class StoreTaskRequest extends FormRequest
             $project = $this->project();
 
             $isAssignable = $assignee !== null
+                && ! $project->workspace->isClient($assignee)
                 && ($project->workspace->userHasAtLeast($assignee, UserRole::ADMIN) || $project->hasMember($assignee));
 
             if (! $isAssignable) {
                 $validator->errors()->add('assigned_to', 'The assignee must be a member of this project.');
+            }
+        });
+
+        $validator->after(function ($validator) {
+            if (! $this->project()->workspace->isClient($this->user())) {
+                return;
+            }
+
+            if ($this->input('assigned_to') !== null) {
+                $validator->errors()->add('assigned_to', 'Clients cannot assign the tasks they request.');
+            }
+
+            if ($this->input('sprint_id') !== null) {
+                $validator->errors()->add('sprint_id', 'Clients cannot put a task into a sprint.');
             }
         });
     }

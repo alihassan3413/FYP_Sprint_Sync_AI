@@ -21,6 +21,8 @@ final class CreateWorkspaceInvitationAction
 
     public function handle(Workspace $workspace, User $invitedBy, WorkspaceInvitationData $data): WorkspaceInvitation
     {
+        $customRoleId = $this->resolveCustomRoleId($workspace, $data->workspace_role_id);
+
         $invitation = DB::transaction(fn () => WorkspaceInvitation::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
@@ -30,17 +32,20 @@ final class CreateWorkspaceInvitationAction
                 'invited_by' => $invitedBy->id,
                 'token' => Str::random(64),
                 'role' => $data->role,
+                'workspace_role_id' => $customRoleId,
                 'accepted_at' => null,
                 'expires_at' => now()->addDays(config('workspace.invitation_ttl_days')),
             ]
         ));
+
+        $invitation->load('customRole');
 
         $this->auditLogger->handle(
             $workspace,
             null,
             $invitedBy,
             AuditAction::MEMBER_INVITED,
-            "{$invitedBy->name} invited {$invitation->email} as {$invitation->role->label()}.",
+            "{$invitedBy->name} invited {$invitation->email} as {$invitation->roleLabel()}.",
             $invitation,
         );
 
@@ -62,12 +67,26 @@ final class CreateWorkspaceInvitationAction
         return $invitation;
     }
 
+    /**
+     * Custom roles are workspace scoped, so an id from another workspace is dropped.
+     */
+    private function resolveCustomRoleId(Workspace $workspace, ?int $workspaceRoleId): ?int
+    {
+        if ($workspaceRoleId === null) {
+            return null;
+        }
+
+        $id = $workspace->roles()->whereKey($workspaceRoleId)->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
     private function dispatchMail(Workspace $workspace, User $invitedBy, WorkspaceInvitation $invitation): void
     {
         Mail::to($invitation->email)->queue(new MemberInvitationMail(
             workspaceName: $workspace->name,
             invitedByName: $invitedBy->name,
-            role: $invitation->role->label(),
+            role: $invitation->roleLabel(),
             invitationUrl: route('workspace.invitations.accept', ['token' => $invitation->token]),
             expiresAt: $invitation->expires_at->format('F j, Y'),
         ));

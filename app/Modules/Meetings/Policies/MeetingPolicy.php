@@ -7,6 +7,7 @@ namespace App\Modules\Meetings\Policies;
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\ProjectRole;
 use App\UserRole;
 
@@ -18,16 +19,17 @@ final class MeetingPolicy
             return true;
         }
 
+        if ($project->workspace->isClient($user)) {
+            return $project->hasMember($user)
+                && $project->workspace->allowsClient($user, ClientPermission::MeetingsView);
+        }
+
         return $project->hasMember($user);
     }
 
     public function view(User $user, Meeting $meeting): bool
     {
-        if ($meeting->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
-            return true;
-        }
-
-        return $meeting->project->hasMember($user);
+        return $this->viewAny($user, $meeting->project);
     }
 
     public function create(User $user, Project $project): bool

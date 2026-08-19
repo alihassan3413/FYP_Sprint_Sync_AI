@@ -6,6 +6,7 @@ namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Database\Factories\WorkspaceFactory;
 use App\UserRole;
@@ -125,11 +126,52 @@ final class Workspace extends Model
 
     public function allows(User $user, WorkspacePermission $permission): bool
     {
+        if ($this->isClient($user)) {
+            return false;
+        }
+
         if ($this->userHasAtLeast($user, UserRole::ADMIN)) {
             return true;
         }
 
         return $this->customRoleFor($user)?->grants($permission->value) ?? false;
+    }
+
+    public function isClient(User $user): bool
+    {
+        return $this->roleFor($user)?->isClient() ?? false;
+    }
+
+    /**
+     * Client capabilities come from the custom role attached to them, falling back
+     * to the read-only defaults when the workspace has not configured one.
+     */
+    public function allowsClient(User $user, ClientPermission $permission): bool
+    {
+        if (! $this->isClient($user)) {
+            return false;
+        }
+
+        $customRole = $this->customRoleFor($user);
+
+        return $customRole === null
+            ? ClientPermission::defaults()[$permission->value]
+            : $customRole->grants($permission->value);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function clientPermissionsFor(User $user): array
+    {
+        if (! $this->isClient($user)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            ClientPermission::values(),
+            fn (string $permission) => $this->allowsClient($user, ClientPermission::from($permission)),
+        ));
     }
 
     public function customRoleFor(User $user): ?WorkspaceRole
@@ -149,6 +191,10 @@ final class Workspace extends Model
      */
     public function grantedPermissionsFor(User $user): array
     {
+        if ($this->isClient($user)) {
+            return $this->clientPermissionsFor($user);
+        }
+
         if ($this->userHasAtLeast($user, UserRole::ADMIN)) {
             return WorkspacePermission::values();
         }

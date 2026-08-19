@@ -80,6 +80,13 @@ export type BoardColumnData = {
     is_done: boolean;
     project_id: number;
 };
+export enum ClientPermission {
+    BoardView = 'client.board.view',
+    TasksComment = 'client.tasks.comment',
+    TasksRequest = 'client.tasks.request',
+    TasksClose = 'client.tasks.close',
+    MeetingsView = 'client.meetings.view',
+}
 export type DashboardMeetingData = {
     id: number;
     title: string;
@@ -249,6 +256,7 @@ export enum UserRole {
     OWNER = 'owner',
     ADMIN = 'admin',
     MEMBER = 'member',
+    CLIENT = 'client',
 }
 export type WorkspaceData = {
     name: string;
@@ -259,6 +267,7 @@ export type WorkspaceData = {
 export type WorkspaceInvitationData = {
     email: string;
     role: string;
+    workspace_role_id?: number;
 };
 export enum WorkspacePermission {
     ProjectsView = 'projects.view',

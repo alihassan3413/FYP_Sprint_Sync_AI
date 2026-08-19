@@ -8,6 +8,7 @@ import {
     Code,
     CreditCard,
     Crown,
+    Handshake,
     Info,
     LayoutIcon,
     Loader2,
@@ -44,10 +45,17 @@ interface PermissionGroup {
     permissions: { key: string; label: string; hint: string }[];
 }
 
+interface ClientPermissionOption {
+    value: string;
+    label: string;
+    description: string;
+}
+
 const props = defineProps<{
     roles: WorkspaceRoleData[];
     systemRoles: SystemRole[];
     availablePermissions: string[];
+    availableClientPermissions: ClientPermissionOption[];
     canManageRoles: boolean;
     workspaceId: number;
 }>();
@@ -105,13 +113,29 @@ const allPermissionGroups: PermissionGroup[] = [
     },
 ];
 
+/**
+ * Client permissions only take effect for members whose system role is Client,
+ * so they get their own group rather than being mixed into workspace access.
+ */
+const clientPermissionGroup = computed<PermissionGroup>(() => ({
+    key: 'client',
+    label: 'Client access',
+    icon: Handshake,
+    permissions: (props.availableClientPermissions ?? []).map((permission) => ({
+        key: permission.value,
+        label: permission.label,
+        hint: permission.description,
+    })),
+}));
+
 const permissionGroups = computed(() =>
-    allPermissionGroups
-        .map((group) => ({
+    [
+        ...allPermissionGroups.map((group) => ({
             ...group,
             permissions: group.permissions.filter((permission) => props.availablePermissions.includes(permission.key)),
-        }))
-        .filter((group) => group.permissions.length > 0),
+        })),
+        clientPermissionGroup.value,
+    ].filter((group) => group.permissions.length > 0),
 );
 
 const allPermissionKeys = computed(() => permissionGroups.value.flatMap((group) => group.permissions.map((permission) => permission.key)));
@@ -120,6 +144,7 @@ const systemRoleStyles: Record<string, { icon: Component; iconColor: string; ico
     owner: { icon: Crown, iconColor: '#534AB7', iconBg: '#EEEDFE' },
     admin: { icon: ShieldCheck, iconColor: '#3B6D11', iconBg: '#EAF3DE' },
     member: { icon: User, iconColor: '#185FA5', iconBg: '#E6F1FB' },
+    client: { icon: Handshake, iconColor: '#8A5A00', iconBg: '#FBF1E0' },
 };
 
 const customIconMap: Record<string, Component> = {

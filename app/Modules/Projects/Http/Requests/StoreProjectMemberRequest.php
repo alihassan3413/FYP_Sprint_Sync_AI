@@ -33,6 +33,21 @@ final class StoreProjectMemberRequest extends FormRequest
         ];
     }
 
+    public function withValidator(mixed $validator): void
+    {
+        $validator->after(function ($validator) {
+            $member = User::find($this->input('user_id'));
+
+            if ($member === null) {
+                return;
+            }
+
+            if ($this->project()->workspace->isClient($member) && $this->input('role') !== ProjectRole::MEMBER->value) {
+                $validator->errors()->add('role', 'Clients can only be added to a project as a member.');
+            }
+        });
+    }
+
     public function project(): Project
     {
         return $this->route('project');

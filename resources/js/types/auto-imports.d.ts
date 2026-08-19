@@ -32,6 +32,7 @@ declare global {
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
   const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
+  const getCsrfToken: typeof import('../lib/csrf').getCsrfToken
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
@@ -87,6 +88,7 @@ declare global {
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
+  const toSpeakableText: typeof import('../composables/useVoiceOutput').toSpeakableText
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
@@ -117,6 +119,8 @@ declare global {
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useToggle: typeof import('@vueuse/core').useToggle
   const useUserTimezone: typeof import('../composables/useUserTimezone').useUserTimezone
+  const useVoiceInput: typeof import('../composables/useVoiceInput').useVoiceInput
+  const useVoiceOutput: typeof import('../composables/useVoiceOutput').useVoiceOutput
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -133,6 +137,9 @@ declare global {
   // @ts-ignore
   export type { TaskStatusUpdatedPayload } from '../composables/useProjectTaskStream'
   import('../composables/useProjectTaskStream')
+  // @ts-ignore
+  export type { VoiceInputOptions } from '../composables/useVoiceInput'
+  import('../composables/useVoiceInput')
   // @ts-ignore
   export type { ActivityKind, ActivityEntry } from '../lib/activity'
   import('../lib/activity')
@@ -199,6 +206,7 @@ declare module 'vue' {
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
     readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
+    readonly getCsrfToken: UnwrapRef<typeof import('../lib/csrf')['getCsrfToken']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
@@ -254,6 +262,7 @@ declare module 'vue' {
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
+    readonly toSpeakableText: UnwrapRef<typeof import('../composables/useVoiceOutput')['toSpeakableText']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
@@ -284,6 +293,8 @@ declare module 'vue' {
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
     readonly useUserTimezone: UnwrapRef<typeof import('../composables/useUserTimezone')['useUserTimezone']>
+    readonly useVoiceInput: UnwrapRef<typeof import('../composables/useVoiceInput')['useVoiceInput']>
+    readonly useVoiceOutput: UnwrapRef<typeof import('../composables/useVoiceOutput')['useVoiceOutput']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>

@@ -6,7 +6,7 @@
  */
 
 export type MemberStatus = 'active' | 'away' | 'offline' | 'pending' | 'suspended';
-export type MemberRole = 'owner' | 'admin' | 'member' | 'guest' | 'billing';
+export type MemberRole = 'owner' | 'admin' | 'member' | 'client' | 'guest' | 'billing';
 
 export interface WorkspaceRoleOption {
     id: number;

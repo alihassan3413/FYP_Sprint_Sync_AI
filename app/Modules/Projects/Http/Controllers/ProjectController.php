@@ -50,6 +50,10 @@ final class ProjectController
         $projectMemberIds = $project->members()->pluck('users.id');
         $canManageProjectMembers = $user->can('manageMembers', $project);
         $canManageTasks = $user->can('create', [Task::class, $project]);
+        $canViewBoard = $user->can('viewAny', [Task::class, $project]);
+        $canViewSprints = $user->can('viewAny', [Sprint::class, $project]);
+        $canViewMeetings = $user->can('viewAny', [Meeting::class, $project]);
+        $isClient = $workspace->isClient($user);
 
         return Inertia::render('projects/show', [
             'project' => ProjectData::fromModel($project),
@@ -60,29 +64,40 @@ final class ProjectController
             'canManageProjectMembers' => $canManageProjectMembers,
             'canManageBoardColumns' => $user->can('create', [BoardColumn::class, $project]),
             'canManageSprints' => $user->can('create', [Sprint::class, $project]),
-            'sprints' => $project->sprints()
-                ->withCount('tasks')
-                ->orderByDesc('starts_on')
-                ->get()
-                ->map(SprintData::fromModel(...))
-                ->values(),
-            'boardColumns' => $project->boardColumns()
-                ->orderBy('position')
-                ->get()
-                ->map(BoardColumnData::fromModel(...))
-                ->values(),
-            'tasks' => $project->tasks()
-                ->with(['assignee:id,name,email', 'comments.user:id,name,email'])
-                ->latest()
-                ->get()
-                ->map(TaskData::fromModel(...))
-                ->values(),
-            'meetings' => $project->meetings()
-                ->with(['creator:id,name,email', 'participants', 'transcript'])
-                ->orderBy('scheduled_at')
-                ->get()
-                ->map(MeetingData::fromModel(...))
-                ->values(),
+            'canViewBoard' => $canViewBoard,
+            'isClient' => $isClient,
+            'clientPermissions' => $workspace->clientPermissionsFor($user),
+            'sprints' => $canViewSprints
+                ? $project->sprints()
+                    ->withCount('tasks')
+                    ->orderByDesc('starts_on')
+                    ->get()
+                    ->map(SprintData::fromModel(...))
+                    ->values()
+                : collect(),
+            'boardColumns' => $canViewBoard
+                ? $project->boardColumns()
+                    ->orderBy('position')
+                    ->get()
+                    ->map(BoardColumnData::fromModel(...))
+                    ->values()
+                : collect(),
+            'tasks' => $canViewBoard
+                ? $project->tasks()
+                    ->with(['assignee:id,name,email', 'comments.user:id,name,email'])
+                    ->latest()
+                    ->get()
+                    ->map(TaskData::fromModel(...))
+                    ->values()
+                : collect(),
+            'meetings' => $canViewMeetings
+                ? $project->meetings()
+                    ->with(['creator:id,name,email', 'participants', 'transcript'])
+                    ->orderBy('scheduled_at')
+                    ->get()
+                    ->map(MeetingData::fromModel(...))
+                    ->values()
+                : collect(),
             'members' => $canManageTasks
                 ? $workspace->users()
                     ->select('users.id', 'users.name', 'users.email', 'workspace_users.role as workspace_role')
@@ -97,17 +112,19 @@ final class ProjectController
                     ->sortBy('name')
                     ->values()
                 : collect(),
-            'projectMembers' => $project->members()
-                ->select('users.id', 'users.name', 'users.email')
-                ->orderBy('users.name')
-                ->get()
-                ->map(fn (User $member) => [
-                    'id' => $member->id,
-                    'name' => $member->name,
-                    'email' => $member->email,
-                    'role' => $member->pivot->role,
-                ])
-                ->values(),
+            'projectMembers' => $isClient
+                ? collect()
+                : $project->members()
+                    ->select('users.id', 'users.name', 'users.email')
+                    ->orderBy('users.name')
+                    ->get()
+                    ->map(fn (User $member) => [
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'email' => $member->email,
+                        'role' => $member->pivot->role,
+                    ])
+                    ->values(),
             'workspaceMembers' => $canManageProjectMembers
                 ? $workspace->users()
                     ->select('users.id', 'users.name', 'users.email')

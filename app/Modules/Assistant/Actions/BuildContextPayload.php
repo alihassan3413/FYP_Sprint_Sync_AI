@@ -58,6 +58,16 @@ Rules:
 - For simple workspace count or summary questions, call get_workspace_info without members/invitations unless needed.
 - If the user asks who the members are, list members, show admins, or show team members, call get_workspace_info with include_members=true.
 - If the user asks about pending invitations, invites, or invited users, call get_workspace_info with include_invitations=true.
+- Workspaces have two role layers: base roles (owner, admin, member, client) and custom roles created in workspace settings that grant specific permissions on top of a base role. Admin, member and client can be granted by invitation; owner cannot.
+- A client is an outside guest, e.g. the customer a project is being built for. They see only the projects they have been added to, never the team roster, workspace settings, analytics or other projects.
+- What a client can do inside their projects — view the board and sprints, comment on tasks, request tasks, close tasks, view meetings — is decided by the client permissions on the custom role attached to them. With no custom role they are read-only.
+- Inviting a client does NOT give them any project. After the invitation, they must be added to each project with add_project_member. Say this when you invite a client.
+- Clients cannot be assigned tasks, cannot be project managers, and cannot be given workspace permissions.
+- If the user asks what custom roles exist, what a custom role can do, which permissions a role grants, or who holds a role, call get_workspace_info with include_roles=true. Use custom_role_filter with include_members=true to list the holders of one role.
+- Never invent a custom role name or a permission. Read them from get_workspace_info with include_roles=true.
+- To invite someone with a custom role, call get_workspace_info with include_roles=true to get the exact role name, then call invite_user with custom_role set to that name. Leave the base role as "member" unless the user asks for admin, or "client" when they describe the person as a client, customer or external stakeholder.
+- When inviting a client, use get_workspace_info with include_roles=true and pick the custom role whose client_permissions match what the user wants the client to do. If none matches, tell them which client roles exist and offer to invite read-only for now.
+- If invite_user reports an unknown custom role, tell the user which custom roles exist instead of retrying with a guess. If the workspace has none, say so and offer to invite them as a plain member.
 - get_workspace_info is read-only, so do not ask for confirmation before using it.
 - If the user cancels or rejects a tool confirmation, acknowledge the cancellation once and do not call the same tool again unless the user clearly asks to try again.
 - When the user mentions a project by name, says "my projects", "this project", or asks which projects exist, call list_projects.
@@ -74,6 +84,8 @@ Rules:
 - To change an existing meeting, call list_meetings to resolve the meeting_id, then call edit_meeting with only the fields that change. Omitted fields keep their current values.
 - edit_meeting replaces the whole invite list when you pass participant_emails, so include everyone who stays invited, not just additions.
 - cancel_meeting deletes a meeting for everyone and cannot be undone. Only call it when the user clearly wants the meeting called off; if they want it moved, use edit_meeting.
+- Workspace membership and project membership are separate. A workspace member cannot be assigned a task until they are added to that project.
+- If create_task reports the assignee is not on the project, tell the user and offer to add them with add_project_member. Wait for them to agree, add the member, then create the task.
 TXT;
 
         $parts[] = <<<'TXT'
@@ -97,12 +109,15 @@ TXT;
                 ->whereKey($user->id)
                 ->first();
 
+            $customRoleName = UntrustedText::inline($workspace->customRoleFor($user)?->name);
+
             $parts[] = sprintf(
-                "Current workspace: '%s' (ID: %d, slug: %s). Current user's workspace role: %s. Workspace was created %s.",
+                "Current workspace: '%s' (ID: %d, slug: %s). Current user's base workspace role: %s. Current user's custom role: %s. Workspace was created %s.",
                 UntrustedText::inline($workspace->name) ?? 'unnamed',
                 $workspace->id,
                 UntrustedText::inline($workspace->slug) ?? 'unknown',
                 $membership?->pivot?->role ?? 'unknown',
+                $customRoleName ?? 'none',
                 $workspace->created_at?->diffForHumans() ?? 'recently',
             );
         } else {

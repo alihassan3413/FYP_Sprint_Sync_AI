@@ -11,6 +11,7 @@ use App\Modules\Workspace\Http\Requests\AcceptWorkspaceInvitationRequest;
 use App\Modules\Workspace\Http\Requests\StoreWorkspaceInvitationRequest;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
+use App\Modules\Workspace\Models\WorkspaceRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,15 @@ final class WorkspaceInvitationController
 
         return Inertia::render('workspace/invitations/Create', [
             'workspace' => ['name' => $workspace->name, 'slug' => $workspace->slug],
+            'workspaceRoles' => $workspace->roles()
+                ->orderBy('name')
+                ->get()
+                ->map(fn (WorkspaceRole $role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'permissions' => array_keys(array_filter($role->permissions ?? [])),
+                ])
+                ->values(),
             'inviteLink' => $link === null ? null : [
                 'url' => route('workspace.join.show', ['token' => $link->token]),
                 'expires_at' => $link->expires_at->toIso8601String(),
@@ -101,6 +111,7 @@ final class WorkspaceInvitationController
             'invitation' => [
                 'email' => $invitation->email,
                 'role' => $invitation->role->value,
+                'custom_role' => $invitation->customRole?->name,
                 'workspace' => ['name' => $invitation->workspace->name],
             ],
         ]);
@@ -125,7 +136,7 @@ final class WorkspaceInvitationController
     private function findInvitation(string $token): WorkspaceInvitation
     {
         return WorkspaceInvitation::query()
-            ->with('workspace')
+            ->with(['workspace', 'customRole'])
             ->where('token', $token)
             ->firstOrFail();
     }

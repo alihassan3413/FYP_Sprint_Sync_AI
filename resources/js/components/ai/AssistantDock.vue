@@ -14,15 +14,45 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { inputValue, submit, expand, collapse, messages } = useAiAssistant();
 
-const inputRef = ref<InstanceType<typeof Input> | null>(null);
+const inputRef = ref<HTMLTextAreaElement | null>(null);
 const isFocused = ref(false);
 
 const isActive = computed(() => isFocused.value || inputValue.value.trim().length > 0);
 
 function focusInput() {
-    const el = (inputRef.value as unknown as { $el?: HTMLInputElement })?.$el;
-    el?.focus();
+    inputRef.value?.focus();
 }
+const MAX_INPUT_HEIGHT = 132;
+
+function textareaEl(): HTMLTextAreaElement | null {
+    return inputRef.value;
+}
+
+function autoGrow() {
+    const el = textareaEl();
+    if (!el) return;
+
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+    el.style.overflowY = el.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
+}
+
+function insertNewline() {
+    const el = textareaEl();
+    if (!el) return;
+
+    const start = el.selectionStart ?? inputValue.value.length;
+    const end = el.selectionEnd ?? start;
+
+    inputValue.value = `${inputValue.value.slice(0, start)}\n${inputValue.value.slice(end)}`;
+
+    nextTick(() => {
+        el.selectionStart = el.selectionEnd = start + 1;
+        autoGrow();
+    });
+}
+
+watch(inputValue, () => nextTick(autoGrow));
 
 function onSubmitClick() {
     const prompt = inputValue.value.trim();
@@ -36,10 +66,19 @@ function selectSuggestion(text: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key !== 'Enter') return;
+
+    if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        onSubmitClick();
+        insertNewline();
+
+        return;
     }
+
+    if (e.shiftKey) return;
+
+    e.preventDefault();
+    onSubmitClick();
 }
 
 defineExpose({ focusInput });
@@ -85,14 +124,18 @@ defineExpose({ focusInput });
             </button>
             <span v-else />
 
-            <button
-                type="button"
-                class="grid size-6 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
-                aria-label="Minimize assistant"
-                @click="collapse"
-            >
-                <X class="size-3.5" :stroke-width="2.5" />
-            </button>
+            <div class="flex items-center gap-0.5">
+                <AssistantVoiceToggle />
+
+                <button
+                    type="button"
+                    class="grid size-6 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Minimize assistant"
+                    @click="collapse"
+                >
+                    <X class="size-3.5" :stroke-width="2.5" />
+                </button>
+            </div>
         </div>
 
         <!-- Suggestion chips -->
@@ -116,7 +159,7 @@ defineExpose({ focusInput });
 
         <!-- Main input bar -->
         <div
-            class="flex items-center justify-between rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
+            class="flex items-center justify-between gap-2 rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
             @click="focusInput"
         >
             <motion.div
@@ -127,17 +170,19 @@ defineExpose({ focusInput });
                 <Sparkles class="size-4 text-white" :stroke-width="2" />
             </motion.div>
 
-            <Input
+            <textarea
                 ref="inputRef"
                 v-model="inputValue"
-                type="text"
+                rows="1"
                 :placeholder="props.placeholder"
                 aria-label="Ask the AI assistant"
-                class="h-auto! flex-1 border-0! bg-transparent! p-0! text-center text-[16px] font-normal tracking-tight text-white placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0!"
+                class="h-auto! min-w-0 flex-1 resize-none border-0! bg-transparent! px-2! py-0! text-center text-[16px] font-normal tracking-tight text-white outline-none [scrollbar-width:none] placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0! [&::-webkit-scrollbar]:hidden"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
                 @keydown="onKeydown"
             />
+
+            <AssistantMicButton />
 
             <button
                 type="button"

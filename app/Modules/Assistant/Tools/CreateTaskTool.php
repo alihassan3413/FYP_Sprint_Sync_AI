@@ -56,7 +56,7 @@ final class CreateTaskTool implements AssistantTool
                 'assignee_email' => [
                     'type' => 'string',
                     'format' => 'email',
-                    'description' => 'Optional email address of the person to assign. Must already have access to the project.',
+                    'description' => 'Optional email address of the person to assign. They must already be on the project; if not, offer add_project_member first.',
                 ],
                 'due_date' => [
                     'type' => 'string',
@@ -131,7 +131,9 @@ final class CreateTaskTool implements AssistantTool
                 return [
                     'success' => false,
                     'error_code' => 'assignee_not_assignable',
-                    'error' => "{$args['assignee_email']} is not a member of {$project->name}, so the task cannot be assigned to them.",
+                    'error' => "{$args['assignee_email']} is not on {$project->name} yet, so the task cannot be assigned to them. "
+                        .'If they are already in this workspace you can offer to add them to the project with add_project_member, '
+                        .'then create the task again. Do not add them without asking the user first.',
                 ];
             }
         }

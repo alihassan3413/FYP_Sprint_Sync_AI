@@ -16,6 +16,11 @@ final class WorkspacePolicy
         return $workspace->hasMember($user);
     }
 
+    public function viewTeam(User $user, Workspace $workspace): bool
+    {
+        return $workspace->hasMember($user) && ! $workspace->isClient($user);
+    }
+
     public function update(User $user, Workspace $workspace): bool
     {
         return $workspace->userHasAtLeast($user, UserRole::ADMIN);

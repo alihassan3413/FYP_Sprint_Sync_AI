@@ -22,6 +22,8 @@ final class TeamMemberController
 
     public function index(Request $request, Workspace $workspace): Response
     {
+        abort_unless($request->user()->can('viewTeam', $workspace), 403);
+
         return Inertia::render('teams/index', [
             'members' => $this->roster->forWorkspace($workspace, $request->user()),
             'canManageMembers' => $request->user()->can('manageMembers', $workspace),

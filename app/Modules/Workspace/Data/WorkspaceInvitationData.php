@@ -16,5 +16,7 @@ final class WorkspaceInvitationData extends Data
 
         #[TypeScriptType("'admin' | 'member'")]
         public UserRole $role,
+
+        public ?int $workspace_role_id = null,
     ) {}
 }

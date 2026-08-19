@@ -25,6 +25,11 @@ final class StoreWorkspaceInvitationRequest extends FormRequest
         return [
             'email' => ['required', 'email:rfc', 'max:255'],
             'role' => ['required', Rule::in(UserRole::invitationRoles())],
+            'workspace_role_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('workspace_roles', 'id')->where('workspace_id', $this->workspace()->id),
+            ],
         ];
     }
 

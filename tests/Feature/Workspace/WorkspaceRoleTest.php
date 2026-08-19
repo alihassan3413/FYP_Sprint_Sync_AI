@@ -44,13 +44,15 @@ final class WorkspaceRoleTest extends TestCase
                 ->component('workspace/settings/RoleManagement')
                 ->where('canManageRoles', true)
                 ->has('roles', 1)
-                ->has('systemRoles', 3)
+                ->has('systemRoles', 4)
                 ->where('systemRoles.0.value', UserRole::OWNER->value)
                 ->where('systemRoles.0.member_count', 1)
                 ->where('systemRoles.1.value', UserRole::ADMIN->value)
                 ->where('systemRoles.1.member_count', 1)
                 ->where('systemRoles.2.value', UserRole::MEMBER->value)
-                ->where('systemRoles.2.member_count', 1));
+                ->where('systemRoles.2.member_count', 1)
+                ->where('systemRoles.3.value', UserRole::CLIENT->value)
+                ->where('systemRoles.3.member_count', 0));
     }
 
     public function test_a_plain_member_cannot_manage_roles(): void

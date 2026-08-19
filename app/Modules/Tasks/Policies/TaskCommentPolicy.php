@@ -7,6 +7,7 @@ namespace App\Modules\Tasks\Policies;
 use App\Models\User;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskComment;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\ProjectRole;
 use App\UserRole;
 
@@ -14,16 +15,20 @@ final class TaskCommentPolicy
 {
     public function viewAny(User $user, Task $task): bool
     {
-        if ($task->workspace->userHasAtLeast($user, UserRole::ADMIN)) {
-            return true;
-        }
-
-        return $task->project->hasMember($user);
+        return $user->can('view', $task);
     }
 
     public function create(User $user, Task $task): bool
     {
-        return $this->viewAny($user, $task);
+        if (! $this->viewAny($user, $task)) {
+            return false;
+        }
+
+        if ($task->workspace->isClient($user)) {
+            return $task->workspace->allowsClient($user, ClientPermission::TasksComment);
+        }
+
+        return true;
     }
 
     public function delete(User $user, TaskComment $comment): bool

@@ -17,6 +17,9 @@ const props = defineProps<{
     canManageProjectMembers: boolean;
     canManageBoardColumns: boolean;
     canManageSprints: boolean;
+    canViewBoard?: boolean;
+    isClient?: boolean;
+    clientPermissions?: string[];
     sprints: Sprint[];
     tasks: Task[];
     boardColumns: BoardColumn[];
@@ -142,11 +145,13 @@ function onDeleted() {
 
                     <!-- Board -->
                     <TabsContent value="board">
-                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <AppSegmentedControl v-if="tasks.length > 0" v-model="taskScope" :options="taskScopeOptions" />
-                            <p v-else class="text-muted-foreground text-xs">No tasks yet</p>
+                        <div class="mb-4 flex min-h-9 items-center justify-between gap-3">
+                            <div class="flex min-w-0 flex-1 items-center overflow-x-auto">
+                                <AppSegmentedControl v-if="tasks.length > 0" v-model="taskScope" :options="taskScopeOptions" />
+                                <p v-else class="text-muted-foreground text-xs">No tasks yet</p>
+                            </div>
 
-                            <Button v-if="canManageTasks" size="sm" class="gap-1.5" @click="isCreateTaskModalOpen = true">
+                            <Button v-if="canManageTasks" size="sm" class="shrink-0 gap-1.5" @click="isCreateTaskModalOpen = true">
                                 <Plus class="size-3.5" />
                                 New task
                             </Button>
@@ -180,6 +185,16 @@ function onDeleted() {
                             @create-column="isCreateColumnModalOpen = true"
                             @delete-column="(column) => (deleteColumnTarget = column)"
                         />
+
+                        <AppEmptyState
+                            v-else-if="canViewBoard === false"
+                            title="The board is not shared with you"
+                            description="Your client access to this project does not include the task board. Ask the team if you need it."
+                        >
+                            <template #icon>
+                                <FolderKanban class="size-5" />
+                            </template>
+                        </AppEmptyState>
 
                         <AppEmptyState v-else title="No tasks yet" description="Nobody has added a task to this project yet.">
                             <template #icon>

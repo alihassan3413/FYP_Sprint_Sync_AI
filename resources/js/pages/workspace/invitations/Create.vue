@@ -1,23 +1,32 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Check, Copy, CreditCard, Key, Link2, LoaderCircle, Mail, RefreshCw, Send, Trash2, User } from 'lucide-vue-next';
+import { Check, Copy, CreditCard, Handshake, Key, Link2, LoaderCircle, Mail, RefreshCw, Send, Trash2, User } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 
-const props = defineProps<{
-    workspace: { name: string; slug: string };
-    seats?: { used: number; total: number };
-    inviteLink: { url: string; expires_at: string; uses: number } | null;
-    canManageInviteLink: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        workspace: { name: string; slug: string };
+        seats?: { used: number; total: number };
+        inviteLink: { url: string; expires_at: string; uses: number } | null;
+        canManageInviteLink: boolean;
+        workspaceRoles?: { id: number; name: string; permissions: string[] }[];
+    }>(),
+    {
+        workspaceRoles: () => [],
+    },
+);
 
 const { workspaceRoute } = useCurrentWorkspace();
 
-const form = useForm({
+const form = useForm<{ email: string; role: string; workspace_role_id: number | null }>({
     email: '',
     role: 'member',
+    workspace_role_id: null,
 });
+
+const selectedCustomRole = computed(() => props.workspaceRoles.find((role) => role.id === form.workspace_role_id) ?? null);
 
 const submit = () => {
     form.post(workspaceRoute('workspace.invitations.store', { workspace: props.workspace.slug }), {
@@ -96,6 +105,12 @@ const roleOptions = [
         description: 'Everything members can do, plus manage projects, sprints, and integrations.',
         icon: Key,
     },
+    {
+        value: 'client',
+        label: 'Client',
+        description: 'External guest. Sees only the projects you add them to, with the access their client role allows.',
+        icon: Handshake,
+    },
 ];
 </script>
 
@@ -131,6 +146,50 @@ const roleOptions = [
                         <AppRadioCard v-model="form.role" :options="roleOptions" accent="blue" />
 
                         <InputError :message="form.errors.role" />
+                    </div>
+
+                    <div v-if="workspaceRoles.length > 0" class="grid gap-2">
+                        <Label class="text-[13px] font-medium">Custom role <span class="text-muted-foreground font-normal">(optional)</span></Label>
+
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+                                :class="form.workspace_role_id === null ? 'border-primary ring-primary/20 ring-2' : 'hover:border-foreground/20'"
+                                @click="form.workspace_role_id = null"
+                            >
+                                <Check v-if="form.workspace_role_id === null" class="size-3" />
+                                None
+                            </button>
+
+                            <button
+                                v-for="workspaceRole in workspaceRoles"
+                                :key="workspaceRole.id"
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+                                :class="
+                                    form.workspace_role_id === workspaceRole.id
+                                        ? 'border-primary ring-primary/20 ring-2'
+                                        : 'hover:border-foreground/20'
+                                "
+                                @click="form.workspace_role_id = workspaceRole.id"
+                            >
+                                <Check v-if="form.workspace_role_id === workspaceRole.id" class="size-3" />
+                                {{ workspaceRole.name }}
+                            </button>
+                        </div>
+
+                        <p v-if="selectedCustomRole" class="text-muted-foreground text-[11px] leading-relaxed">
+                            <template v-if="selectedCustomRole.permissions.length > 0">
+                                Grants: {{ selectedCustomRole.permissions.join(', ') }}
+                            </template>
+                            <template v-else> This role grants no extra permissions yet. </template>
+                        </p>
+                        <p v-else class="text-muted-foreground text-[11px] leading-relaxed">
+                            Custom roles add permissions on top of the role above. They're managed in workspace settings.
+                        </p>
+
+                        <InputError :message="form.errors.workspace_role_id" />
                     </div>
                 </div>
 

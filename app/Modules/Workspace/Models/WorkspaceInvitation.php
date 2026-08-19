@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $email
  * @property UserRole $role
+ * @property int|null $workspace_role_id
  * @property string $token
  * @property int $workspace_id
  * @property int $invited_by
@@ -31,6 +32,7 @@ final class WorkspaceInvitation extends Model
     protected $fillable = [
         'email',
         'role',
+        'workspace_role_id',
         'token',
         'workspace_id',
         'invited_by',
@@ -72,6 +74,23 @@ final class WorkspaceInvitation extends Model
     public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
+    }
+
+    public function customRole(): BelongsTo
+    {
+        return $this->belongsTo(WorkspaceRole::class, 'workspace_role_id');
+    }
+
+    /**
+     * The role label shown to the invitee, including the custom role when one is attached.
+     */
+    public function roleLabel(): string
+    {
+        $customRole = $this->customRole;
+
+        return $customRole === null
+            ? $this->role->label()
+            : "{$customRole->name} ({$this->role->label()})";
     }
 
     public function scopePending(Builder $query): Builder

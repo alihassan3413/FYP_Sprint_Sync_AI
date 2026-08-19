@@ -1,7 +1,9 @@
 import { getSuggestions, type AIContext } from '@/lib/ai-suggestions';
+import { getCsrfToken } from '@/lib/csrf';
 import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import { useVoiceOutput } from './useVoiceOutput';
 
 export type AssistantState = 'collapsed' | 'dock' | 'expanded';
 
@@ -35,6 +37,8 @@ type PageContext = {
     workspace_slug?: string | null;
     workspace_name?: string | null;
 };
+
+const { speak, speakChunk, flushSpeech, stopSpeaking } = useVoiceOutput();
 
 // ---- Module-level singleton state ----
 const state = ref<AssistantState>('collapsed');
@@ -86,6 +90,7 @@ function show() {
 
 // ---- Conversation ----
 function clearConversation() {
+    stopSpeaking();
     messages.value = [];
     inputValue.value = '';
     conversationId.value = null;
@@ -127,20 +132,6 @@ function finishMessage(id: string) {
     if (msg) msg.streaming = false;
 }
 
-function getCookie(name: string): string | null {
-    const value = document.cookie.split('; ').find((row) => row.startsWith(`${name}=`));
-
-    if (!value) {
-        return null;
-    }
-
-    return decodeURIComponent(value.split('=')[1] ?? '');
-}
-
-function getCsrfToken(): string {
-    return getCookie('XSRF-TOKEN') || document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
-
 /**
  * Build a friendly summary line for a pending tool. The backend's tool
  * description is a PROMPT for the LLM, not user-facing copy. So we
@@ -152,8 +143,11 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
     switch (name) {
         case 'create_workspace':
             return `Create workspace "${args.name ?? 'untitled'}"`;
-        case 'invite_user':
-            return `Invite ${args.email ?? 'someone'}${args.role && args.role !== 'member' ? ` as ${args.role}` : ''}`;
+        case 'invite_user': {
+            const roleLabels = [args.custom_role, args.role && args.role !== 'member' ? args.role : null].filter(Boolean);
+
+            return `Invite ${args.email ?? 'someone'}${roleLabels.length > 0 ? ` as ${roleLabels.join(' · ')}` : ''}`;
+        }
         case 'create_task':
             return `Create task "${args.title ?? 'untitled'}"${args.assignee_email ? ` for ${args.assignee_email}` : ''}`;
         case 'create_project':
@@ -268,6 +262,9 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
                     msg.isLoading = false;
                 }
                 appendToMessage(assistantMsg.id, event.delta as string);
+                // Speaks whole sentences as they arrive; no-ops when the
+                // speaker toggle is off.
+                speakChunk(event.delta as string);
                 break;
             }
 
@@ -317,6 +314,9 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
                         msg.isLoading = false;
                         if (!msg.content.trim()) {
                             msg.content = getToolIntro(toolName);
+                            // Written client-side, so it never reaches
+                            // speakChunk through the text stream.
+                            speak(msg.content);
                         }
                         msg.pendingTool = newPending;
                     }
@@ -390,6 +390,9 @@ async function submit(prompt: string) {
     const trimmed = prompt.trim();
     if (!trimmed || isStreaming.value) return;
 
+    // Interrupt the previous answer the moment a new one is asked.
+    stopSpeaking();
+
     addUserMessage(trimmed);
     inputValue.value = '';
     state.value = 'expanded';
@@ -430,12 +433,15 @@ async function submit(prompt: string) {
         }
 
         finishMessage(assistantMsg.id);
+        flushSpeech();
         isStreaming.value = false;
     }
 }
 
 async function confirmTool(messageId: number, action: 'confirm' | 'reject'): Promise<void> {
     if (isStreaming.value) return;
+
+    stopSpeaking();
 
     const sourceMsg = messages.value.find((m) => m.pendingTool?.messageId === messageId);
 
@@ -446,7 +452,9 @@ async function confirmTool(messageId: number, action: 'confirm' | 'reject'): Pro
     }
 
     if (action === 'reject') {
-        addAssistantMessage('Okay, I canceled that action.', false, false);
+        const text = 'Okay, I canceled that action.';
+        addAssistantMessage(text, false, false);
+        speak(text);
         return;
     }
 
@@ -481,6 +489,7 @@ async function confirmTool(messageId: number, action: 'confirm' | 'reject'): Pro
         }
 
         finishMessage(assistantMsg.id);
+        flushSpeech();
         isStreaming.value = false;
     }
 }

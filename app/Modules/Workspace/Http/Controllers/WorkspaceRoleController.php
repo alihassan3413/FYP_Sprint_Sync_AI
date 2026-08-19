@@ -7,6 +7,7 @@ namespace App\Modules\Workspace\Http\Controllers;
 use App\Modules\Workspace\Actions\CreateWorkspaceRoleAction;
 use App\Modules\Workspace\Actions\DeleteWorkspaceRoleAction;
 use App\Modules\Workspace\Actions\UpdateWorkspaceRoleAction;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Data\WorkspaceRoleData;
 use App\Modules\Workspace\Http\Requests\StoreWorkspaceRoleRequest;
@@ -33,6 +34,15 @@ final class WorkspaceRoleController
         return Inertia::render('workspace/settings/RoleManagement', [
             'workspaceId' => $workspace->id,
             'availablePermissions' => WorkspacePermission::values(),
+            'availableClientPermissions' => array_map(
+                fn (ClientPermission $permission) => [
+                    'value' => $permission->value,
+                    'label' => $permission->label(),
+                    'description' => $permission->description(),
+                ],
+                ClientPermission::cases(),
+            ),
+            'clientPermissionDefaults' => ClientPermission::defaults(),
             'canManageRoles' => $request->user()->can('manageRoles', $workspace),
             'systemRoles' => collect(UserRole::cases())
                 ->map(fn (UserRole $role) => [

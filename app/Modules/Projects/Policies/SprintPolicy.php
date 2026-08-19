@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Policies;
 use App\Models\User;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Models\Sprint;
+use App\Modules\Workspace\Data\ClientPermission;
 use App\ProjectRole;
 use App\UserRole;
 
@@ -14,12 +15,20 @@ final class SprintPolicy
 {
     public function viewAny(User $user, Project $project): bool
     {
-        return $user->can('view', $project);
+        if (! $user->can('view', $project)) {
+            return false;
+        }
+
+        if ($project->workspace->isClient($user)) {
+            return $project->workspace->allowsClient($user, ClientPermission::BoardView);
+        }
+
+        return true;
     }
 
     public function view(User $user, Sprint $sprint): bool
     {
-        return $user->can('view', $sprint->project);
+        return $this->viewAny($user, $sprint->project);
     }
 
     public function create(User $user, Project $project): bool
