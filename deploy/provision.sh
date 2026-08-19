@@ -20,11 +20,34 @@
 #
 # It never edits another site's vhost, never restarts another PHP version's FPM,
 # and restores the system-wide `php` alternative if installing PHP changed it.
-# Re-running is safe and idempotent: secrets already in .env are preserved.
+#
+# Re-running is safe and idempotent. On a second run the script:
+#   * installs only apt packages that are actually missing (and only then does
+#     it run `apt-get update`),
+#   * keeps the existing .env, its APP_KEY, Reverb credentials, API keys and any
+#     mail settings edited on the server,
+#   * leaves the nginx vhost and certbot's TLS block alone unless the generated
+#     template genuinely changed, and re-installs the existing certificate
+#     rather than issuing a new one,
+#   * reloads PHP-FPM instead of restarting it, so other pools keep serving,
+#   * skips composer install / npm ci / vite build when the lockfiles, commit
+#     and VITE_* values are unchanged.
+#
+# FORCE=1 additionally re-runs every skipped build step (and bypasses the
+# "another vhost already serves this domain" guard).
 
 set -Eeuo pipefail
 
 # ---------------------------------------------------------------- configuration
+
+# Which optional settings the operator passed explicitly this run. Anything not
+# passed is left exactly as an existing .env already has it on a re-run.
+APP_NAME_EXPLICIT="${APP_NAME+1}"
+MAIL_MAILER_EXPLICIT="${MAIL_MAILER+1}"
+MAIL_HOST_EXPLICIT="${MAIL_HOST+1}"
+MAIL_PORT_EXPLICIT="${MAIL_PORT+1}"
+MAIL_FROM_ADDRESS_EXPLICIT="${MAIL_FROM_ADDRESS+1}"
+
 DOMAIN="${DOMAIN:-}"
 REPO="${REPO:-https://github.com/alihassan3413/FYP_Sprint_Sync_AI.git}"
 BRANCH="${BRANCH:-main}"
@@ -55,6 +78,13 @@ PHP_BIN="/usr/bin/php${PHP_VERSION}"
 FPM_SOCKET="/run/php/php${PHP_VERSION}-fpm-${APP_SLUG}.sock"
 NGINX_SITE="/etc/nginx/sites-available/${DOMAIN}"
 APP_SCHEME="http"
+COMPOSER_BIN="${COMPOSER_BIN:-}"
+APP_HOME="/home/${APP_USER}"
+# Fingerprints of the last successful expensive step, so a re-run can skip work
+# whose inputs have not changed. FORCE=1 ignores them.
+STATE_DIR="${APP_DIR}/storage/app/.provision"
+APT_UPDATED=0
+NGINX_VHOST_REWRITTEN=0
 
 # ---------------------------------------------------------------------- helpers
 log()   { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -64,7 +94,10 @@ die()   { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 trap 'printf "\033[1;31merror:\033[0m aborted at line %s. Other sites on this box were never touched; to inspect this app see /var/log/nginx/%s.error.log and %s/storage/logs/\n" "$LINENO" "$DOMAIN" "$APP_DIR" >&2' ERR
 
-as_app() { sudo -u "$APP_USER" -H env PATH="${NODE_PREFIX}/bin:/usr/local/bin:/usr/bin:/bin" COMPOSER_HOME="/home/${APP_USER}/.composer" "$@"; }
+# ${APP_HOME}/bin/php is a shim pointing at ${PHP_BIN}, so anything the app
+# shells out to (composer's `@php artisan` scripts, npm hooks) gets this app's
+# PHP version rather than whatever /usr/bin/php happens to be for other sites.
+as_app() { sudo -u "$APP_USER" -H env PATH="${APP_HOME}/bin:${NODE_PREFIX}/bin:/usr/local/bin:/usr/bin:/bin" COMPOSER_HOME="${APP_HOME}/.composer" "$@"; }
 
 # Add or replace a key in .env, preserving every other line.
 set_env() {
@@ -86,6 +119,75 @@ get_env() {
 
 rand() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 
+# ------------------------------------------------------------- package helpers
+pkg_installed() {
+  [ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null || true)" = "installed" ]
+}
+
+# apt-get update runs at most once per run, and only when something is missing.
+apt_update_once() {
+  if [ "$APT_UPDATED" = "1" ]; then
+    return 0
+  fi
+  log "Refreshing apt package lists"
+  apt-get update
+  APT_UPDATED=1
+}
+
+# Install only the packages that are genuinely missing. Output stays visible:
+# these steps take minutes and a silent terminal looks like a hung script.
+# --force-confold means an upgrade never overwrites a config file another site
+# on this box depends on.
+apt_install() {
+  local pkg missing=()
+  for pkg in "$@"; do
+    if ! pkg_installed "$pkg"; then
+      missing+=("$pkg")
+    fi
+  done
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    ok "already installed: $*"
+    return 0
+  fi
+
+  log "Installing ${#missing[@]} missing package(s): ${missing[*]}"
+  apt_update_once
+  apt-get install -y \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "${missing[@]}"
+}
+
+# Write stdin to a file only when the content actually differs. Returns 0 when
+# the file changed, 1 when it was already correct, so callers can skip restarts.
+write_if_changed() {
+  local dest="$1" tmp
+  tmp="$(mktemp)"
+  cat > "$tmp"
+  if [ -f "$dest" ] && cmp -s "$tmp" "$dest"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  install -m 0644 "$tmp" "$dest"
+  rm -f "$tmp"
+  return 0
+}
+
+# Has an expensive step already succeeded for exactly these inputs?
+stamp_current() {
+  if [ "$FORCE" = "1" ]; then
+    return 1
+  fi
+  [ -f "${STATE_DIR}/$1" ] && [ "$(cat "${STATE_DIR}/$1" 2>/dev/null)" = "$2" ]
+}
+
+stamp_write() {
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$2" > "${STATE_DIR}/$1"
+  chown -R "${APP_USER}:${APP_USER}" "$STATE_DIR" 2>/dev/null || true
+}
+
 # ------------------------------------------------------------------- preflight
 preflight() {
   log "Preflight checks"
@@ -95,6 +197,13 @@ preflight() {
   [ -n "$APP_DIR" ]    || die "APP_DIR resolved empty."
 
   command -v nginx >/dev/null || die "nginx not found. This script targets a plain nginx server."
+
+  # install_node rm -rf's this path, so never let a bad override point it at
+  # something that matters on a shared box.
+  case "$NODE_PREFIX" in
+    /opt/node-?*) ;;
+    *) die "NODE_PREFIX must look like /opt/node-<version> (got '${NODE_PREFIX}')." ;;
+  esac
 
   for panel in /usr/local/cpanel /usr/local/psa /usr/local/CyberCP /usr/local/directadmin; do
     [ -d "$panel" ] && die "control panel detected at ${panel}. Writing vhosts by hand would fight the panel — provision through it instead."
@@ -134,29 +243,52 @@ preflight() {
 
 # ------------------------------------------------------------------- packages
 install_packages() {
-  log "Installing base packages"
+  log "Checking base packages"
 
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
+  # List services that want a restart, never restart them for us: another site's
+  # daemon must not be bounced as a side effect of provisioning this one.
+  export NEEDRESTART_MODE=l
 
-  apt-get install -y -qq git curl unzip xz-utils ca-certificates acl >/dev/null
+  apt_install git curl unzip xz-utils ca-certificates acl iproute2
 
   # Remember the current system-wide `php` so other sites keep the version they expect.
   local previous_php=""
-  command -v php >/dev/null && previous_php="$(readlink -f "$(command -v php)")"
-
-  if [ ! -x "$PHP_BIN" ]; then
-    log "Installing PHP ${PHP_VERSION} from ppa:ondrej/php"
-    apt-get install -y -qq software-properties-common >/dev/null
-    add-apt-repository -y ppa:ondrej/php >/dev/null
-    apt-get update -qq
+  if command -v php >/dev/null; then
+    previous_php="$(readlink -f "$(command -v php)")"
   fi
 
-  apt-get install -y -qq \
-    "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-mbstring" \
-    "php${PHP_VERSION}-xml" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" \
-    "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-intl" "php${PHP_VERSION}-gd" \
-    "php${PHP_VERSION}-sqlite3" "php${PHP_VERSION}-opcache" "php${PHP_VERSION}-readline" >/dev/null
+  local php_packages=(
+    "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-mbstring"
+    "php${PHP_VERSION}-xml" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip"
+    "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-intl" "php${PHP_VERSION}-gd"
+    "php${PHP_VERSION}-sqlite3" "php${PHP_VERSION}-opcache" "php${PHP_VERSION}-readline"
+  )
+
+  local pkg php_missing=0
+  for pkg in "${php_packages[@]}"; do
+    if ! pkg_installed "$pkg"; then
+      php_missing=1
+      break
+    fi
+  done
+
+  # Ubuntu 24.04 ships PHP 8.3, so 8.4 needs ondrej/php. Only touch apt sources
+  # when something is missing AND the configured archives cannot supply it.
+  if [ "$php_missing" = "1" ] && ! apt-cache show "php${PHP_VERSION}-fpm" >/dev/null 2>&1; then
+    if grep -rqs "ondrej/php\|ondrej-ubuntu-php" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+      ok "ppa:ondrej/php already configured"
+      apt_update_once
+    else
+      log "Adding ppa:ondrej/php (PHP ${PHP_VERSION} is not in the Ubuntu archive)"
+      apt_install software-properties-common
+      add-apt-repository -y ppa:ondrej/php
+      APT_UPDATED=0
+      apt_update_once
+    fi
+  fi
+
+  apt_install "${php_packages[@]}"
 
   [ -x "$PHP_BIN" ] || die "PHP ${PHP_VERSION} did not install."
 
@@ -170,27 +302,56 @@ install_packages() {
 }
 
 install_composer() {
-  if command -v composer >/dev/null; then
-    ok "composer already present ($(composer --version 2>/dev/null | head -1))"
+  if [ -z "$COMPOSER_BIN" ] && command -v composer >/dev/null; then
+    COMPOSER_BIN="$(command -v composer)"
+  fi
+
+  if [ -n "$COMPOSER_BIN" ] && [ -x "$COMPOSER_BIN" ]; then
+    ok "composer already present at ${COMPOSER_BIN}"
     return
   fi
+
   log "Installing Composer"
-  curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
-  "$PHP_BIN" /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
-  rm -f /tmp/composer-setup.php
+  local setup=/tmp/composer-setup.php expected actual
+  curl -fsSL https://getcomposer.org/installer -o "$setup"
+  expected="$(curl -fsSL https://composer.github.io/installer.sig)"
+  actual="$("$PHP_BIN" -r "echo hash_file('sha384', '${setup}');")"
+  if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    rm -f "$setup"
+    die "composer installer checksum mismatch — refusing to execute it."
+  fi
+  "$PHP_BIN" "$setup" --install-dir=/usr/local/bin --filename=composer
+  rm -f "$setup"
+  COMPOSER_BIN=/usr/local/bin/composer
   ok "composer installed"
 }
 
 install_node() {
   if [ -x "${NODE_PREFIX}/bin/node" ]; then
-    ok "node ${NODE_VERSION} already at ${NODE_PREFIX}"
+    ok "node $("${NODE_PREFIX}/bin/node" -v) already at ${NODE_PREFIX}"
     return
   fi
+
   log "Installing Node ${NODE_VERSION} into ${NODE_PREFIX} (isolated — the system node other sites use is untouched)"
-  mkdir -p "$NODE_PREFIX"
-  curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz
-  tar -xJf /tmp/node.tar.xz -C "$NODE_PREFIX" --strip-components=1
-  rm -f /tmp/node.tar.xz
+
+  local tarball="node-v${NODE_VERSION}-linux-x64.tar.xz" tmp
+  tmp="$(mktemp -d)"
+  curl -fSL --progress-bar "https://nodejs.org/dist/v${NODE_VERSION}/${tarball}" -o "${tmp}/${tarball}"
+  curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" -o "${tmp}/SHASUMS256.txt"
+  if ! ( cd "$tmp" && grep " ${tarball}\$" SHASUMS256.txt | sha256sum -c - ); then
+    rm -rf "$tmp"
+    die "node tarball checksum mismatch — refusing to install it."
+  fi
+
+  # Unpack beside the target and move it into place, so an interrupted run never
+  # leaves a half-populated ${NODE_PREFIX} that the next run mistakes for done.
+  mkdir -p "${tmp}/unpack"
+  tar -xJf "${tmp}/${tarball}" -C "${tmp}/unpack" --strip-components=1
+  rm -rf "${NODE_PREFIX}.partial" "$NODE_PREFIX"
+  mkdir -p "$(dirname "$NODE_PREFIX")"
+  mv "${tmp}/unpack" "${NODE_PREFIX}.partial"
+  rm -rf "$tmp"
+  mv "${NODE_PREFIX}.partial" "$NODE_PREFIX"
   ok "$("${NODE_PREFIX}/bin/node" -v)"
 }
 
@@ -200,12 +361,18 @@ create_user() {
     ok "user ${APP_USER} exists"
   else
     log "Creating system user ${APP_USER}"
-    useradd --system --create-home --home-dir "/home/${APP_USER}" --shell /bin/bash "$APP_USER"
+    useradd --system --create-home --home-dir "$APP_HOME" --shell /bin/bash "$APP_USER"
     ok "user created"
   fi
-  usermod -aG "$APP_USER" www-data
-  mkdir -p "/home/${APP_USER}/.composer"
-  chown -R "${APP_USER}:${APP_USER}" "/home/${APP_USER}"
+
+  if ! id -nG www-data | tr ' ' '\n' | grep -qx "$APP_USER"; then
+    usermod -aG "$APP_USER" www-data
+  fi
+
+  mkdir -p "${APP_HOME}/.composer" "${APP_HOME}/bin"
+  # See as_app(): pin `php` for everything this app shells out to.
+  ln -sfn "$PHP_BIN" "${APP_HOME}/bin/php"
+  chown -R "${APP_USER}:${APP_USER}" "$APP_HOME"
 }
 
 fetch_code() {
@@ -224,15 +391,28 @@ fetch_code() {
     chown "${APP_USER}:${APP_USER}" "$APP_DIR"
     as_app git clone --depth 1 --branch "$BRANCH" "$REPO" "$APP_DIR"
   fi
-  as_app git -C "$APP_DIR" config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+
+  # --add would append a duplicate line to ~/.gitconfig on every single run.
+  if ! as_app git config --global --get-all safe.directory 2>/dev/null | grep -qx "$APP_DIR"; then
+    as_app git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+  fi
+
   ok "code at $(as_app git -C "$APP_DIR" rev-parse --short HEAD)"
 }
 
 # -------------------------------------------------------------------- php-fpm
 write_fpm_pool() {
-  log "Writing dedicated PHP-FPM pool"
+  log "Checking PHP-FPM pool"
 
-  cat > "/etc/php/${PHP_VERSION}/fpm/pool.d/${APP_SLUG}.conf" <<POOL_EOF
+  # FPM runs as ${APP_USER} and logs here, so the directory must exist and be
+  # writable by it before the pool starts.
+  mkdir -p "${APP_DIR}/storage/logs"
+  chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}/storage/logs"
+
+  local pool="/etc/php/${PHP_VERSION}/fpm/pool.d/${APP_SLUG}.conf"
+  local changed=0
+
+  if write_if_changed "$pool" <<POOL_EOF
 ; Managed by deploy/provision.sh for ${DOMAIN} — do not edit by hand.
 [${APP_SLUG}]
 user = ${APP_USER}
@@ -268,11 +448,26 @@ php_admin_value[opcache.validate_timestamps] = 0
 
 php_admin_value[open_basedir] = ${APP_DIR}:/tmp:/usr/share/php:/dev/urandom:/etc/ssl/certs:/usr/share/ca-certificates
 POOL_EOF
+  then
+    changed=1
+  fi
 
-  mkdir -p "${APP_DIR}/storage/logs"
   systemctl enable "php${PHP_VERSION}-fpm" >/dev/null 2>&1 || true
-  "php-fpm${PHP_VERSION}" -t 2>/dev/null || die "php-fpm config test failed — pool not applied."
-  systemctl restart "php${PHP_VERSION}-fpm"
+
+  if [ "$changed" = "0" ] && systemctl is-active --quiet "php${PHP_VERSION}-fpm"; then
+    ok "pool ${APP_SLUG} already configured on ${FPM_SOCKET}"
+    return
+  fi
+
+  "php-fpm${PHP_VERSION}" -t || die "php-fpm config test failed — pool not applied."
+
+  if systemctl is-active --quiet "php${PHP_VERSION}-fpm"; then
+    # Reload, not restart: other pools on this PHP version keep serving.
+    systemctl reload "php${PHP_VERSION}-fpm"
+  else
+    systemctl start "php${PHP_VERSION}-fpm"
+  fi
+
   ok "pool ${APP_SLUG} listening on ${FPM_SOCKET}"
 }
 
@@ -296,16 +491,11 @@ pick_reverb_port() {
 
 write_nginx_site() {
   local reverb_port="$1"
-  log "Writing nginx vhost for ${DOMAIN}"
+  log "Checking nginx vhost for ${DOMAIN}"
 
-  local backup=""
-  if [ -f "$NGINX_SITE" ]; then
-    backup="${NGINX_SITE}.bak.$(date +%s)"
-    cp "$NGINX_SITE" "$backup"
-  fi
-
-  cat > "$NGINX_SITE" <<NGINX_EOF
-# Managed by deploy/provision.sh for ${DOMAIN} — certbot may append TLS directives.
+  local body fingerprint
+  body="$(mktemp)"
+  cat > "$body" <<NGINX_EOF
 server {
     listen 80;
     listen [::]:80;
@@ -385,12 +575,43 @@ server {
 }
 NGINX_EOF
 
+  fingerprint="$(sha256sum "$body" | cut -c1-16)"
+
+  # certbot edits this file in place to add its TLS directives. Regenerating the
+  # plain-HTTP template on every run would tear HTTPS off a live site, so only
+  # rewrite when the template we would produce has genuinely changed.
+  if [ -f "$NGINX_SITE" ] \
+     && grep -q "provision-fingerprint: ${fingerprint}" "$NGINX_SITE" \
+     && [ -L "/etc/nginx/sites-enabled/${DOMAIN}" ]; then
+    rm -f "$body"
+    NGINX_VHOST_REWRITTEN=0
+    ok "vhost already current — certbot's TLS block (if any) left untouched"
+    return
+  fi
+
+  local backup=""
+  if [ -f "$NGINX_SITE" ]; then
+    backup="${NGINX_SITE}.bak.$(date +%s)"
+    cp "$NGINX_SITE" "$backup"
+    warn "vhost template changed — regenerating ${NGINX_SITE} (backup: ${backup})"
+  fi
+
+  {
+    echo "# Managed by deploy/provision.sh for ${DOMAIN} — certbot may append TLS directives."
+    echo "# provision-fingerprint: ${fingerprint}"
+    cat "$body"
+  } > "$NGINX_SITE"
+  rm -f "$body"
+  chmod 644 "$NGINX_SITE"
+  NGINX_VHOST_REWRITTEN=1
+
   ln -sfn "$NGINX_SITE" "/etc/nginx/sites-enabled/${DOMAIN}"
 
-  if ! nginx -t 2>/dev/null; then
+  if ! nginx -t; then
     rm -f "/etc/nginx/sites-enabled/${DOMAIN}"
     if [ -n "$backup" ]; then
       mv "$backup" "$NGINX_SITE"
+      ln -sfn "$NGINX_SITE" "/etc/nginx/sites-enabled/${DOMAIN}"
     else
       rm -f "$NGINX_SITE"
     fi
@@ -408,6 +629,25 @@ setup_ssl() {
     warn "SKIP_SSL=1 — serving plain HTTP. Websockets will use ws://, not wss://."
     return
   fi
+
+  # A certificate already issued for this domain is reused rather than re-issued:
+  # Let's Encrypt rate-limits duplicate issuance, and a re-run must never cost a
+  # cert. It only has to be re-installed if we just regenerated the vhost.
+  if [ -d "/etc/letsencrypt/live/${DOMAIN}" ] && command -v certbot >/dev/null; then
+    if [ "$NGINX_VHOST_REWRITTEN" = "0" ]; then
+      APP_SCHEME="https"
+      ok "existing certificate for ${DOMAIN} left in place"
+      return
+    fi
+    log "Re-installing the existing certificate into the regenerated vhost"
+    if certbot install --cert-name "$DOMAIN" --nginx --non-interactive --redirect; then
+      APP_SCHEME="https"
+      ok "HTTPS restored from the existing certificate"
+      return
+    fi
+    warn "could not re-install the existing certificate — falling through to a normal issuance attempt."
+  fi
+
   if [ -z "$LETSENCRYPT_EMAIL" ]; then
     warn "LETSENCRYPT_EMAIL not set — skipping TLS. Re-run with it to enable HTTPS."
     return
@@ -430,15 +670,15 @@ setup_ssl() {
   if ! command -v certbot >/dev/null; then
     log "Installing certbot"
     if command -v snap >/dev/null; then
-      snap install --classic certbot >/dev/null
+      snap install --classic certbot
       ln -sf /snap/bin/certbot /usr/bin/certbot
     else
-      apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
+      apt_install certbot python3-certbot-nginx
     fi
   fi
 
   log "Requesting Let's Encrypt certificate"
-  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$LETSENCRYPT_EMAIL" --redirect; then
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$LETSENCRYPT_EMAIL" --redirect --keep-until-expiring; then
     APP_SCHEME="https"
     ok "HTTPS active, renewal handled by the certbot timer"
   else
@@ -447,13 +687,31 @@ setup_ssl() {
 }
 
 # ------------------------------------------------------------------------- env
+# Write a value only when the operator passed it explicitly, or the key has no
+# answer in .env yet. Keeps hand edits on the server from being reverted.
+set_env_unless_present() {
+  local key="$1" value="$2" explicit="${3:-}"
+  if [ "$explicit" = "1" ] || [ -z "$(get_env "$key")" ]; then
+    set_env "$key" "$value"
+  fi
+}
+
+# Must run before composer: composer's post-install scripts boot Laravel, which
+# expects a .env to be there. Never overwrites an existing one.
+seed_env_file() {
+  if [ -f "${APP_DIR}/.env" ]; then
+    ok "existing .env kept — its secrets are preserved"
+  else
+    log "Creating .env from .env.example"
+    as_app cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
+  fi
+  chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
+  chmod 640 "${APP_DIR}/.env"
+}
+
 write_env() {
   local reverb_port="$1"
   log "Writing production .env"
-
-  [ -f "${APP_DIR}/.env" ] || as_app cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
-  chmod 640 "${APP_DIR}/.env"
-  chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
 
   local ws_scheme="ws"
   local ws_port="80"
@@ -462,7 +720,7 @@ write_env() {
     ws_port="443"
   fi
 
-  set_env APP_NAME "\"${APP_NAME}\""
+  set_env_unless_present APP_NAME "\"${APP_NAME}\"" "$APP_NAME_EXPLICIT"
   set_env APP_ENV production
   set_env APP_DEBUG false
   set_env APP_URL "${APP_SCHEME}://${DOMAIN}"
@@ -505,16 +763,27 @@ write_env() {
   set_env VITE_REVERB_PORT "$ws_port"
   set_env VITE_REVERB_SCHEME "$ws_scheme"
 
-  set_env MAIL_MAILER "$MAIL_MAILER"
-  set_env MAIL_HOST "$MAIL_HOST"
-  set_env MAIL_PORT "$MAIL_PORT"
-  [ -n "$MAIL_USERNAME" ] && set_env MAIL_USERNAME "$MAIL_USERNAME"
-  [ -n "$MAIL_PASSWORD" ] && set_env MAIL_PASSWORD "$MAIL_PASSWORD"
-  set_env MAIL_FROM_ADDRESS "\"${MAIL_FROM_ADDRESS}\""
+  # Mail settings are only written when passed explicitly or still unanswered —
+  # otherwise a re-run would silently revert SMTP details edited on the server.
+  set_env_unless_present MAIL_MAILER "$MAIL_MAILER" "$MAIL_MAILER_EXPLICIT"
+  set_env_unless_present MAIL_HOST "$MAIL_HOST" "$MAIL_HOST_EXPLICIT"
+  set_env_unless_present MAIL_PORT "$MAIL_PORT" "$MAIL_PORT_EXPLICIT"
+  if [ -n "$MAIL_USERNAME" ]; then
+    set_env MAIL_USERNAME "$MAIL_USERNAME"
+  fi
+  if [ -n "$MAIL_PASSWORD" ]; then
+    set_env MAIL_PASSWORD "$MAIL_PASSWORD"
+  fi
+  set_env_unless_present MAIL_FROM_ADDRESS "\"${MAIL_FROM_ADDRESS}\"" "$MAIL_FROM_ADDRESS_EXPLICIT"
   set_env MAIL_FROM_NAME "\"\${APP_NAME}\""
 
-  [ -n "$OPENAI_API_KEY" ]    && set_env OPENAI_API_KEY "$OPENAI_API_KEY"
-  [ -n "$ANTHROPIC_API_KEY" ] && set_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+  # Only overwrite an API key when one was actually supplied this run.
+  if [ -n "$OPENAI_API_KEY" ]; then
+    set_env OPENAI_API_KEY "$OPENAI_API_KEY"
+  fi
+  if [ -n "$ANTHROPIC_API_KEY" ]; then
+    set_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+  fi
 
   if [ -z "$(get_env OPENAI_API_KEY)" ]; then
     warn "OPENAI_API_KEY is empty — transcription and the assistant will fail until you set it in ${APP_DIR}/.env"
@@ -529,19 +798,63 @@ write_env() {
 }
 
 # ----------------------------------------------------------------------- build
-build_app() {
-  log "Installing PHP dependencies"
-  as_app composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --working-dir="$APP_DIR"
+# Composer must complete before ANY artisan command: on a fresh box
+# vendor/autoload.php does not exist yet and artisan dies on line 1.
+install_php_dependencies() {
+  local fingerprint
+  fingerprint="$(sha256sum "${APP_DIR}/composer.lock" | cut -c1-16)"
+
+  if [ -f "${APP_DIR}/vendor/autoload.php" ] && stamp_current composer "$fingerprint"; then
+    ok "composer dependencies already match composer.lock"
+  else
+    log "Installing PHP dependencies (composer install)"
+    as_app "$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader \
+      --no-interaction --prefer-dist --working-dir="$APP_DIR"
+    [ -f "${APP_DIR}/vendor/autoload.php" ] || die "composer install did not produce vendor/autoload.php."
+    stamp_write composer "$fingerprint"
+    ok "vendor/ ready"
+  fi
+
+  # Caches written by the previous release would be read by the new code.
+  as_app "$PHP_BIN" "${APP_DIR}/artisan" optimize:clear --no-interaction >/dev/null 2>&1 || true
+}
+
+build_frontend() {
+  local lock_fp head vite_fp build_fp
+  lock_fp="$(sha256sum "${APP_DIR}/package-lock.json" | cut -c1-16)"
+
+  if [ -d "${APP_DIR}/node_modules" ] && stamp_current npm "$lock_fp"; then
+    ok "node_modules already match package-lock.json"
+  else
+    log "Installing node modules (npm ci)"
+    as_app env NODE_OPTIONS=--max-old-space-size=1024 npm --prefix "$APP_DIR" ci --no-audit --no-fund
+    stamp_write npm "$lock_fp"
+  fi
+
+  # Vite bakes VITE_* values into the bundle, so a changed .env means a rebuild
+  # even when the commit is identical.
+  head="$(as_app git -C "$APP_DIR" rev-parse HEAD)"
+  vite_fp="$(grep -E '^VITE_' "${APP_DIR}/.env" 2>/dev/null | sha256sum | cut -c1-16)"
+  build_fp="${head}-${lock_fp}-${vite_fp}"
+
+  if [ -f "${APP_DIR}/public/build/manifest.json" ] && stamp_current build "$build_fp"; then
+    ok "assets already built for this commit and .env"
+    return
+  fi
 
   log "Building frontend assets (this is the slow step)"
-  as_app env NODE_OPTIONS=--max-old-space-size=1024 npm --prefix "$APP_DIR" ci --no-audit --no-fund
   as_app env NODE_OPTIONS=--max-old-space-size=1024 npm --prefix "$APP_DIR" run build
   [ -f "${APP_DIR}/public/build/manifest.json" ] || die "vite build produced no manifest."
+  stamp_write build "$build_fp"
   ok "assets built"
+}
 
+prepare_database() {
   log "Preparing SQLite database"
   as_app mkdir -p "${APP_DIR}/database"
-  as_app touch "${APP_DIR}/database/database.sqlite"
+  if [ ! -f "${APP_DIR}/database/database.sqlite" ]; then
+    as_app touch "${APP_DIR}/database/database.sqlite"
+  fi
   as_app "$PHP_BIN" "${APP_DIR}/artisan" migrate --force --no-interaction
 
   if [ "$SEED_DEMO" = "1" ]; then
@@ -550,10 +863,13 @@ build_app() {
   fi
 
   as_app "$PHP_BIN" "${APP_DIR}/artisan" storage:link --no-interaction || true
+  ok "database ready"
+}
 
+optimize_app() {
   log "Caching config, routes, views and events"
   as_app "$PHP_BIN" "${APP_DIR}/artisan" optimize
-  ok "application built"
+  ok "application optimized"
 }
 
 fix_permissions() {
@@ -562,8 +878,10 @@ fix_permissions() {
 
   # Skip node_modules/.git/vendor: huge, already correctly owned, and their
   # bin stubs must keep the exec bit that a blanket chmod 644 would strip.
+  # .env is pruned too: without it the blanket chmod 644 below would briefly
+  # expose the app secrets to every other user on this shared box.
   find "$APP_DIR" \
-    \( -path "${APP_DIR}/node_modules" -o -path "${APP_DIR}/.git" -o -path "${APP_DIR}/vendor" \) -prune -o \
+    \( -path "${APP_DIR}/node_modules" -o -path "${APP_DIR}/.git" -o -path "${APP_DIR}/vendor" -o -path "${APP_DIR}/.env" \) -prune -o \
     -type d -exec chmod 755 {} + -o \
     -type f -exec chmod 644 {} +
 
@@ -581,9 +899,11 @@ fix_permissions() {
 # -------------------------------------------------------------------- services
 write_services() {
   local reverb_port="$1"
-  log "Writing systemd units"
+  log "Checking systemd units"
 
-  cat > "/etc/systemd/system/${APP_SLUG}-queue.service" <<QUEUE_EOF
+  local units_changed=0
+
+  if write_if_changed "/etc/systemd/system/${APP_SLUG}-queue.service" <<QUEUE_EOF
 [Unit]
 Description=${APP_NAME} queue worker (${DOMAIN})
 After=network.target
@@ -602,8 +922,11 @@ StandardError=append:${APP_DIR}/storage/logs/queue.log
 [Install]
 WantedBy=multi-user.target
 QUEUE_EOF
+  then
+    units_changed=1
+  fi
 
-  cat > "/etc/systemd/system/${APP_SLUG}-reverb.service" <<REVERB_EOF
+  if write_if_changed "/etc/systemd/system/${APP_SLUG}-reverb.service" <<REVERB_EOF
 [Unit]
 Description=${APP_NAME} Reverb websocket server (${DOMAIN})
 After=network.target
@@ -622,16 +945,23 @@ StandardError=append:${APP_DIR}/storage/logs/reverb.log
 [Install]
 WantedBy=multi-user.target
 REVERB_EOF
+  then
+    units_changed=1
+  fi
 
-  cat > "/etc/cron.d/${APP_SLUG}-scheduler" <<CRON_EOF
+  write_if_changed "/etc/cron.d/${APP_SLUG}-scheduler" <<CRON_EOF || true
+# ${APP_NAME} scheduler (${DOMAIN}) — managed by deploy/provision.sh
 # ${APP_NAME} scheduler (${DOMAIN}) — managed by deploy/provision.sh
 * * * * * ${APP_USER} cd ${APP_DIR} && ${PHP_BIN} artisan schedule:run >> ${APP_DIR}/storage/logs/scheduler.log 2>&1
 CRON_EOF
-  chmod 644 "/etc/cron.d/${APP_SLUG}-scheduler"
 
-  systemctl daemon-reload
-  systemctl enable --now "${APP_SLUG}-queue.service" >/dev/null
-  systemctl enable --now "${APP_SLUG}-reverb.service" >/dev/null
+  if [ "$units_changed" = "1" ]; then
+    systemctl daemon-reload
+  fi
+
+  systemctl enable "${APP_SLUG}-queue.service" "${APP_SLUG}-reverb.service" >/dev/null
+  # Always restart: even with unchanged units, the workers are holding the old
+  # code in memory after a deploy.
   systemctl restart "${APP_SLUG}-queue.service" "${APP_SLUG}-reverb.service"
   ok "queue worker, reverb and scheduler running"
 }
@@ -692,13 +1022,26 @@ main() {
   write_fpm_pool
   write_nginx_site "$reverb_port"
   setup_ssl
+
+  # Order matters and is the thing most likely to bite on a fresh box:
+  #   .env exists -> composer install -> only then any artisan command.
+  # `artisan key:generate` inside write_env needs vendor/autoload.php.
+  seed_env_file
+  install_php_dependencies
   write_env "$reverb_port"
-  build_app
+
+  build_frontend
+  prepare_database
+  optimize_app
   fix_permissions
   write_services "$reverb_port"
 
   # TLS may have been added after the vhost was written; make sure nginx has it all.
-  nginx -t >/dev/null 2>&1 && systemctl reload nginx
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx
+  else
+    warn "nginx -t is failing — skipped the final reload. Run 'nginx -t' to see why."
+  fi
 
   verify
   summary
