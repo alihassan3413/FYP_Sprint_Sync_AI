@@ -7,11 +7,15 @@ return [
 
     'default_model' => env('ASSISTANT_DEFAULT_MODEL', 'claude-sonnet-5'),
 
+    /*
+     * The model a client may request. The driver above is fixed, so a model
+     * from another vendor would be sent to Anthropic and rejected — these have
+     * to stay in step with the driver rather than being a free-text list.
+     */
     'allowed_models' => [
+        'claude-opus-5',
         'claude-sonnet-5',
         'claude-haiku-4-5',
-        'gpt-4o-mini',
-        'gpt-4o',
     ],
 
     'anthropic' => [

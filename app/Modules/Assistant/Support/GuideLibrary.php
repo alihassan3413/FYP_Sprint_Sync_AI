@@ -259,6 +259,22 @@ final class GuideLibrary
             'where' => 'Projects → open a project → Sprints',
             'keywords' => ['sprint', 'report', 'status', 'health', 'progress', 'burndown', 'velocity', 'standup', 'behind', 'on track', 'at risk', 'remaining'],
         ],
+        'project-health' => [
+            'title' => 'Reading how a project is really going',
+            'stage' => self::STAGE_TEAM,
+            'audience' => self::AUDIENCE_MEMBER,
+            'summary' => 'A verdict on a project, and whether one person is quietly carrying it.',
+            'steps' => [
+                'Ask how a project is going and SprintSync weighs completion against overdue work, unowned work, work that has gone quiet, and how the load is spread.',
+                'It answers with a verdict — healthy, worth watching, at risk, or needs attention now — and the numbers that justify it.',
+                'It flags when one person holds most of the open work. A project can be 80% done and still be fragile if everything left sits with one person.',
+                'It also points out who has nothing open, so you know who to hand work to.',
+                'Every finding comes with the counts behind it, so you can check the judgement rather than take it on trust.',
+            ],
+            'say' => ['How is the Website Revamp project going?', 'Is anyone overloaded?', 'Who has capacity right now?'],
+            'where' => 'Analytics',
+            'keywords' => ['health', 'performance', 'evaluate', 'assess', 'going', 'workload', 'load', 'overloaded', 'balance', 'capacity', 'carrying', 'fair', 'spread', 'risk', 'trouble', 'stalled', 'bottleneck'],
+        ],
         'analytics' => [
             'title' => 'Analytics across projects',
             'stage' => self::STAGE_TEAM,

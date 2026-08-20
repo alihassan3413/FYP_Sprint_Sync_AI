@@ -139,6 +139,13 @@ final class CommandCatalog
             'keywords' => ['meeting', 'cancel', 'call off', 'delete', 'remove', 'drop', 'scrap'],
             'template' => 'Cancel the meeting ',
         ],
+        'evaluate_project' => [
+            'label' => 'How is this project really going',
+            'description' => 'A verdict on a project, plus who is carrying the load.',
+            'category' => 'Insights',
+            'keywords' => ['health', 'performance', 'evaluate', 'assess', 'how', 'going', 'project', 'workload', 'load', 'balance', 'overloaded', 'busy', 'capacity', 'carrying', 'fair', 'spread', 'team', 'risk', 'trouble', 'stuck', 'stalled'],
+            'template' => 'How is the project going?',
+        ],
         'get_analytics' => [
             'label' => 'How are we doing',
             'description' => 'Completion rate, overdue work, and progress by project.',
