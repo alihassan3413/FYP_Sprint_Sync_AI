@@ -7,10 +7,12 @@ namespace App\Modules\Assistant\Actions;
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AiProvider;
 use App\Modules\Assistant\Contracts\ProvidesConfirmationDetails;
+use App\Modules\Assistant\Exceptions\AiProviderException;
 use App\Modules\Assistant\Models\Conversation;
 use App\Modules\Assistant\Models\Message;
 use App\Modules\Assistant\Support\ToolArgumentValidator;
 use App\Modules\Assistant\Support\ToolContext;
+use App\Modules\Assistant\Support\ToolFailure;
 use App\Modules\Assistant\Support\ToolResultEnvelope;
 use App\Modules\Assistant\Tools\ToolRegistry;
 use Generator;
@@ -297,12 +299,7 @@ final class ProcessChatMessage
         $tool = $this->registry->get($name);
 
         if ($tool === null) {
-            $this->recordToolResult($conversation, $toolCall['id'], $name, [
-                'success' => false,
-                'error' => 'That action is not available to you.',
-            ], Message::STATUS_FAILED);
-
-            yield ['type' => 'tool_failed', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+            yield from $this->failToolCall($conversation, $toolCall['id'], $name, ToolFailure::unknownTool($name));
 
             return;
         }
@@ -310,24 +307,13 @@ final class ProcessChatMessage
         try {
             $args = $this->argumentValidator->validate($tool, is_array($args) ? $args : []);
         } catch (ValidationException $e) {
-            $this->recordToolResult($conversation, $toolCall['id'], $name, [
-                'success' => false,
-                'error_code' => 'invalid_arguments',
-                'error' => 'The arguments were invalid: '.implode(' ', array_keys($e->errors())).'.',
-            ], Message::STATUS_FAILED);
-
-            yield ['type' => 'tool_failed', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+            yield from $this->failToolCall($conversation, $toolCall['id'], $name, ToolFailure::invalidArguments($e));
 
             return;
         }
 
         if (! $tool->authorize($toolContext)) {
-            $this->recordToolResult($conversation, $toolCall['id'], $name, [
-                'success' => false,
-                'error' => 'That action is not available to you.',
-            ], Message::STATUS_FAILED);
-
-            yield ['type' => 'tool_failed', 'tool_call_id' => $toolCall['id'], 'name' => $name];
+            yield from $this->failToolCall($conversation, $toolCall['id'], $name, ToolFailure::unauthorized($tool, $toolContext));
 
             return;
         }
@@ -484,11 +470,35 @@ final class ProcessChatMessage
     }
 
     /**
+     * Records the failure and emits it with its reason attached, so the client
+     * can show the user what actually happened instead of a generic notice.
+     *
+     * @param  array<string, mixed>  $failure
+     * @return Generator<int, array<string, mixed>>
+     */
+    private function failToolCall(Conversation $conversation, string $toolCallId, string $name, array $failure): Generator
+    {
+        $this->recordToolResult($conversation, $toolCallId, $name, $failure, Message::STATUS_FAILED);
+
+        yield [
+            'type' => 'tool_failed',
+            'tool_call_id' => $toolCallId,
+            'name' => $name,
+            'error_code' => $failure['error_code'] ?? null,
+            'error' => $failure['error'] ?? null,
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     private function errorEvent(Throwable $e): array
     {
-        $message = 'Something went wrong while generating a response. Please try again.';
+        $message = match (true) {
+            $e instanceof AiProviderException => 'The AI service is not responding right now. Nothing was changed — please try again in a moment.',
+            $e instanceof ValidationException => 'I could not work with those details. Could you rephrase what you need?',
+            default => 'I hit an unexpected problem and could not finish that. Nothing was changed — please try again.',
+        };
 
         if (app()->environment('local')) {
             $message .= ' ['.$e->getMessage().']';

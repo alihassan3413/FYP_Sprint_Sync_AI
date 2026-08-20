@@ -6,6 +6,7 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Modules\Assistant\Contracts\AssistantTool;
 use App\Modules\Assistant\Support\ToolContext;
+use App\Modules\Assistant\Support\ToolFailure;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -21,11 +22,7 @@ final class ExecuteToolCall
         $user = $context->user;
 
         if (! $tool->authorize($context)) {
-            return [
-                'success' => false,
-                'error_code' => 'unauthorized',
-                'error' => 'You do not have permission to perform this action.',
-            ];
+            return ToolFailure::unauthorized($tool, $context);
         }
 
         try {
@@ -38,11 +35,7 @@ final class ExecuteToolCall
                 'exception' => $e,
             ]);
 
-            return [
-                'success' => false,
-                'error_code' => 'execution_failed',
-                'error' => 'The action failed due to a system error. Please try again.',
-            ];
+            return ToolFailure::executionFailed($tool);
         }
 
         Log::info('Assistant tool executed', [

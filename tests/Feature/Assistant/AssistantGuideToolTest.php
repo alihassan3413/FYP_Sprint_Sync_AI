@@ -81,6 +81,24 @@ final class AssistantGuideToolTest extends TestCase
         $this->assertNotNull(app(ToolRegistry::class)->get('get_guide'));
     }
 
+    public function test_the_guide_is_the_first_command_in_the_palette(): void
+    {
+        $this->owner->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+
+        $response = $this->actingAs($this->owner)
+            ->getJson(route('assistant.commands', ['workspace_id' => $this->workspace->id]))
+            ->assertOk();
+
+        $commands = $response->json('commands');
+
+        $this->assertSame(
+            'get_guide',
+            $commands[0]['name'],
+            'The guide must stay at the top of the / palette: it is what a lost user needs first.',
+        );
+        $this->assertSame('Learn', $commands[0]['category']);
+    }
+
     public function test_it_never_asks_for_confirmation(): void
     {
         $this->assertFalse($this->tool()->requiresConfirmation());

@@ -367,7 +367,7 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
 
                 // If the tool failed, surface the error to the user.
                 if (result && result.success === false) {
-                    appendToMessage(assistantMsg.id, `\n\n⚠️ ${result.error ?? 'Action failed.'}`);
+                    appendToMessage(assistantMsg.id, `\n\n⚠️ ${result.error?.trim() || 'That action could not be completed.'}`);
                 }
 
                 // If the tool returned a switch_to URL, navigate via Inertia.
@@ -383,9 +383,12 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
                 break;
             }
 
-            case 'tool_failed':
-                appendToMessage(assistantMsg.id, `\n\n⚠️ The action could not be completed.`);
+            case 'tool_failed': {
+                const reason = (event.error as string | undefined)?.trim();
+
+                appendToMessage(assistantMsg.id, `\n\n⚠️ ${reason || 'That action could not be completed.'}`);
                 break;
+            }
 
             case 'tool_rejected': {
                 const msg = messages.value.find((m) => m.pendingTool?.messageId === event.message_id);

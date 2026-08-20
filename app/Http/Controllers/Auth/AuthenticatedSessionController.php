@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Modules\Workspace\Actions\AcceptWorkspaceInvitationAction;
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
+use App\Support\Routing\LandingRoute;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,9 +40,7 @@ final class AuthenticatedSessionController extends Controller
             return $this->acceptPendingInvitation($action, $user, (string) $token);
         }
 
-        return redirect()->intended(
-            route('dashboard', ['workspace' => $user->activeWorkspaceOrFail()->slug], false)
-        );
+        return redirect()->intended(LandingRoute::for($user));
     }
 
     public function destroy(Request $request): RedirectResponse

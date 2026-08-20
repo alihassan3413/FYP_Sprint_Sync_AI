@@ -101,7 +101,7 @@ final class ConfirmActionController
         $tool = $registry->get($pendingMessage->metadata['name'] ?? '');
 
         if ($tool === null) {
-            $this->fail($stream, $pendingMessage, 'That action is no longer available.');
+            $this->fail($stream, $pendingMessage, 'That action is no longer available in this workspace, so I could not carry it out.');
 
             return;
         }
@@ -109,7 +109,7 @@ final class ConfirmActionController
         try {
             $args = $argumentValidator->validate($tool, $pendingMessage->metadata['args'] ?? []);
         } catch (ValidationException) {
-            $this->fail($stream, $pendingMessage, 'The requested action had invalid details. Please ask again.');
+            $this->fail($stream, $pendingMessage, 'The details for that action were no longer valid, so nothing was changed. Please ask me again.');
 
             return;
         }

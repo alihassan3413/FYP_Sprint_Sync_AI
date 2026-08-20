@@ -121,6 +121,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->workspaces()->whereKey($this->current_workspace_id)->first();
     }
 
+    /**
+     * The workspace to drop this user into.
+     *
+     * Falls back to any workspace they belong to when `current_workspace_id`
+     * is null or points at one they have since been removed from, and records
+     * the choice, so a stale pointer never strands them on sign-in.
+     */
+    public function resolveActiveWorkspace(): ?Workspace
+    {
+        $workspace = $this->activeWorkspace();
+
+        if ($workspace !== null) {
+            return $workspace;
+        }
+
+        $workspace = $this->workspaces()->orderBy('workspaces.id')->first();
+
+        if ($workspace !== null) {
+            $this->forceFill(['current_workspace_id' => $workspace->id])->save();
+        }
+
+        return $workspace;
+    }
+
     public function activeWorkspaceOrFail(): Workspace
     {
         $workspace = $this->activeWorkspace();

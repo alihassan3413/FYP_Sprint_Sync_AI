@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Support\Routing\LandingRoute;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -31,11 +32,9 @@ final class AppServiceProvider extends ServiceProvider
     private function redirectAuthenticatedGuests(): void
     {
         RedirectIfAuthenticated::redirectUsing(function (Request $request): string {
-            $workspace = $request->user()?->activeWorkspace();
+            $user = $request->user();
 
-            return $workspace === null
-                ? route('home')
-                : route('dashboard', ['workspace' => $workspace->slug]);
+            return $user === null ? route('home') : LandingRoute::for($user);
         });
     }
 }
