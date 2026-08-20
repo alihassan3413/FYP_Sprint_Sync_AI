@@ -1,1054 +1,867 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import {
-    ArrowRight,
-    ArrowUpRight,
-    Boxes,
-    Check,
-    ChevronRight,
-    Code2,
-    FileText,
-    Github,
-    Kanban,
-    KeyRound,
-    Layers,
-    LayoutDashboard,
-    LineChart,
-    MessageSquare,
-    Minus,
-    Plus,
-    Server,
-    Sparkles,
-    Star,
-    X,
-    Zap,
-} from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { ArrowUpRight, CalendarDays, Check, ChevronRight, Kanban, Menu, Mic, Play, Shield, Sparkles, X } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
-// FAQ accordion state
-const openFaq = ref<number | null>(0);
-const toggleFaq = (i: number) => (openFaq.value = openFaq.value === i ? null : i);
+/* ------------------------------------------------------------------ *
+ * The scripted hero demo.
+ *
+ * Every command below is a real action the assistant performs. The last
+ * scene is a refusal on purpose: "it cannot outrank you" is the objection
+ * that actually closes people, and showing it beats claiming it.
+ * ------------------------------------------------------------------ */
+interface Scene {
+    id: string;
+    chip: string;
+    command: string;
+    reply: string;
+    confirm: { action: string; rows: [string, string][] } | null;
+    denied?: boolean;
+    effect: 'task' | 'sprint' | 'meeting' | 'none';
+}
 
-// Pricing toggle
-const billingYearly = ref(true);
-
-// Animated stats counter
-const stats = ref([
-    { label: 'Avg. Issue Triage Time', value: '0.4s', sub: 'AI-classified instantly' },
-    { label: 'Setup Time', value: '< 5min', sub: 'vs Jira’s 2 weeks' },
+const scenes: Scene[] = [
     {
-        label: 'Tools Replaced',
-        value: '6+',
-        sub: 'kanban, docs, chat, sprints, wiki, time',
+        id: 'task',
+        chip: 'Create a task',
+        command: 'Create a task to fix the login redirect, assign it to Sara, due Friday',
+        reply: "I'll add that to Website Revamp and put it in To Do.",
+        confirm: {
+            action: 'Create task',
+            rows: [
+                ['Title', 'Fix the login redirect'],
+                ['Project', 'Website Revamp'],
+                ['Assignee', 'Sara Ahmed'],
+                ['Due', 'Fri 22 Aug'],
+            ],
+        },
+        effect: 'task',
     },
-    { label: 'Self-Hosting', value: '100%', sub: 'your data, your servers' },
-]);
+    {
+        id: 'sprint',
+        chip: 'Sprint status',
+        command: 'How is the current sprint going?',
+        reply: "Sprint 4 is 62% done with 3 days left. That's behind pace — two tasks are overdue.",
+        confirm: null,
+        effect: 'sprint',
+    },
+    {
+        id: 'meeting',
+        chip: 'Schedule a meeting',
+        command: 'Schedule a sprint review Thursday at 4pm and invite the team',
+        reply: 'Booking it for Thu 21 Aug, 16:00. Six participants will get an email invite.',
+        confirm: {
+            action: 'Schedule meeting',
+            rows: [
+                ['Title', 'Sprint review'],
+                ['When', 'Thu 21 Aug, 16:00'],
+                ['Participants', '6 people'],
+            ],
+        },
+        effect: 'meeting',
+    },
+    {
+        id: 'denied',
+        chip: 'Try something you cannot do',
+        command: 'Delete the Website Revamp project',
+        reply: "You don't have permission to delete projects in this workspace. I've asked the owner instead.",
+        confirm: null,
+        denied: true,
+        effect: 'none',
+    },
+];
 
-// Page-load orchestration
-const mounted = ref(false);
+const active = ref(0);
+const typed = ref('');
+const streamed = ref('');
+const phase = ref<'typing' | 'thinking' | 'replying' | 'confirming' | 'settled'>('typing');
+
+const scene = computed(() => scenes[active.value]);
+const showConfirm = computed(() => (phase.value === 'confirming' || phase.value === 'settled') && scene.value.confirm !== null);
+const showDenied = computed(() => (phase.value === 'confirming' || phase.value === 'settled') && scene.value.denied === true);
+
+/* Board state the demo mutates, so the reply visibly does something. */
+const todo = ref(['Rework empty states', 'Audit colour contrast']);
+const doing = ref(['Checkout bug on mobile']);
+const done = ref(['Ship invite links']);
+const sprintPct = ref(0);
+const sprintLive = ref(false);
+const meeting = ref<{ title: string; when: string } | null>(null);
+
+const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let cancelled = false;
+let timers: ReturnType<typeof setTimeout>[] = [];
+
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        timers.push(setTimeout(resolve, reduceMotion ? Math.min(ms, 120) : ms));
+    });
+}
+
+function resetBoard(): void {
+    todo.value = ['Rework empty states', 'Audit colour contrast'];
+    doing.value = ['Checkout bug on mobile'];
+    done.value = ['Ship invite links'];
+    sprintPct.value = 0;
+    sprintLive.value = false;
+    meeting.value = null;
+}
+
+async function typeOut(text: string): Promise<void> {
+    typed.value = '';
+
+    if (reduceMotion) {
+        typed.value = text;
+
+        return;
+    }
+
+    for (const character of text) {
+        if (cancelled) return;
+        typed.value += character;
+        await wait(18);
+    }
+}
+
+async function streamOut(text: string): Promise<void> {
+    streamed.value = '';
+
+    if (reduceMotion) {
+        streamed.value = text;
+
+        return;
+    }
+
+    for (const word of text.split(' ')) {
+        if (cancelled) return;
+        streamed.value += (streamed.value === '' ? '' : ' ') + word;
+        await wait(38);
+    }
+}
+
+function applyEffect(effect: Scene['effect']): void {
+    if (effect === 'task') {
+        todo.value = ['Fix the login redirect', ...todo.value];
+    }
+
+    if (effect === 'sprint') {
+        sprintLive.value = true;
+        sprintPct.value = 62;
+    }
+
+    if (effect === 'meeting') {
+        meeting.value = { title: 'Sprint review', when: 'Thu 21 Aug · 16:00' };
+    }
+}
+
+async function playScene(index: number): Promise<void> {
+    active.value = index;
+    resetBoard();
+    streamed.value = '';
+    phase.value = 'typing';
+
+    await typeOut(scenes[index].command);
+    if (cancelled) return;
+
+    phase.value = 'thinking';
+    await wait(620);
+    if (cancelled) return;
+
+    phase.value = 'replying';
+    await streamOut(scenes[index].reply);
+    if (cancelled) return;
+
+    phase.value = 'confirming';
+    await wait(520);
+    if (cancelled) return;
+
+    applyEffect(scenes[index].effect);
+    phase.value = 'settled';
+}
+
+async function loop(): Promise<void> {
+    while (!cancelled) {
+        await playScene(active.value);
+        if (cancelled) return;
+
+        await wait(3200);
+        if (cancelled) return;
+
+        active.value = (active.value + 1) % scenes.length;
+    }
+}
+
+/** Clicking a chip takes the demo straight to that scene. */
+function jumpTo(index: number): void {
+    cancelled = true;
+    timers.forEach(clearTimeout);
+    timers = [];
+
+    window.setTimeout(() => {
+        cancelled = false;
+        active.value = index;
+        void loop();
+    }, 40);
+}
+
+/* Nav */
+const scrolled = ref(false);
+const menuOpen = ref(false);
+
+function onScroll(): void {
+    scrolled.value = window.scrollY > 12;
+}
+
+/* Reveal-on-scroll, one per section. */
+let observer: IntersectionObserver | null = null;
+
 onMounted(() => {
-    mounted.value = true;
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    observer = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-revealed');
+                    observer?.unobserve(entry.target);
+                }
+            });
+        },
+        { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
+    );
+
+    document.querySelectorAll('[data-reveal]').forEach((node) => observer?.observe(node));
+
+    void loop();
 });
 
-// FAQ data
-const faqs = [
+onBeforeUnmount(() => {
+    cancelled = true;
+    timers.forEach(clearTimeout);
+    window.removeEventListener('scroll', onScroll);
+    observer?.disconnect();
+});
+
+const navLinks = [
+    { label: 'How it works', href: '#how' },
+    { label: "What's inside", href: '#inside' },
+    { label: 'For agencies', href: '#agencies' },
+];
+
+const pillars = [
     {
-        q: 'How is Sprint Sync different from Jira?',
-        a: 'Jira buries you in configuration. Sprint Sync ships with sensible defaults — boards, sprints, and AI triage work in 5 minutes flat. No Scrum Master required, no certification, no part-time admin. And it’s self-hostable, so your roadmap never lives on someone else’s server.',
+        t: 'It asks before it acts.',
+        d: 'Anything that creates, changes or deletes shows you a confirmation card first. Nothing is written on a guess.',
     },
     {
-        q: 'Why not just use Linear?',
-        a: 'Linear is fast — we love it — but it’s built for engineers only. Your PMs, designers, and ops folks bounce off the mental model. Sprint Sync gives engineering Linear-grade speed AND gives the rest of the org a workspace they’ll actually open. One tool, no tribal silos.',
+        t: "It can't outrank you.",
+        d: "The assistant is only handed the tools your role allows. Ask for something you're not permitted to do and there's no tool there to call.",
     },
     {
-        q: 'Is the AI actually useful or just a marketing checkbox?',
-        a: 'Real work, no theatre. Sprint Sync AI auto-triages incoming tickets, drafts release notes from your sprint, summarizes long comment threads into 3 bullets, and turns voice notes into structured issues. It runs on your infra if you self-host — your data stays yours.',
-    },
-    {
-        q: 'What does "all-in-one" actually mean here?',
-        a: 'Kanban boards + sprint planning + docs/wiki + threaded comments + time tracking + roadmaps — all native, not bolted on. You stop paying for Notion + Slack + Jira + Toggl + Confluence. One workspace, one bill, one source of truth.',
-    },
-    {
-        q: 'Can I self-host it?',
-        a: 'Yes. Sprint Sync ships with a Docker compose file and detailed self-host docs. Run it on your own VPS, in your VPC, or air-gapped on a laptop. Source code is open. Your roadmap, your servers, your rules.',
-    },
-    {
-        q: 'How is the pricing structured?',
-        a: 'Flat per-seat pricing, no enterprise upsell traps. Free tier covers up to 10 users — same as Jira but without the configuration nightmare. Paid plans unlock advanced AI agents, SSO, and unlimited automations. No "Premium" / "Premium+" / "Premium Plus" ladder.',
+        t: 'It leaves a trail.',
+        d: 'Workspace and project activity is written to an audit log you can search.',
     },
 ];
 
-// Comparison data
-const compareRows = [
-    {
-        label: 'Setup time',
-        sprintsync: '< 5 minutes',
-        jira: '1-2 weeks',
-        linear: '~10 minutes',
-        clickup: '2-3 weeks',
-    },
-    {
-        label: 'Built for non-devs',
-        sprintsync: true,
-        jira: 'sort of',
-        linear: false,
-        clickup: true,
-    },
-    {
-        label: 'Native AI triage',
-        sprintsync: true,
-        jira: 'add-on',
-        linear: 'partial',
-        clickup: 'add-on',
-    },
-    {
-        label: 'Self-hostable',
-        sprintsync: true,
-        jira: false,
-        linear: false,
-        clickup: false,
-    },
-    {
-        label: 'All-in-one (docs + chat + boards)',
-        sprintsync: true,
-        jira: false,
-        linear: false,
-        clickup: 'bloated',
-    },
-    {
-        label: 'Keyboard-first UX',
-        sprintsync: true,
-        jira: false,
-        linear: true,
-        clickup: false,
-    },
-    {
-        label: 'Source-available',
-        sprintsync: true,
-        jira: false,
-        linear: false,
-        clickup: false,
-    },
-    {
-        label: 'Configuration debt',
-        sprintsync: 'none',
-        jira: 'crushing',
-        linear: 'low',
-        clickup: 'high',
-    },
-];
+const clientCapabilities = ['View project board & sprints', 'Comment on tasks', 'Request tasks', 'Close tasks — never reopen them', 'View meetings'];
 
-// Pricing tiers
-const tiers = [
-    {
-        name: 'Solo',
-        tagline: 'For indie hackers & freelancers',
-        priceMonthly: 0,
-        priceYearly: 0,
-        cta: 'Start free',
-        highlighted: false,
-        features: ['Up to 10 users', 'Unlimited projects', 'Kanban + sprints', 'Basic AI assist (50/mo)', 'Community support'],
-    },
-    {
-        name: 'Team',
-        tagline: 'For growing teams that ship',
-        priceMonthly: 9,
-        priceYearly: 7,
-        cta: 'Start 14-day trial',
-        highlighted: true,
-        features: [
-            'Unlimited users',
-            'AI auto-triage & summaries',
-            'Docs + Wiki',
-            'Roadmaps + Goals',
-            'SSO + advanced permissions',
-            'Priority support',
-        ],
-    },
-    {
-        name: 'Self-Hosted',
-        tagline: 'For privacy-first orgs',
-        priceMonthly: 19,
-        priceYearly: 15,
-        cta: 'Get the binary',
-        highlighted: false,
-        features: [
-            'Everything in Team',
-            'Run on your infra',
-            'Air-gapped deployment OK',
-            'Source code access',
-            'Custom AI model endpoints',
-            'Dedicated Slack channel',
-        ],
-    },
+const commandGroups = [
+    { group: 'Workspace', items: ['Create a workspace', 'Invite someone', 'Who is in this workspace'] },
+    { group: 'Projects', items: ['List projects', 'Create a project', 'Add someone to a project'] },
+    { group: 'Tasks', items: ['Find tasks', 'Create a task', 'Update a task', 'Comment on a task', 'Delete a task'] },
+    { group: 'Sprints', items: ['Plan, start or close a sprint', 'Sprint status'] },
+    { group: 'Meetings', items: ['Schedule a meeting', 'List meetings', 'Change a meeting', 'Cancel a meeting'] },
+    { group: 'Insights', items: ['How are we doing'] },
+    { group: 'Learn', items: ['Teach me how to use SprintSync'] },
 ];
 </script>
 
 <template>
-    <Head title="Sprint Sync — The All-in-One Workspace That Doesn't Suck">
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
-            rel="stylesheet"
-        />
-    </Head>
+    <Head title="SprintSync — run your sprint by saying so" />
 
-    <div class="min-h-screen bg-[#fafaf7] font-sans text-black antialiased selection:bg-lime-500 selection:text-black">
-        <div class="overflow-hidden border-b-[3px] border-black bg-black text-white">
-            <div class="animate-marquee flex py-2 text-sm font-bold tracking-widest whitespace-nowrap uppercase">
-                <span class="mx-6">★ SHIP FASTER</span>
-                <span class="mx-6">★ NO ADMIN HEADACHES</span>
-                <span class="mx-6">★ SELF-HOSTABLE</span>
-                <span class="mx-6">★ AI THAT ACTUALLY WORKS</span>
-                <span class="mx-6">★ KANBAN + DOCS + CHAT + SPRINTS</span>
-                <span class="mx-6">★ NEW GEN TOOL</span>
-                <span class="mx-6">★ SHIP FASTER</span>
-                <span class="mx-6">★ NO ADMIN HEADACHES</span>
-                <span class="mx-6">★ SELF-HOSTABLE</span>
-                <span class="mx-6">★ AI THAT ACTUALLY WORKS</span>
-                <span class="mx-6">★ KANBAN + DOCS + CHAT + SPRINTS</span>
-                <span class="mx-6">★ NEW GEN TOOL</span>
-            </div>
-        </div>
-
-        <header class="sticky top-0 z-40 border-b-[3px] border-black bg-[#fafaf7]/90 backdrop-blur">
-            <nav class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
-                <Link :href="route('home')" class="group flex items-center gap-3">
-                    <div
-                        class="flex h-10 w-10 items-center justify-center border-[3px] border-black bg-lime-500 shadow-[4px_4px_0_0_#000] transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:shadow-[6px_6px_0_0_#000]"
+    <div class="ss">
+        <!-- ============================ NAV ============================ -->
+        <header class="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
+            <nav
+                class="mx-auto flex max-w-[1200px] items-center justify-between gap-3 rounded-full transition-all duration-300"
+                :class="scrolled ? 'bg-white/80 px-3 py-2.5 shadow-[0_8px_30px_rgba(11,11,15,0.10)] backdrop-blur-xl' : 'px-1 py-2'"
+            >
+                <Link :href="route('home')" class="group flex shrink-0 items-center gap-2">
+                    <span
+                        class="flex items-center gap-2 rounded-full bg-[var(--ss-ink)] py-2.5 pr-3 pl-4 text-[15px] font-extrabold tracking-tight text-white transition-transform duration-300 group-hover:-translate-y-0.5"
                     >
-                        <Boxes class="h-5 w-5" :stroke-width="3" />
-                    </div>
-                    <span class="text-xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif">Sprint Sync</span>
+                        sprintsync
+                    </span>
+                    <span
+                        class="grid size-9 place-items-center rounded-full bg-[var(--ss-lime)] transition-transform duration-300 group-hover:rotate-12"
+                    >
+                        <Sparkles class="size-4 text-[var(--ss-ink)]" :stroke-width="2.5" />
+                    </span>
                 </Link>
 
-                <div class="hidden items-center gap-8 lg:flex">
-                    <a href="#features" class="text-sm font-bold tracking-wider uppercase hover:underline">Features</a>
-                    <a href="#compare" class="text-sm font-bold tracking-wider uppercase hover:underline">Compare</a>
-                    <a href="#pricing" class="text-sm font-bold tracking-wider uppercase hover:underline">Pricing</a>
-                    <a href="#faq" class="text-sm font-bold tracking-wider uppercase hover:underline">FAQ</a>
+                <div class="hidden items-center gap-2 md:flex">
+                    <a
+                        v-for="link in navLinks"
+                        :key="link.href"
+                        :href="link.href"
+                        class="rounded-full bg-white px-5 py-2.5 text-[14px] font-bold text-[var(--ss-ink)] shadow-[0_1px_0_rgba(11,11,15,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-ink)] hover:text-white"
+                    >
+                        {{ link.label }}
+                    </a>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
                     <Link
-                        v-if="$page.props.auth?.user"
-                        :href="route('dashboard', { workspace: $page.props.workspace?.current?.slug })"
-                        class="border-[3px] border-black bg-white px-5 py-2.5 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
+                        :href="route('login')"
+                        class="group hidden items-center gap-2 rounded-full bg-[var(--ss-ink)] py-2.5 pr-5 pl-2.5 text-[14px] font-bold text-white transition-transform duration-200 hover:-translate-y-0.5 sm:flex"
                     >
-                        Dashboard
+                        <span class="grid size-7 place-items-center rounded-full bg-white/15 transition-colors group-hover:bg-[var(--ss-lime)]">
+                            <ArrowUpRight class="size-3.5 transition-colors group-hover:text-[var(--ss-ink)]" :stroke-width="2.5" />
+                        </span>
+                        Log in
                     </Link>
-                    <template v-else>
-                        <Link :href="route('login')" class="hidden text-sm font-bold tracking-wider uppercase hover:underline sm:inline">Log in</Link>
-                        <Link
-                            :href="route('register')"
-                            class="border-[3px] border-black bg-lime-500 px-5 py-2.5 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
-                        >
-                            Get Started
-                        </Link>
-                    </template>
+
+                    <Link
+                        :href="route('register')"
+                        class="rounded-full bg-[var(--ss-indigo)] px-5 py-2.5 text-[14px] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-indigo-hot)]"
+                    >
+                        Get started
+                    </Link>
+
+                    <button
+                        type="button"
+                        class="grid size-11 place-items-center rounded-full bg-white text-[var(--ss-ink)] md:hidden"
+                        :aria-expanded="menuOpen"
+                        aria-label="Menu"
+                        @click="menuOpen = !menuOpen"
+                    >
+                        <component :is="menuOpen ? X : Menu" class="size-5" :stroke-width="2.5" />
+                    </button>
                 </div>
             </nav>
+
+            <div v-if="menuOpen" class="mx-auto mt-2 max-w-[1200px] rounded-3xl bg-white p-3 shadow-[0_20px_60px_rgba(11,11,15,0.16)] md:hidden">
+                <a
+                    v-for="link in navLinks"
+                    :key="link.href"
+                    :href="link.href"
+                    class="block rounded-2xl px-4 py-3 text-[15px] font-bold text-[var(--ss-ink)] hover:bg-[var(--ss-paper)]"
+                    @click="menuOpen = false"
+                >
+                    {{ link.label }}
+                </a>
+            </div>
         </header>
 
-        <section class="relative overflow-hidden border-b-[3px] border-black">
-            <div
-                class="absolute inset-0 opacity-[0.04]"
-                style="
-                    background-image: linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px);
-                    background-size: 40px 40px;
-                "
-            ></div>
+        <!-- ============================ HERO ============================ -->
+        <section class="relative overflow-hidden px-4 pt-28 pb-6 sm:px-6 sm:pt-36">
+            <div class="ss-grain" aria-hidden="true"></div>
 
-            <div class="relative mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-24 lg:py-32">
-                <div class="grid gap-12 lg:grid-cols-12 lg:gap-8">
-                    <!-- Left: headline -->
-                    <div class="lg:col-span-7">
-                        <!-- Tag pill -->
-                        <div
-                            class="inline-flex items-center gap-2 border-[3px] border-black bg-white px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
+            <div class="relative mx-auto max-w-[1200px]">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    <!-- Headline -->
+                    <div class="lg:col-span-7 lg:pt-6">
+                        <span
+                            class="inline-flex items-center gap-2 rounded-full bg-[var(--ss-lavender)] px-4 py-2 text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-indigo)] uppercase"
                         >
-                            <span class="relative flex h-2 w-2">
-                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-500 opacity-75"></span>
-                                <span class="relative inline-flex h-2 w-2 rounded-full bg-lime-500"></span>
-                            </span>
-                            v1.0 — Now in public beta
-                        </div>
+                            <span class="size-1.5 animate-pulse rounded-full bg-[var(--ss-indigo)]"></span>
+                            AI-native sprint management
+                        </span>
 
-                        <h1
-                            class="mt-6 text-5xl leading-[0.95] tracking-tight md:text-7xl lg:text-[5.5rem]"
-                            style="font-family: 'Archivo Black', sans-serif"
-                        >
-                            The workspace
-                            <span class="relative inline-block">
-                                <span class="relative z-10">that</span>
-                            </span>
-                            <span class="relative ml-2 inline-block -rotate-2 border-[3px] border-black bg-lime-500 px-3 shadow-[6px_6px_0_0_#000]">
-                                ships.
-                            </span>
+                        <h1 class="mt-6 text-[clamp(2.75rem,6.4vw,5.25rem)] leading-[0.94] font-extrabold tracking-[-0.035em] text-[var(--ss-ink)]">
+                            Run your sprint<br />
+                            by <span class="ss-mark">saying so.</span>
                         </h1>
 
-                        <p class="mt-8 max-w-xl text-lg leading-relaxed text-neutral-700 md:text-xl">
-                            Jira is a swamp. Linear is dev-only. ClickUp is a feature graveyard.
-                            <strong class="text-black">Sprint Sync is the all-in-one workspace</strong>
-                            your engineers, designers, and PMs all actually open every day.
+                        <p class="mt-6 max-w-[46ch] text-[clamp(1rem,1.35vw,1.2rem)] leading-[1.55] font-medium text-[var(--ss-ink-dim)]">
+                            SprintSync turns one sentence into a task, a sprint, a meeting or a report — inside a permission model that keeps the AI
+                            in its lane.
                         </p>
 
-                        <div class="mt-10 flex flex-col gap-4 sm:flex-row">
+                        <div class="mt-8 flex flex-wrap items-center gap-3">
                             <Link
                                 :href="route('register')"
-                                class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-lime-500 px-8 py-4 text-base font-bold tracking-wider uppercase shadow-[6px_6px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
+                                class="group inline-flex items-center gap-2 rounded-full bg-[var(--ss-indigo)] py-4 pr-4 pl-7 text-[15px] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-indigo-hot)]"
                             >
-                                Start Free — No Card
-                                <ArrowRight class="h-5 w-5 transition-transform group-hover:translate-x-1" :stroke-width="3" />
+                                Get started free
+                                <span class="grid size-8 place-items-center rounded-full bg-white/18 transition-transform group-hover:rotate-45">
+                                    <ArrowUpRight class="size-4" :stroke-width="2.5" />
+                                </span>
                             </Link>
+
                             <a
-                                href="#compare"
-                                class="inline-flex items-center justify-center gap-2 border-[3px] border-black bg-white px-8 py-4 text-base font-bold tracking-wider uppercase shadow-[6px_6px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_#000]"
+                                href="#inside"
+                                class="group inline-flex items-center gap-3 rounded-full bg-white py-4 pr-7 pl-3 text-[15px] font-bold text-[var(--ss-ink)] transition-all duration-200 hover:-translate-y-0.5"
                             >
-                                Why we beat Jira
-                                <ChevronRight class="h-5 w-5" :stroke-width="3" />
+                                <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] text-white">
+                                    <Play class="size-3.5 fill-current" />
+                                </span>
+                                Watch it work
                             </a>
                         </div>
 
-                        <!-- Trust row -->
-                        <div class="mt-12 flex flex-wrap items-center gap-6 text-xs font-bold tracking-widest text-neutral-600 uppercase">
-                            <span class="flex items-center gap-1.5"><Check class="h-4 w-4" :stroke-width="3" /> 14-day free trial</span>
-                            <span class="flex items-center gap-1.5"><Check class="h-4 w-4" :stroke-width="3" /> Self-hostable</span>
-                            <span class="flex items-center gap-1.5"><Check class="h-4 w-4" :stroke-width="3" /> Open source core</span>
+                        <!-- Chips drive the demo -->
+                        <div class="mt-9 flex flex-wrap gap-2">
+                            <button
+                                v-for="(item, index) in scenes"
+                                :key="item.id"
+                                type="button"
+                                class="rounded-full border px-4 py-2 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5"
+                                :class="
+                                    active === index
+                                        ? 'border-transparent bg-[var(--ss-ink)] text-white'
+                                        : 'border-[rgba(11,11,15,0.12)] bg-transparent text-[var(--ss-ink-dim)] hover:border-[var(--ss-ink)] hover:text-[var(--ss-ink)]'
+                                "
+                                @click="jumpTo(index)"
+                            >
+                                {{ item.chip }}
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Right: product preview mock -->
+                    <!-- The assistant, doing it -->
                     <div class="lg:col-span-5">
-                        <div class="relative">
-                            <!-- Stacked decorative card -->
-                            <div class="absolute inset-0 translate-x-3 translate-y-3 border-[3px] border-black bg-pink-300"></div>
-                            <div class="absolute inset-0 translate-x-1.5 translate-y-1.5 border-[3px] border-black bg-lime-500"></div>
+                        <div class="relative flex h-full min-h-[460px] flex-col rounded-[28px] bg-[var(--ss-ink)] p-5 sm:p-6">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-extrabold tracking-[0.16em] text-white/40 uppercase">Live preview</span>
+                                <span class="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/70">
+                                    <span class="size-1.5 rounded-full bg-[var(--ss-lime)]"></span>
+                                    scripted
+                                </span>
+                            </div>
 
-                            <!-- Main "screenshot" card -->
-                            <div class="relative border-[3px] border-black bg-white p-5 shadow-[10px_10px_0_0_#000]">
-                                <!-- Window chrome -->
-                                <div class="mb-4 flex items-center gap-2 border-b-2 border-black pb-3">
-                                    <div class="h-3 w-3 border-2 border-black bg-red-400"></div>
-                                    <div class="h-3 w-3 border-2 border-black bg-yellow-300"></div>
-                                    <div class="h-3 w-3 border-2 border-black bg-lime-500"></div>
-                                    <span class="ml-3 font-mono text-xs font-bold">sprintsync.app/board</span>
+                            <!-- composer -->
+                            <div class="mt-5 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
+                                <p class="min-h-[3.5rem] font-mono text-[14px] leading-[1.5] text-white">
+                                    {{ typed }}<span v-if="phase === 'typing'" class="ss-caret"></span>
+                                </p>
+
+                                <div class="mt-3 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="rounded-lg bg-white/10 px-2 py-1 font-mono text-[11px] font-bold text-white/60">/</span>
+                                        <Mic class="size-4 text-white/40" :stroke-width="2.5" />
+                                    </div>
+                                    <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-lime)]">
+                                        <ArrowUpRight class="size-4 text-[var(--ss-ink)]" :stroke-width="3" />
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- reply -->
+                            <div class="mt-4 flex-1">
+                                <div v-if="phase === 'thinking'" class="flex items-center gap-2 px-1">
+                                    <span class="ss-dot"></span><span class="ss-dot ss-dot-2"></span><span class="ss-dot ss-dot-3"></span>
+                                    <span class="ml-1 text-[12px] font-semibold text-white/40">SprintSync is working</span>
                                 </div>
 
-                                <!-- Mock kanban -->
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div class="space-y-2">
-                                        <div class="border-2 border-black bg-neutral-100 px-2 py-1 text-[10px] font-bold uppercase">To Do · 3</div>
-                                        <div class="border-2 border-black bg-white p-2 text-xs shadow-[2px_2px_0_0_#000]">
-                                            <div class="mb-1 font-bold">Auth flow</div>
-                                            <div class="text-[10px] text-neutral-500">SS-12</div>
-                                        </div>
-                                        <div class="border-2 border-black bg-white p-2 text-xs shadow-[2px_2px_0_0_#000]">
-                                            <div class="mb-1 font-bold">OAuth setup</div>
-                                            <div class="text-[10px] text-neutral-500">SS-13</div>
-                                        </div>
+                                <p v-else-if="streamed" class="px-1 text-[15px] leading-[1.55] font-medium text-white/90">
+                                    {{ streamed }}
+                                </p>
+
+                                <!-- confirmation -->
+                                <div v-if="showConfirm" class="ss-pop mt-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-[var(--ss-lime)]/40">
+                                    <div class="flex items-center gap-2">
+                                        <Shield class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
+                                        <span class="text-[13px] font-extrabold text-white">Confirm this action</span>
                                     </div>
-                                    <div class="space-y-2">
-                                        <div class="border-2 border-black bg-yellow-200 px-2 py-1 text-[10px] font-bold uppercase">Doing · 2</div>
-                                        <div class="border-2 border-black bg-white p-2 text-xs shadow-[2px_2px_0_0_#000]">
-                                            <div class="mb-1 font-bold">Kanban DnD</div>
-                                            <div class="text-[10px] text-neutral-500">SS-14</div>
-                                            <div
-                                                class="mt-1.5 inline-flex items-center gap-1 border border-black bg-pink-200 px-1 text-[9px] font-bold"
-                                            >
-                                                <Sparkles class="h-2 w-2" :stroke-width="3" /> AI
-                                            </div>
+
+                                    <dl class="mt-3 space-y-1.5">
+                                        <div v-for="row in scene.confirm?.rows" :key="row[0]" class="flex justify-between gap-4">
+                                            <dt class="text-[12px] font-semibold text-white/40">{{ row[0] }}</dt>
+                                            <dd class="text-[12px] font-bold text-white">{{ row[1] }}</dd>
                                         </div>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <div class="border-2 border-black bg-lime-500 px-2 py-1 text-[10px] font-bold uppercase">Done · 8</div>
-                                        <div class="border-2 border-black bg-white p-2 text-xs shadow-[2px_2px_0_0_#000]">
-                                            <div class="mb-1 font-bold line-through opacity-60">Schema</div>
-                                            <div class="text-[10px] text-neutral-500">SS-11</div>
-                                        </div>
+                                    </dl>
+
+                                    <div class="mt-4 flex justify-end gap-2">
+                                        <span class="rounded-full px-3 py-1.5 text-[12px] font-bold text-white/50">Cancel</span>
+                                        <span class="rounded-full bg-[var(--ss-lime)] px-4 py-1.5 text-[12px] font-extrabold text-[var(--ss-ink)]">
+                                            Confirm
+                                        </span>
                                     </div>
                                 </div>
 
-                                <!-- AI assist popup -->
-                                <div class="mt-4 flex items-start gap-2 border-[3px] border-black bg-yellow-200 p-3 shadow-[3px_3px_0_0_#000]">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-black bg-black">
-                                        <Sparkles class="h-4 w-4 text-lime-500" :stroke-width="3" />
-                                    </div>
-                                    <div class="text-xs">
-                                        <div class="font-bold">AI auto-triaged 4 tickets</div>
-                                        <div class="mt-0.5 text-neutral-700">Assigned to @ali, @sara · saved 12min</div>
+                                <div
+                                    v-if="showDenied"
+                                    class="ss-pop mt-4 rounded-2xl bg-[rgba(251,113,133,0.10)] p-4 ring-1 ring-[var(--ss-rose)]/40"
+                                >
+                                    <p class="text-[12px] font-bold text-[var(--ss-rose)]">Blocked by your permissions — nothing was changed.</p>
+                                </div>
+                            </div>
+
+                            <p class="mt-4 text-[11px] leading-relaxed font-medium text-white/30">
+                                Every command shown is a real action the product performs.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== BENTO ROW ===================== -->
+                <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    <!-- board -->
+                    <div class="rounded-[28px] bg-white p-5 sm:p-6 lg:col-span-5">
+                        <div class="flex items-center justify-between">
+                            <span class="flex items-center gap-2 text-[12px] font-extrabold tracking-[0.12em] text-[var(--ss-ink-faint)] uppercase">
+                                <Kanban class="size-3.5" :stroke-width="2.5" /> Board
+                            </span>
+                            <span
+                                v-if="meeting"
+                                class="ss-pop flex items-center gap-1.5 rounded-full bg-[var(--ss-lavender)] px-3 py-1.5 text-[11px] font-bold text-[var(--ss-indigo)]"
+                            >
+                                <CalendarDays class="size-3" :stroke-width="2.5" /> {{ meeting.when }}
+                            </span>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-3 gap-2.5">
+                            <div
+                                v-for="col in [
+                                    { n: 'To Do', i: todo },
+                                    { n: 'In Progress', i: doing },
+                                    { n: 'Done', i: done },
+                                ]"
+                                :key="col.n"
+                            >
+                                <p
+                                    class="mb-2 flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider text-[var(--ss-ink-faint)] uppercase"
+                                >
+                                    {{ col.n }}
+                                    <span class="rounded-full bg-[var(--ss-paper)] px-1.5 py-0.5 text-[10px]">{{ col.i.length }}</span>
+                                </p>
+                                <div class="space-y-2">
+                                    <div
+                                        v-for="card in col.i"
+                                        :key="card"
+                                        class="ss-pop rounded-xl bg-[var(--ss-paper)] p-2.5 text-[11px] leading-snug font-bold text-[var(--ss-ink)]"
+                                    >
+                                        {{ card }}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Stats row -->
-                <div class="mt-20 grid gap-0 border-[3px] border-black bg-white shadow-[8px_8px_0_0_#000] sm:grid-cols-2 lg:grid-cols-4">
-                    <div
-                        v-for="(s, i) in stats"
-                        :key="s.label"
-                        class="border-black p-6 transition-colors hover:bg-lime-50"
-                        :class="[
-                            i !== 0 && 'border-t-[3px] sm:border-t-0',
-                            i % 2 !== 0 && 'sm:border-l-[3px]',
-                            i >= 2 && 'sm:border-t-[3px] lg:border-t-0',
-                            i > 0 && 'lg:border-t-0 lg:border-l-[3px]',
-                        ]"
-                    >
-                        <div class="text-4xl font-black tracking-tight md:text-5xl" style="font-family: 'Archivo Black', sans-serif">
-                            {{ s.value }}
+                    <!-- sprint health -->
+                    <div class="flex flex-col justify-between rounded-[28px] bg-[var(--ss-lime)] p-5 sm:p-6 lg:col-span-3">
+                        <div class="flex items-start justify-between">
+                            <span class="text-[12px] font-extrabold tracking-[0.12em] text-[var(--ss-ink)]/60 uppercase">Sprint 4</span>
+                            <span
+                                v-if="sprintLive"
+                                class="ss-pop rounded-full bg-[var(--ss-ink)] px-3 py-1.5 text-[11px] font-extrabold text-[var(--ss-lime)]"
+                            >
+                                At risk
+                            </span>
                         </div>
-                        <div class="mt-2 text-xs font-bold tracking-widest text-neutral-700 uppercase">
-                            {{ s.label }}
+
+                        <div>
+                            <p class="text-[clamp(2.75rem,5vw,3.75rem)] leading-none font-extrabold tracking-tight text-[var(--ss-ink)]">
+                                {{ sprintPct }}<span class="text-[0.5em]">%</span>
+                            </p>
+                            <div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ss-ink)]/15">
+                                <div
+                                    class="h-full rounded-full bg-[var(--ss-ink)] transition-all duration-[900ms] ease-out"
+                                    :style="{ width: sprintPct + '%' }"
+                                ></div>
+                            </div>
+                            <p class="mt-3 text-[13px] font-bold text-[var(--ss-ink)]/70">Scope done against time gone. Three days left.</p>
                         </div>
-                        <div class="mt-1 text-xs text-neutral-500">{{ s.sub }}</div>
+                    </div>
+
+                    <!-- commands -->
+                    <div class="flex flex-col justify-between rounded-[28px] bg-[var(--ss-indigo)] p-5 text-white sm:p-6 lg:col-span-4">
+                        <span class="text-[12px] font-extrabold tracking-[0.12em] text-white/60 uppercase">Ask for anything</span>
+                        <div>
+                            <p class="text-[clamp(2.75rem,5vw,3.75rem)] leading-none font-extrabold tracking-tight">19</p>
+                            <p class="mt-2 text-[15px] leading-snug font-bold text-white/85">
+                                real actions the assistant can take — the same ones the buttons call.
+                            </p>
+                            <a
+                                href="#inside"
+                                class="mt-4 inline-flex items-center gap-1 text-[13px] font-extrabold text-[var(--ss-lime)] transition-all hover:gap-2"
+                            >
+                                See the list <ChevronRight class="size-4" :stroke-width="3" />
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section class="border-b-[3px] border-black bg-black py-20 text-white md:py-28">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="max-w-3xl">
-                    <div
-                        class="inline-flex items-center gap-2 border-[3px] border-lime-500 bg-black px-4 py-1.5 text-xs font-bold tracking-widest text-lime-500 uppercase"
-                    >
-                        <Zap class="h-3 w-3" :stroke-width="3" /> The problem
+        <!-- ============================ TRUST ============================ -->
+        <section id="how" data-reveal class="ss-reveal px-4 py-20 sm:px-6 sm:py-28">
+            <div class="mx-auto grid max-w-[1200px] gap-10 md:grid-cols-3">
+                <div v-for="pillar in pillars" :key="pillar.t">
+                    <span class="grid size-10 place-items-center rounded-full bg-[var(--ss-lime)]">
+                        <Check class="size-5 text-[var(--ss-ink)]" :stroke-width="3" />
+                    </span>
+                    <h3 class="mt-5 text-[clamp(1.4rem,2vw,1.8rem)] leading-tight font-extrabold tracking-tight text-[var(--ss-ink)]">
+                        {{ pillar.t }}
+                    </h3>
+                    <p class="mt-3 text-[15px] leading-relaxed font-medium text-[var(--ss-ink-dim)]">{{ pillar.d }}</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================ COMMANDS ============================ -->
+        <section id="inside" data-reveal class="ss-reveal px-4 pb-20 sm:px-6 sm:pb-28">
+            <div class="mx-auto max-w-[1200px] rounded-[36px] bg-[var(--ss-ink)] p-6 sm:p-12">
+                <span class="text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-lime)] uppercase">The whole product, in sentences</span>
+                <h2 class="mt-4 max-w-[20ch] text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.02] font-extrabold tracking-[-0.03em] text-white">
+                    Nineteen things you can just ask for.
+                </h2>
+
+                <div class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                    <div v-for="group in commandGroups" :key="group.group">
+                        <p class="text-[11px] font-extrabold tracking-[0.14em] text-white/35 uppercase">{{ group.group }}</p>
+                        <div class="mt-3 flex flex-wrap gap-1.5">
+                            <span
+                                v-for="item in group.items"
+                                :key="item"
+                                class="rounded-full bg-white/[0.07] px-3 py-1.5 text-[12px] font-bold text-white/80 transition-colors hover:bg-[var(--ss-lime)] hover:text-[var(--ss-ink)]"
+                            >
+                                {{ item }}
+                            </span>
+                        </div>
                     </div>
-                    <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
-                        Project tools have a
-                        <span class="bg-lime-500 px-2 text-black">brand problem.</span>
+                </div>
+
+                <p class="mt-10 text-[13px] font-medium text-white/35">
+                    Type <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono font-bold text-white/70">/</span> in the app to search all nineteen
+                    in plain language. "want to start a new sprint" finds the right one.
+                </p>
+            </div>
+        </section>
+
+        <!-- ============================ AGENCIES ============================ -->
+        <section id="agencies" data-reveal class="ss-reveal px-4 pb-20 sm:px-6 sm:pb-28">
+            <div class="mx-auto grid max-w-[1200px] items-center gap-4 lg:grid-cols-12">
+                <div class="rounded-[28px] bg-[var(--ss-lavender)] p-6 sm:p-10 lg:col-span-7">
+                    <span class="text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-indigo)] uppercase">For agencies</span>
+                    <h2 class="mt-4 text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.04] font-extrabold tracking-[-0.03em] text-[var(--ss-ink)]">
+                        Give the client the board.<br />Not your Slack.
                     </h2>
-                    <p class="mt-6 text-lg text-neutral-300 md:text-xl">
-                        Every sprint planning meeting starts with someone complaining about the tool. We got tired of it. So we built the one we
-                        wished existed.
+                    <p class="mt-4 max-w-[52ch] text-[15px] leading-relaxed font-medium text-[var(--ss-ink-dim)]">
+                        Clients are a role of their own, not a member you hope behaves. They never see your team roster, your other projects, or your
+                        workspace settings — and you pick exactly what they can do inside the projects they're on.
                     </p>
                 </div>
 
-                <div class="mt-16 grid gap-6 md:grid-cols-3">
-                    <!-- Jira card -->
-                    <div class="group border-[3px] border-white bg-neutral-900 p-7 transition-all hover:bg-red-950">
-                        <div class="mb-5 inline-flex h-12 w-12 items-center justify-center border-[3px] border-white bg-red-500">
-                            <X class="h-6 w-6" :stroke-width="3" />
-                        </div>
-                        <h3 class="text-2xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif">Jira</h3>
-                        <p class="mt-3 text-sm font-bold tracking-wider text-red-300 uppercase">The configuration swamp</p>
-                        <p class="mt-4 text-neutral-300">
-                            Two weeks of setup. A part-time admin. Custom fields no one remembers adding. By month six, your workflow looks like a
-                            Visio diagram from 2008.
-                        </p>
-                    </div>
-
-                    <!-- Linear card -->
-                    <div class="group border-[3px] border-white bg-neutral-900 p-7 transition-all hover:bg-yellow-950">
-                        <div class="mb-5 inline-flex h-12 w-12 items-center justify-center border-[3px] border-white bg-yellow-400">
-                            <Minus class="h-6 w-6 text-black" :stroke-width="3" />
-                        </div>
-                        <h3 class="text-2xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif">Linear</h3>
-                        <p class="mt-3 text-sm font-bold tracking-wider text-yellow-300 uppercase">The dev-only club</p>
-                        <p class="mt-4 text-neutral-300">
-                            Fast — beautiful, even. But your PM bounces off the keyboard shortcuts, your designer can’t find the docs, and ops gets
-                            locked out. Tribal knowledge silos.
-                        </p>
-                    </div>
-
-                    <!-- ClickUp card -->
-                    <div class="group border-[3px] border-white bg-neutral-900 p-7 transition-all hover:bg-orange-950">
-                        <div class="mb-5 inline-flex h-12 w-12 items-center justify-center border-[3px] border-white bg-orange-400">
-                            <Layers class="h-6 w-6 text-black" :stroke-width="3" />
-                        </div>
-                        <h3 class="text-2xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif">ClickUp</h3>
-                        <p class="mt-3 text-sm font-bold tracking-wider text-orange-300 uppercase">Feature graveyard</p>
-                        <p class="mt-4 text-neutral-300">
-                            17 view types, 40 custom field options, 12 automation triggers. Half are half-baked. New hires need three weeks to find
-                            anything. Slow on bad days.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- "And then there's us" -->
-                <div class="relative mt-16">
-                    <div class="absolute inset-0 translate-x-2 translate-y-2 bg-yellow-400"></div>
-                    <div class="relative border-[3px] border-white bg-lime-500 p-8 text-black md:p-12">
-                        <div class="flex items-start gap-6 md:items-center">
-                            <div class="flex h-16 w-16 shrink-0 items-center justify-center border-[3px] border-black bg-black md:h-20 md:w-20">
-                                <Boxes class="h-8 w-8 text-lime-500 md:h-10 md:w-10" :stroke-width="3" />
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold tracking-widest uppercase">And then there’s us</p>
-                                <h3 class="mt-2 text-3xl tracking-tight md:text-5xl" style="font-family: 'Archivo Black', sans-serif">
-                                    Sprint Sync is the workspace your whole team will actually use.
-                                </h3>
-                                <p class="mt-4 max-w-2xl text-base md:text-lg">
-                                    Linear-grade speed for engineers. Notion-style docs for PMs. Figma-friendly comments for designers. AI that does
-                                    the boring work. Self-host it if you want.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="features" class="border-b-[3px] border-black py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="max-w-3xl">
+                <div class="rounded-[28px] bg-white p-6 sm:p-10 lg:col-span-5">
                     <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-yellow-400 px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
+                        v-for="capability in clientCapabilities"
+                        :key="capability"
+                        class="flex items-center gap-3 border-b border-[rgba(11,11,15,0.07)] py-3 last:border-0"
                     >
-                        <Sparkles class="h-3 w-3" :stroke-width="3" /> What you get
+                        <span class="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--ss-lime)]">
+                            <Check class="size-3.5 text-[var(--ss-ink)]" :stroke-width="3" />
+                        </span>
+                        <span class="text-[14px] font-bold text-[var(--ss-ink)]">{{ capability }}</span>
                     </div>
-                    <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
-                        Everything your team needs.<br />
-                        <span class="bg-black px-2 text-lime-500">Nothing it doesn't.</span>
-                    </h2>
-                </div>
-
-                <!-- Feature 1: Big AI feature -->
-                <div class="mt-16 grid gap-6 lg:grid-cols-12">
-                    <div class="lg:col-span-7">
-                        <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-pink-300"></div>
-                            <div class="relative h-full border-[3px] border-black bg-white p-8 shadow-[6px_6px_0_0_#000] md:p-10">
-                                <div class="flex h-14 w-14 items-center justify-center border-[3px] border-black bg-black">
-                                    <Sparkles class="h-7 w-7 text-lime-500" :stroke-width="3" />
-                                </div>
-                                <h3 class="mt-6 text-3xl font-black tracking-tight md:text-4xl" style="font-family: 'Archivo Black', sans-serif">
-                                    AI that does the boring work.
-                                </h3>
-                                <p class="mt-4 text-neutral-700 md:text-lg">
-                                    Drop a bug report into the queue — Sprint Sync AI auto-classifies it, tags it, assigns it to the right engineer,
-                                    and even drafts the first reply.
-                                </p>
-
-                                <div class="mt-6 grid gap-3 sm:grid-cols-2">
-                                    <div class="border-2 border-black bg-neutral-50 p-3">
-                                        <div class="text-xs font-bold tracking-wider text-neutral-500 uppercase">Auto-Triage</div>
-                                        <div class="mt-1 text-sm font-bold">99% accuracy on labels</div>
-                                    </div>
-                                    <div class="border-2 border-black bg-neutral-50 p-3">
-                                        <div class="text-xs font-bold tracking-wider text-neutral-500 uppercase">Sprint Summary</div>
-                                        <div class="mt-1 text-sm font-bold">3-bullet TL;DR by Friday 4pm</div>
-                                    </div>
-                                    <div class="border-2 border-black bg-neutral-50 p-3">
-                                        <div class="text-xs font-bold tracking-wider text-neutral-500 uppercase">Voice → Issue</div>
-                                        <div class="mt-1 text-sm font-bold">Speak. We structure.</div>
-                                    </div>
-                                    <div class="border-2 border-black bg-neutral-50 p-3">
-                                        <div class="text-xs font-bold tracking-wider text-neutral-500 uppercase">Release Notes</div>
-                                        <div class="mt-1 text-sm font-bold">Drafted from your sprint</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-5">
-                        <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-500"></div>
-                            <div
-                                class="relative flex h-full flex-col border-[3px] border-black bg-black p-8 text-white shadow-[6px_6px_0_0_#000] md:p-10"
-                            >
-                                <div class="flex h-14 w-14 items-center justify-center border-[3px] border-white bg-lime-500">
-                                    <Layers class="h-7 w-7 text-black" :stroke-width="3" />
-                                </div>
-                                <h3 class="mt-6 text-3xl font-black tracking-tight md:text-4xl" style="font-family: 'Archivo Black', sans-serif">
-                                    One tool. Six tools’ worth of work.
-                                </h3>
-                                <p class="mt-4 text-neutral-300">Stop paying for Notion + Slack + Jira + Toggl + Confluence. We bundled it.</p>
-                                <ul class="mt-6 space-y-3">
-                                    <li class="flex items-center gap-3 text-sm">
-                                        <Kanban class="h-5 w-5 text-lime-500" :stroke-width="3" /> Kanban + Sprints
-                                    </li>
-                                    <li class="flex items-center gap-3 text-sm">
-                                        <FileText class="h-5 w-5 text-lime-500" :stroke-width="3" /> Docs & Wiki
-                                    </li>
-                                    <li class="flex items-center gap-3 text-sm">
-                                        <MessageSquare class="h-5 w-5 text-lime-500" :stroke-width="3" />
-                                        Threaded comments
-                                    </li>
-                                    <li class="flex items-center gap-3 text-sm">
-                                        <LineChart class="h-5 w-5 text-lime-500" :stroke-width="3" /> Roadmaps & goals
-                                    </li>
-                                    <li class="flex items-center gap-3 text-sm">
-                                        <LayoutDashboard class="h-5 w-5 text-lime-500" :stroke-width="3" />
-                                        Custom dashboards
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-4">
-                        <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-cyan-300"></div>
-                            <div class="relative flex h-full flex-col border-[3px] border-black bg-white p-7 shadow-[6px_6px_0_0_#000]">
-                                <div class="flex h-12 w-12 items-center justify-center border-[3px] border-black bg-cyan-300">
-                                    <Server class="h-6 w-6" :stroke-width="3" />
-                                </div>
-                                <h3 class="mt-5 text-2xl font-black tracking-tight" style="font-family: 'Archivo Black', sans-serif">
-                                    Self-host. Sleep well.
-                                </h3>
-                                <p class="mt-3 text-sm text-neutral-700">
-                                    Docker compose, run it on your VPS or air-gapped. Your roadmap never lives on someone else’s server.
-                                </p>
-                                <code class="mt-5 block border-2 border-black bg-neutral-900 p-3 font-mono text-xs text-lime-500">
-                                    $ docker compose up -d<br />
-                                    <span class="text-neutral-500"># sprint-sync running on :8080</span>
-                                </code>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Feature 4: Speed -->
-                    <div class="lg:col-span-4">
-                        <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-yellow-300"></div>
-                            <div class="relative flex h-full flex-col border-[3px] border-black bg-white p-7 shadow-[6px_6px_0_0_#000]">
-                                <div class="flex h-12 w-12 items-center justify-center border-[3px] border-black bg-yellow-300">
-                                    <Zap class="h-6 w-6" :stroke-width="3" />
-                                </div>
-                                <h3 class="mt-5 text-2xl font-black tracking-tight" style="font-family: 'Archivo Black', sans-serif">
-                                    Keyboard-first. Always.
-                                </h3>
-                                <p class="mt-3 text-sm text-neutral-700">
-                                    Every action in 1-2 keystrokes. Command palette opens with
-                                    <kbd class="border-2 border-black bg-neutral-100 px-1 font-mono text-[10px] font-bold">⌘K</kbd>. Mouse optional.
-                                </p>
-                                <div class="mt-5 flex flex-wrap gap-1.5">
-                                    <kbd class="border-2 border-black bg-neutral-100 px-2 py-0.5 font-mono text-[10px] font-bold">⌘K</kbd>
-                                    <kbd class="border-2 border-black bg-neutral-100 px-2 py-0.5 font-mono text-[10px] font-bold">C</kbd>
-                                    <kbd class="border-2 border-black bg-neutral-100 px-2 py-0.5 font-mono text-[10px] font-bold">⌘↵</kbd>
-                                    <kbd class="border-2 border-black bg-neutral-100 px-2 py-0.5 font-mono text-[10px] font-bold">G→I</kbd>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Feature 5: Open source -->
-                    <div class="lg:col-span-4">
-                        <div class="relative h-full">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-orange-300"></div>
-                            <div class="relative flex h-full flex-col border-[3px] border-black bg-white p-7 shadow-[6px_6px_0_0_#000]">
-                                <div class="flex h-12 w-12 items-center justify-center border-[3px] border-black bg-orange-300">
-                                    <Github class="h-6 w-6" :stroke-width="3" />
-                                </div>
-                                <h3 class="mt-5 text-2xl font-black tracking-tight" style="font-family: 'Archivo Black', sans-serif">
-                                    Source-available.
-                                </h3>
-                                <p class="mt-3 text-sm text-neutral-700">
-                                    Read the code. Audit the AI. Fork it. Submit PRs. Lock-in is for vendors who don’t trust themselves.
-                                </p>
-                                <a
-                                    href="https://github.com/alihassan3413/FYP_Sprint_Sync_AI"
-                                    class="mt-5 inline-flex items-center gap-2 self-start border-2 border-black bg-black px-3 py-1.5 text-xs font-bold tracking-wider text-white uppercase transition-all hover:bg-orange-300 hover:text-black"
-                                >
-                                    <Star class="h-3 w-3" :stroke-width="3" /> Star on GitHub
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="mt-4 text-[13px] font-medium text-[var(--ss-ink-faint)]">
+                        Off by default. A new client sees the board and nothing else until you say otherwise.
+                    </p>
                 </div>
             </div>
         </section>
 
-        <section id="compare" class="bg-primary/10 border-b-[3px] border-black py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="max-w-3xl">
-                    <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-white px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
-                    >
-                        <KeyRound class="h-3 w-3" :stroke-width="3" /> Receipts
-                    </div>
-                    <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
-                        Side by side.<br />Honestly.
-                    </h2>
-                    <p class="mt-4 text-lg text-neutral-800">No marketing fluff. Here's how Sprint Sync stacks up against the big three.</p>
-                </div>
+        <!-- ============================ CTA ============================ -->
+        <section data-reveal class="ss-reveal px-4 pb-16 sm:px-6">
+            <div class="relative mx-auto max-w-[1200px] overflow-hidden rounded-[36px] bg-[var(--ss-ink)] px-6 py-20 text-center sm:px-12">
+                <div class="ss-glow" aria-hidden="true"></div>
 
-                <div class="relative mt-12">
-                    <div class="absolute inset-0 translate-x-2 translate-y-2 bg-black"></div>
-                    <div class="relative overflow-x-auto border-[3px] border-black bg-white">
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b-[3px] border-black bg-black text-white">
-                                <tr>
-                                    <th class="p-4 font-bold tracking-wider uppercase md:p-5">Feature</th>
-                                    <th class="border-l-[3px] border-white bg-lime-500 p-4 font-black tracking-wider text-black uppercase md:p-5">
-                                        Sprint Sync
-                                    </th>
-                                    <th class="border-l-[3px] border-white p-4 font-bold tracking-wider uppercase md:p-5">Jira</th>
-                                    <th class="border-l-[3px] border-white p-4 font-bold tracking-wider uppercase md:p-5">Linear</th>
-                                    <th class="border-l-[3px] border-white p-4 font-bold tracking-wider uppercase md:p-5">ClickUp</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(row, i) in compareRows" :key="row.label" :class="i % 2 === 0 ? 'bg-white' : 'bg-neutral-50'">
-                                    <td class="border-t-2 border-black p-4 font-bold md:p-5">
-                                        {{ row.label }}
-                                    </td>
-                                    <td class="border-t-2 border-l-2 border-black bg-lime-100 p-4 font-bold md:p-5">
-                                        <span v-if="row.sprintsync === true" class="inline-flex items-center gap-1.5">
-                                            <Check class="h-4 w-4" :stroke-width="3" /> Yes
-                                        </span>
-                                        <span v-else-if="row.sprintsync === false" class="inline-flex items-center gap-1.5 text-neutral-400">
-                                            <X class="h-4 w-4" :stroke-width="3" /> No
-                                        </span>
-                                        <span v-else>{{ row.sprintsync }}</span>
-                                    </td>
-                                    <td class="border-t-2 border-l-2 border-black p-4 md:p-5">
-                                        <span v-if="row.jira === true" class="inline-flex items-center gap-1.5">
-                                            <Check class="h-4 w-4" :stroke-width="3" /> Yes
-                                        </span>
-                                        <span v-else-if="row.jira === false" class="inline-flex items-center gap-1.5 text-neutral-400">
-                                            <X class="h-4 w-4" :stroke-width="3" /> No
-                                        </span>
-                                        <span v-else>{{ row.jira }}</span>
-                                    </td>
-                                    <td class="border-t-2 border-l-2 border-black p-4 md:p-5">
-                                        <span v-if="row.linear === true" class="inline-flex items-center gap-1.5">
-                                            <Check class="h-4 w-4" :stroke-width="3" /> Yes
-                                        </span>
-                                        <span v-else-if="row.linear === false" class="inline-flex items-center gap-1.5 text-neutral-400">
-                                            <X class="h-4 w-4" :stroke-width="3" /> No
-                                        </span>
-                                        <span v-else>{{ row.linear }}</span>
-                                    </td>
-                                    <td class="border-t-2 border-l-2 border-black p-4 md:p-5">
-                                        <span v-if="row.clickup === true" class="inline-flex items-center gap-1.5">
-                                            <Check class="h-4 w-4" :stroke-width="3" /> Yes
-                                        </span>
-                                        <span v-else-if="row.clickup === false" class="inline-flex items-center gap-1.5 text-neutral-400">
-                                            <X class="h-4 w-4" :stroke-width="3" /> No
-                                        </span>
-                                        <span v-else>{{ row.clickup }}</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="border-b-[3px] border-black py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="text-center">
-                    <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-yellow-300 px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
-                    >
-                        <Star class="h-3 w-3" :stroke-width="3" /> Loved by builders
-                    </div>
-                    <h2
-                        class="mx-auto mt-6 max-w-3xl text-4xl leading-[1.05] tracking-tight md:text-6xl"
-                        style="font-family: 'Archivo Black', sans-serif"
-                    >
-                        People are saying things.
-                    </h2>
-                </div>
-
-                <div class="mt-16 grid gap-6 md:grid-cols-3">
-                    <!-- Testimonial 1 - tilted -->
-                    <div class="md:rotate-[-1deg]">
-                        <div class="relative">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-lime-500"></div>
-                            <div class="relative border-[3px] border-black bg-white p-6 shadow-[4px_4px_0_0_#000]">
-                                <div class="mb-3 flex gap-0.5">
-                                    <Star v-for="n in 5" :key="n" class="h-4 w-4 fill-black" :stroke-width="0" />
-                                </div>
-                                <p class="text-base leading-relaxed font-semibold">
-                                    "Replaced Jira, Confluence, and Slack in our sprint loop. We close standups 15 min faster and nobody complains
-                                    about tools anymore."
-                                </p>
-                                <div class="mt-5 flex items-center gap-3 border-t-2 border-black pt-4">
-                                    <div class="flex h-10 w-10 items-center justify-center border-2 border-black bg-pink-300 font-black">M</div>
-                                    <div>
-                                        <div class="text-sm font-black">Maya Chen</div>
-                                        <div class="text-xs tracking-wider text-neutral-600 uppercase">Eng Lead, Shipfast.io</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Testimonial 2 - centered, larger -->
-                    <div class="md:translate-y-4">
-                        <div class="relative">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-pink-300"></div>
-                            <div class="relative border-[3px] border-black bg-black p-6 text-white shadow-[4px_4px_0_0_#000]">
-                                <div class="mb-3 flex gap-0.5">
-                                    <Star v-for="n in 5" :key="n" class="h-4 w-4 fill-lime-300" :stroke-width="0" />
-                                </div>
-                                <p class="text-base leading-relaxed font-semibold">
-                                    "Self-hosted on a $20 VPS. Whole team uses it — devs, designers, our PM.
-                                    <span class="bg-lime-500 px-1 text-black">Finally</span>, a workspace nobody hates."
-                                </p>
-                                <div class="mt-5 flex items-center gap-3 border-t-2 border-white pt-4">
-                                    <div class="flex h-10 w-10 items-center justify-center border-2 border-white bg-lime-500 font-black text-black">
-                                        D
-                                    </div>
-                                    <div>
-                                        <div class="text-sm font-black">Diego Ramos</div>
-                                        <div class="text-xs tracking-wider text-neutral-400 uppercase">Founder, Forklore</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Testimonial 3 - tilted opposite -->
-                    <div class="md:rotate-[1deg]">
-                        <div class="relative">
-                            <div class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black bg-cyan-300"></div>
-                            <div class="relative border-[3px] border-black bg-white p-6 shadow-[4px_4px_0_0_#000]">
-                                <div class="mb-3 flex gap-0.5">
-                                    <Star v-for="n in 5" :key="n" class="h-4 w-4 fill-black" :stroke-width="0" />
-                                </div>
-                                <p class="text-base leading-relaxed font-semibold">
-                                    "AI auto-triage is the real deal. I dump bug reports, it labels & assigns. Saved my designer brain from JQL
-                                    forever."
-                                </p>
-                                <div class="mt-5 flex items-center gap-3 border-t-2 border-black pt-4">
-                                    <div class="flex h-10 w-10 items-center justify-center border-2 border-black bg-yellow-300 font-black">A</div>
-                                    <div>
-                                        <div class="text-sm font-black">Anya Petrov</div>
-                                        <div class="text-xs tracking-wider text-neutral-600 uppercase">Design Lead, Tilt Studio</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="pricing" class="border-b-[3px] border-black bg-lime-100 py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="text-center">
-                    <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-white px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
-                    >
-                        <Code2 class="h-3 w-3" :stroke-width="3" /> Pricing
-                    </div>
-                    <h2
-                        class="mx-auto mt-6 max-w-3xl text-4xl leading-[1.05] tracking-tight md:text-6xl"
-                        style="font-family: 'Archivo Black', sans-serif"
-                    >
-                        Flat per-seat.<br />No "Premium Plus++".
-                    </h2>
-
-                    <!-- Billing toggle -->
-                    <div class="mt-10 inline-flex border-[3px] border-black bg-white shadow-[4px_4px_0_0_#000]">
-                        <button
-                            @click="billingYearly = false"
-                            :class="!billingYearly ? 'bg-black text-white' : 'bg-white text-black'"
-                            class="px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors"
-                        >
-                            Monthly
-                        </button>
-                        <button
-                            @click="billingYearly = true"
-                            :class="billingYearly ? 'bg-black text-white' : 'bg-white text-black'"
-                            class="border-l-[3px] border-black px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors"
-                        >
-                            Yearly · save 22%
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-12 grid gap-6 md:grid-cols-3">
-                    <div v-for="t in tiers" :key="t.name" class="relative" :class="t.highlighted && 'md:-translate-y-4'">
-                        <div
-                            class="absolute inset-0 translate-x-2 translate-y-2 border-[3px] border-black"
-                            :class="t.highlighted ? 'bg-yellow-400' : 'bg-black'"
-                        ></div>
-                        <div
-                            class="relative flex h-full flex-col border-[3px] border-black p-8 shadow-[6px_6px_0_0_#000]"
-                            :class="t.highlighted ? 'bg-lime-500' : 'bg-white'"
-                        >
-                            <div
-                                v-if="t.highlighted"
-                                class="absolute -top-4 left-1/2 -translate-x-1/2 border-[3px] border-black bg-black px-4 py-1 text-xs font-bold tracking-widest text-lime-500 uppercase shadow-[3px_3px_0_0_#000]"
-                            >
-                                ★ Most popular
-                            </div>
-
-                            <h3 class="text-2xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif">
-                                {{ t.name }}
-                            </h3>
-                            <p class="mt-1 text-sm text-neutral-700">{{ t.tagline }}</p>
-
-                            <div class="mt-6 flex items-baseline gap-1">
-                                <span class="text-5xl font-black tracking-tight" style="font-family: 'Archivo Black', sans-serif">
-                                    ${{ billingYearly ? t.priceYearly : t.priceMonthly }}
-                                </span>
-                                <span class="text-sm font-bold text-neutral-700">/user/mo</span>
-                            </div>
-                            <p class="mt-1 text-xs tracking-wider text-neutral-600 uppercase">
-                                {{ billingYearly ? 'billed yearly' : 'billed monthly' }}
-                            </p>
-
-                            <ul class="mt-6 space-y-2.5 border-t-2 border-black pt-6">
-                                <li v-for="f in t.features" :key="f" class="flex items-start gap-2 text-sm font-semibold">
-                                    <div class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-black bg-black">
-                                        <Check class="h-3 w-3 text-lime-500" :stroke-width="4" />
-                                    </div>
-                                    {{ f }}
-                                </li>
-                            </ul>
-
-                            <Link
-                                :href="route('register')"
-                                class="mt-8 inline-flex w-full items-center justify-center gap-2 border-[3px] border-black px-6 py-3 text-sm font-bold tracking-wider uppercase shadow-[4px_4px_0_0_#000] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_0_#000]"
-                                :class="t.highlighted ? 'bg-black text-lime-500' : 'bg-lime-500 text-black'"
-                            >
-                                {{ t.cta }}
-                                <ArrowRight class="h-4 w-4" :stroke-width="3" />
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="faq" class="border-b-[3px] border-black py-20 md:py-28">
-            <div class="mx-auto max-w-4xl px-4 md:px-8">
-                <div class="text-center">
-                    <div
-                        class="inline-flex items-center gap-2 border-[3px] border-black bg-cyan-300 px-4 py-1.5 text-xs font-bold tracking-widest uppercase shadow-[3px_3px_0_0_#000]"
-                    >
-                        Questions?
-                    </div>
-                    <h2 class="mt-6 text-4xl leading-[1.05] tracking-tight md:text-6xl" style="font-family: 'Archivo Black', sans-serif">
-                        FAQ — the real ones.
-                    </h2>
-                </div>
-
-                <div class="mt-12 space-y-4">
-                    <div v-for="(item, i) in faqs" :key="i" class="relative">
-                        <div class="absolute inset-0 translate-x-1.5 translate-y-1.5 border-[3px] border-black bg-black"></div>
-                        <div class="relative border-[3px] border-black bg-white">
-                            <button
-                                @click="toggleFaq(i)"
-                                class="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-lime-50 md:p-6"
-                            >
-                                <span class="text-base font-bold md:text-lg">{{ item.q }}</span>
-                                <div
-                                    class="flex h-8 w-8 shrink-0 items-center justify-center border-[3px] border-black transition-all"
-                                    :class="openFaq === i ? 'bg-black text-lime-500' : 'bg-lime-500 text-black'"
-                                >
-                                    <Plus v-if="openFaq !== i" class="h-4 w-4" :stroke-width="3" />
-                                    <Minus v-else class="h-4 w-4" :stroke-width="3" />
-                                </div>
-                            </button>
-                            <div v-if="openFaq === i" class="border-t-2 border-black bg-neutral-50 p-5 text-sm text-neutral-700 md:p-6 md:text-base">
-                                {{ item.a }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="relative overflow-hidden border-b-[3px] border-black bg-lime-500 py-20 md:py-28">
-            <!-- Decorative diagonal stripes -->
-            <div
-                class="absolute inset-0 opacity-10"
-                style="background-image: repeating-linear-gradient(45deg, #000 0px, #000 2px, transparent 2px, transparent 14px)"
-            ></div>
-
-            <div class="relative mx-auto max-w-5xl px-4 text-center md:px-8">
-                <h2 class="text-5xl leading-[0.95] tracking-tight md:text-7xl lg:text-8xl" style="font-family: 'Archivo Black', sans-serif">
-                    Ship the
-                    <span class="inline-block -rotate-1 bg-black px-3 text-lime-500 shadow-[6px_6px_0_0_#000]">damn thing.</span>
+                <h2
+                    class="relative mx-auto max-w-[16ch] text-[clamp(2.25rem,5.2vw,4rem)] leading-[0.98] font-extrabold tracking-[-0.035em] text-white"
+                >
+                    Stop managing the tool.
                 </h2>
-                <p class="mx-auto mt-8 max-w-2xl text-lg text-neutral-800 md:text-xl">
-                    Stop fighting your tools. Start shipping. 14-day free trial, no credit card, no sales call.
+                <p class="relative mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed font-medium text-white/60">
+                    Set up a workspace, invite your team, and run your first sprint by talking to it.
                 </p>
 
-                <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <div class="relative mt-8 flex flex-wrap justify-center gap-3">
                     <Link
                         :href="route('register')"
-                        class="group inline-flex items-center justify-center gap-2 border-[3px] border-black bg-black px-10 py-5 text-base font-bold tracking-wider text-lime-500 uppercase shadow-[8px_8px_0_0_#000] transition-all hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[11px_11px_0_0_#000] active:translate-x-0 active:translate-y-0 active:shadow-[3px_3px_0_0_#000]"
+                        class="group inline-flex items-center gap-2 rounded-full bg-[var(--ss-lime)] py-4 pr-4 pl-7 text-[15px] font-extrabold text-[var(--ss-ink)] transition-transform duration-200 hover:-translate-y-0.5"
                     >
-                        Start Free Today
-                        <ArrowUpRight
-                            class="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:translate-y-[-2px]"
-                            :stroke-width="3"
-                        />
+                        Get started free
+                        <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] transition-transform group-hover:rotate-45">
+                            <ArrowUpRight class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
+                        </span>
                     </Link>
-                    <a
-                        href="#"
-                        class="inline-flex items-center justify-center gap-2 border-[3px] border-black bg-white px-8 py-5 text-base font-bold tracking-wider uppercase shadow-[8px_8px_0_0_#000] transition-all hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[11px_11px_0_0_#000]"
+                    <Link
+                        :href="route('login')"
+                        class="rounded-full px-7 py-4 text-[15px] font-bold text-white/70 transition-colors hover:text-white"
                     >
-                        <Github class="h-5 w-5" :stroke-width="3" />
-                        Self-host instead
-                    </a>
+                        Sign in
+                    </Link>
                 </div>
             </div>
         </section>
 
-        <footer class="bg-black py-16 text-white">
-            <div class="mx-auto max-w-7xl px-4 md:px-8">
-                <div class="grid gap-12 md:grid-cols-4">
-                    <div class="md:col-span-2">
-                        <div class="flex items-center gap-3">
-                            <div class="flex h-10 w-10 items-center justify-center border-[3px] border-lime-500 bg-lime-500">
-                                <Boxes class="h-5 w-5 text-black" :stroke-width="3" />
-                            </div>
-                            <span class="text-xl font-black tracking-tight uppercase" style="font-family: 'Archivo Black', sans-serif"
-                                >Sprint Sync</span
-                            >
-                        </div>
-                        <p class="mt-5 max-w-md text-sm text-neutral-400">
-                            The all-in-one workspace for cross-functional teams who want to ship, not configure. Self-hostable. AI-powered. Loved.
-                        </p>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-black tracking-widest text-lime-500 uppercase">Product</h4>
-                        <ul class="mt-4 space-y-2 text-sm text-neutral-400">
-                            <li><a href="#features" class="hover:text-white">Features</a></li>
-                            <li><a href="#compare" class="hover:text-white">Compare</a></li>
-                            <li><a href="#pricing" class="hover:text-white">Pricing</a></li>
-                            <li><a href="#" class="hover:text-white">Changelog</a></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-black tracking-widest text-lime-500 uppercase">Company</h4>
-                        <ul class="mt-4 space-y-2 text-sm text-neutral-400">
-                            <li><a href="#" class="hover:text-white">About</a></li>
-                            <li><a href="#" class="hover:text-white">Blog</a></li>
-                            <li><a href="#" class="hover:text-white">Careers</a></li>
-                            <li><a href="#" class="hover:text-white">Contact</a></li>
-                        </ul>
-                    </div>
+        <!-- ============================ FOOTER ============================ -->
+        <footer class="px-4 pb-10 sm:px-6">
+            <div
+                class="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-4 border-t border-[rgba(11,11,15,0.08)] pt-8 sm:flex-row"
+            >
+                <div class="flex items-center gap-2">
+                    <span class="rounded-full bg-[var(--ss-ink)] px-4 py-2 text-[13px] font-extrabold text-white">sprintsync</span>
+                    <span class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">AI-native sprint management.</span>
                 </div>
-
-                <div class="mt-12 flex flex-col items-start justify-between gap-4 border-t-2 border-neutral-800 pt-8 md:flex-row md:items-center">
-                    <p class="text-xs text-neutral-500">© 2026 Sprint Sync. Built with rage against bad tools.</p>
-                    <div class="flex gap-2">
-                        <a href="#" class="border-2 border-neutral-700 p-2 transition-colors hover:border-lime-500 hover:text-lime-500">
-                            <Github class="h-4 w-4" :stroke-width="2.5" />
-                        </a>
-                    </div>
-                </div>
+                <p class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">© 2026 SprintSync · Built with Laravel and Claude.</p>
             </div>
         </footer>
     </div>
 </template>
 
 <style scoped>
-@keyframes marquee {
-    from {
-        transform: translateX(0);
-    }
+/*
+ * The page owns its palette. The app's global tokens are a lime light theme
+ * and an unrelated blue dark theme, so inheriting them would make the landing
+ * page change identity with the visitor's preference.
+ */
+.ss {
+    --ss-ink: #0b0b0f;
+    --ss-ink-dim: #55565f;
+    --ss-ink-faint: #8b8c96;
+    --ss-paper: #efefea;
+    --ss-lavender: #e4e3ff;
+    --ss-lime: #baff1a;
+    --ss-indigo: #365aff;
+    --ss-indigo-hot: #2647e6;
+    --ss-rose: #fb7185;
+
+    background: var(--ss-paper);
+    color: var(--ss-ink);
+    font-feature-settings: 'ss01', 'cv01';
+    min-height: 100vh;
+}
+
+.ss-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(60% 40% at 70% 0%, rgba(54, 90, 255, 0.09), transparent 70%),
+        radial-gradient(40% 40% at 5% 20%, rgba(186, 255, 26, 0.16), transparent 70%);
+}
+
+.ss-glow {
+    position: absolute;
+    inset: -40% 20% auto 20%;
+    height: 420px;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(186, 255, 26, 0.16), transparent 70%);
+    pointer-events: none;
+}
+
+/* Marker swipe behind the emphasised words. */
+.ss-mark {
+    position: relative;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.ss-mark::after {
+    content: '';
+    position: absolute;
+    inset: 12% -0.12em 8%;
+    background: var(--ss-lime);
+    z-index: -1;
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: ss-swipe 620ms cubic-bezier(0.2, 0.8, 0.2, 1) 380ms forwards;
+    border-radius: 4px;
+}
+
+@keyframes ss-swipe {
     to {
-        transform: translateX(-50%);
+        transform: scaleX(1);
     }
 }
-.animate-marquee {
-    animation: marquee 40s linear infinite;
+
+.ss-caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 1px;
+    background: var(--ss-lime);
+    vertical-align: text-bottom;
+    animation: ss-blink 1s steps(2, start) infinite;
+}
+
+@keyframes ss-blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+.ss-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #a78bfa;
+    animation: ss-bounce 900ms ease-in-out infinite;
+}
+
+.ss-dot-2 {
+    animation-delay: 140ms;
+}
+
+.ss-dot-3 {
+    animation-delay: 280ms;
+}
+
+@keyframes ss-bounce {
+    0%,
+    100% {
+        opacity: 0.35;
+        transform: translateY(0);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+
+.ss-pop {
+    animation: ss-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes ss-pop {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+}
+
+.ss-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+        opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ss-reveal.is-revealed {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ss-mark::after {
+        animation: none;
+        transform: scaleX(1);
+    }
+
+    .ss-caret,
+    .ss-dot,
+    .ss-pop {
+        animation: none;
+    }
+
+    .ss-reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
 }
 </style>
