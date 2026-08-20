@@ -28,11 +28,12 @@ const SENTENCE_BOUNDARY = /([.!?]+["')\]]*\s+|\n+)/;
 const CHUNK_TARGET = 340;
 
 /**
- * How far the first utterance may run without a sentence ending before it is
- * cut at a clause instead. A reply that opens with a long run-on would
- * otherwise stay silent until the whole thing had streamed in.
+ * How far the first utterance may run before it is cut at a clause rather than
+ * waiting for a sentence to end. Synthesis time scales with the text sent, so a
+ * short opening clause comes back audibly sooner than a long sentence — and the
+ * rest is generated while it plays.
  */
-const FIRST_CHUNK_CLAUSE_LIMIT = 140;
+const FIRST_CHUNK_CLAUSE_LIMIT = 90;
 
 const CLAUSE_BOUNDARY = /[,;:]\s+/g;
 

@@ -363,10 +363,12 @@ async function consumeSseStream(response: Response, assistantMsg: AssistantMessa
             }
 
             case 'tool_executed': {
-                const result = event.result as { success?: boolean; switch_to?: string; error?: string } | undefined;
+                const result = event.result as { success?: boolean; switch_to?: string; error?: string; awaiting_input?: boolean } | undefined;
 
-                // If the tool failed, surface the error to the user.
-                if (result && result.success === false) {
+                // A tool that is asking something has not failed — the assistant
+                // puts the question in its own words, so a warning here would
+                // read as the request having been cancelled.
+                if (result && result.success === false && !result.awaiting_input) {
                     appendToMessage(assistantMsg.id, `\n\n⚠️ ${result.error?.trim() || 'That action could not be completed.'}`);
                 }
 

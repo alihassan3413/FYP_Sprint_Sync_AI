@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Assistant\Tools;
 
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Contracts\DefersConfirmation;
 use App\Modules\Assistant\Contracts\ProvidesConfirmationDetails;
 use App\Modules\Assistant\Support\AssigneeResolver;
 use App\Modules\Assistant\Support\FuzzyMatcher;
@@ -27,7 +28,7 @@ use Throwable;
  * the project is inferred when there is only one, matched by name when the user
  * named one, and asked about only when it is genuinely ambiguous.
  */
-final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
+final class CreateTaskTool implements AssistantTool, DefersConfirmation, ProvidesConfirmationDetails
 {
     /** Above this, an existing task is close enough that we mention it before duplicating work. */
     private const DUPLICATE_SCORE = 80;
@@ -145,6 +146,53 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             || $workspace->accessibleProjectsFor($context->user)
                 ->get()
                 ->contains(fn (Project $project) => $context->user->can('create', [Task::class, $project]));
+    }
+
+    /**
+     * Placement is asked about before anything is confirmed, so the user answers
+     * a question rather than approving a card that then reports a failure.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    public function needsMoreInformation(array $args, ToolContext $context): bool
+    {
+        return $this->pendingQuestion($args, $context) !== null;
+    }
+
+    /**
+     * The next thing this tool has to ask before it can create anything, or null
+     * when it has everything it needs. Shared with execute() so the question the
+     * user is asked is always the question the tool would actually raise.
+     *
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>|null
+     */
+    private function pendingQuestion(array $args, ToolContext $context): ?array
+    {
+        $workspace = $context->workspace;
+
+        if ($workspace === null) {
+            return null;
+        }
+
+        $resolution = $this->projectResolver->resolve($context, $args, 'this task');
+
+        if (! $resolution->isResolved()) {
+            return $resolution->toolPayload();
+        }
+
+        /* A client's request lands in the starting column; they are never asked. */
+        if ($workspace->isClient($context->user)) {
+            return null;
+        }
+
+        $column = $this->resolveColumn($args, $resolution->project);
+
+        if (is_array($column)) {
+            return $column;
+        }
+
+        return $this->askAboutSprint($args, $resolution->project);
     }
 
     /**
@@ -382,6 +430,7 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             return [
                 'success' => false,
                 'error_code' => 'column_not_found',
+                'awaiting_input' => true,
                 'error' => "\"{$project->name}\" has no column like \"{$named}\".",
                 'columns' => $this->summariseColumns($columns),
                 'next_step' => 'Show the user these columns and ask which one, then call again with board_column_id.',
@@ -395,6 +444,7 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
         return [
             'success' => false,
             'error_code' => 'column_required',
+            'awaiting_input' => true,
             'error' => "Which column should this start in on {$project->name}?",
             'columns' => $this->summariseColumns($columns),
             'next_step' => 'Ask the user which of these columns the task should go in, listing them in order. '
@@ -425,6 +475,7 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
         return [
             'success' => false,
             'error_code' => 'sprint_choice_required',
+            'awaiting_input' => true,
             'error' => "\"{$active->name}\" is running on {$project->name}. Should this task go into it?",
             'sprint' => [
                 'id' => $active->id,

@@ -76,6 +76,8 @@ final readonly class ProjectResolution
             },
             'error' => $this->message,
             'projects' => $this->candidates,
+            /* A question for the user, not something that went wrong. */
+            'awaiting_input' => $this->status === 'ambiguous',
             'next_step' => $this->status === 'ambiguous'
                 ? 'Ask the user which of these projects they mean, then call this tool again with that project_id.'
                 : 'Show the user the projects listed here and ask which one they meant.',

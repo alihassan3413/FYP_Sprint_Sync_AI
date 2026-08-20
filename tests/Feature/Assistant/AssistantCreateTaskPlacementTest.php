@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Assistant;
 
 use App\Models\User;
+use App\Modules\Assistant\Contracts\DefersConfirmation;
 use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Projects\Models\Project;
@@ -55,6 +56,66 @@ final class AssistantCreateTaskPlacementTest extends TestCase
     private function create(array $args, ?User $user = null): array
     {
         return app(CreateTaskTool::class)->execute($args, new ToolContext($user ?? $this->owner, $this->workspace));
+    }
+
+    private function tool(): CreateTaskTool
+    {
+        return app(CreateTaskTool::class);
+    }
+
+    public function test_a_question_is_not_presented_as_a_failure(): void
+    {
+        $result = $this->create(['title' => 'Fix the login redirect']);
+
+        $this->assertTrue($result['awaiting_input'], 'The UI keys off this to avoid showing a warning.');
+    }
+
+    public function test_no_confirmation_card_is_shown_while_a_column_is_outstanding(): void
+    {
+        $tool = $this->tool();
+        $context = new ToolContext($this->owner, $this->workspace);
+
+        $this->assertInstanceOf(DefersConfirmation::class, $tool);
+        $this->assertTrue(
+            $tool->needsMoreInformation(['title' => 'Fix the login redirect'], $context),
+            'Asking for a column must come before the confirmation card, not after it.',
+        );
+    }
+
+    public function test_no_confirmation_card_is_shown_while_the_sprint_is_outstanding(): void
+    {
+        Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
+
+        $this->assertTrue($this->tool()->needsMoreInformation(
+            ['title' => 'Fix it', 'board_column' => 'To Do'],
+            new ToolContext($this->owner, $this->workspace),
+        ));
+    }
+
+    public function test_the_confirmation_card_returns_once_every_question_is_answered(): void
+    {
+        Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
+
+        $this->assertFalse($this->tool()->needsMoreInformation(
+            ['title' => 'Fix it', 'board_column' => 'To Do', 'sprint' => 'none'],
+            new ToolContext($this->owner, $this->workspace),
+        ), 'With nothing left to ask, the user must get a confirmation card before anything is written.');
+
+        $this->assertTrue($this->tool()->requiresConfirmation());
+    }
+
+    public function test_a_client_is_never_deferred_because_they_are_never_asked(): void
+    {
+        Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
+
+        $client = User::factory()->create();
+        $this->workspace->users()->attach($client->id, ['role' => UserRole::CLIENT->value]);
+        $this->project->members()->attach($client->id, ['role' => 'member']);
+
+        $this->assertFalse($this->tool()->needsMoreInformation(
+            ['title' => 'Please fix the checkout', 'project_id' => $this->project->id],
+            new ToolContext($client->refresh(), $this->workspace),
+        ));
     }
 
     public function test_it_asks_which_project_when_several_could_be_meant(): void

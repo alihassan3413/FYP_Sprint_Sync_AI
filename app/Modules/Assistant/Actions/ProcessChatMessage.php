@@ -6,6 +6,7 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Models\User;
 use App\Modules\Assistant\Contracts\AiProvider;
+use App\Modules\Assistant\Contracts\DefersConfirmation;
 use App\Modules\Assistant\Contracts\ProvidesConfirmationDetails;
 use App\Modules\Assistant\Exceptions\AiProviderException;
 use App\Modules\Assistant\Models\Conversation;
@@ -339,7 +340,15 @@ final class ProcessChatMessage
             return;
         }
 
-        if ($tool->requiresConfirmation()) {
+        /*
+         * A tool with an outstanding question is run without a card: it will
+         * only ask, never write. Confirming first would make the user approve
+         * an action that then reports itself as failed.
+         */
+        $hasQuestionFirst = $tool instanceof DefersConfirmation
+            && $tool->needsMoreInformation($args, $toolContext);
+
+        if ($tool->requiresConfirmation() && ! $hasQuestionFirst) {
             $pendingMsg = Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'tool',

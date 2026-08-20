@@ -74,7 +74,14 @@ return [
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
             'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'model' => env('ASSISTANT_SPEECH_MODEL', 'gpt-4o-mini-tts'),
+            /*
+             * tts-1 is OpenAI's low-latency voice, built for real-time playback.
+             * gpt-4o-mini-tts sounds richer but takes noticeably longer to
+             * return the first byte, and the assistant is spoken over a live
+             * conversation where waiting reads as the app being stuck. Set
+             * ASSISTANT_SPEECH_MODEL=gpt-4o-mini-tts to trade speed for polish.
+             */
+            'model' => env('ASSISTANT_SPEECH_MODEL', 'tts-1'),
             'voice' => env('ASSISTANT_SPEECH_VOICE', 'nova'),
             'format' => env('ASSISTANT_SPEECH_FORMAT', 'mp3'),
             'speed' => (float) env('ASSISTANT_SPEECH_SPEED', 1.0),
