@@ -175,7 +175,9 @@ function onRevokeInvite(m: Member) {
                 </AppStatCard>
 
                 <!-- Active now: number + live presence stack -->
-                <div class="group bg-card hover:border-foreground/15 relative rounded-xl border p-4 shadow-sm transition-colors">
+                <div
+                    class="group bg-card border-border/70 hover:border-foreground/15 relative rounded-3xl border p-4 transition-all hover:-translate-y-0.5"
+                >
                     <div class="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] uppercase">
                         <Activity class="size-3.5 text-emerald-500" />
                         <span>Active now</span>
@@ -199,7 +201,7 @@ function onRevokeInvite(m: Member) {
             </div>
 
             <!-- Members table -->
-            <div class="bg-card overflow-hidden rounded-xl border shadow-sm">
+            <div class="bg-card border-border/70 overflow-hidden rounded-3xl border">
                 <AppListToolBar
                     v-model:search="search"
                     v-model:filter="filter"

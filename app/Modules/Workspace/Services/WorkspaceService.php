@@ -59,7 +59,14 @@ final class WorkspaceService
         }
 
         $workspaces = $this->availableFor($user);
-        $current = $workspaces->firstWhere('id', $user->current_workspace_id);
+
+        /*
+         * Falling back matters more than it looks: the front end builds every
+         * workspace-scoped URL from this value, and when it is null those links
+         * resolve to the login page. A stale `current_workspace_id` therefore
+         * turned every button on the page into a silent no-op.
+         */
+        $current = $workspaces->firstWhere('id', $user->current_workspace_id) ?? $workspaces->first();
 
         return [
             'current' => $current === null ? null : $this->toArray($current, $user),

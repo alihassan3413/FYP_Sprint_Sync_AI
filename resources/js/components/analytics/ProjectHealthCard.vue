@@ -26,7 +26,7 @@ const severityIcon = { critical: TriangleAlert, warning: AlertTriangle, note: In
 </script>
 
 <template>
-    <div class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
+    <div class="bg-card border-border/70 rounded-3xl border p-5 sm:p-6">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <h3 v-if="!hideTitle" class="truncate text-[15px] font-semibold tracking-tight">

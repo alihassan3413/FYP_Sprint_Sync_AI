@@ -135,7 +135,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                 <Deferred data="health">
                     <template #fallback>
                         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div v-for="n in 2" :key="n" class="bg-card animate-pulse rounded-xl border p-6">
+                            <div v-for="n in 2" :key="n" class="bg-card border-border/70 animate-pulse rounded-3xl border p-6">
                                 <div class="bg-muted h-4 w-40 rounded"></div>
                                 <div class="bg-muted mt-4 h-1.5 w-full rounded-full"></div>
                                 <div class="mt-4 grid grid-cols-3 gap-2">
@@ -155,7 +155,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                 </Deferred>
             </section>
 
-            <div class="bg-card flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center">
+            <div class="bg-card border-border/70 flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center">
                 <select
                     v-model="projectId"
                     class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
@@ -235,7 +235,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                 </AppStatCard>
             </div>
 
-            <div class="bg-card rounded-xl border p-5 shadow-sm">
+            <div class="bg-card border-border/70 rounded-3xl border p-5 sm:p-6">
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <h3 class="text-[15px] font-semibold tracking-tight">Sprint task completion</h3>
@@ -276,7 +276,7 @@ const projectColumns: Column<ProjectSummary>[] = [
             </div>
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div class="bg-card rounded-xl border p-5 shadow-sm lg:col-span-1">
+                <div class="bg-card border-border/70 rounded-3xl border p-5 sm:p-6 lg:col-span-1">
                     <h3 class="text-[15px] font-semibold tracking-tight">Task completion</h3>
 
                     <div class="mt-4 flex items-baseline gap-2">
@@ -309,14 +309,14 @@ const projectColumns: Column<ProjectSummary>[] = [
                     </div>
                 </div>
 
-                <div class="bg-card rounded-xl border p-5 shadow-sm lg:col-span-1">
+                <div class="bg-card border-border/70 rounded-3xl border p-5 sm:p-6 lg:col-span-1">
                     <h3 class="text-[15px] font-semibold tracking-tight">Tasks by workflow column</h3>
                     <div class="mt-4">
                         <AppBarList :items="columnBars" empty-label="No tasks yet." />
                     </div>
                 </div>
 
-                <div v-if="!isPersonalScope" class="bg-card rounded-xl border p-5 shadow-sm lg:col-span-1">
+                <div v-if="!isPersonalScope" class="bg-card border-border/70 rounded-3xl border p-5 sm:p-6 lg:col-span-1">
                     <div class="flex items-center gap-1.5">
                         <Users class="text-muted-foreground size-3.5" />
                         <h3 class="text-[15px] font-semibold tracking-tight">Tasks by assignee</h3>
@@ -327,7 +327,7 @@ const projectColumns: Column<ProjectSummary>[] = [
                 </div>
             </div>
 
-            <div class="bg-card overflow-hidden rounded-xl border shadow-sm">
+            <div class="bg-card border-border/70 overflow-hidden rounded-3xl border">
                 <div class="border-b px-5 py-4">
                     <h3 class="text-[15px] font-semibold tracking-tight">Project performance</h3>
                 </div>
