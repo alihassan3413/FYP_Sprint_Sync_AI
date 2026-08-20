@@ -19,6 +19,12 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #55 added a `/` command picker to the Assistant input: a searchable,
+authorization-filtered list of the 18 tools, matched against natural phrasing
+("want to create workspace" finds the workspace tool). **No FR status changes**
+— it is discovery UI over the existing tools, and picking a command fills the
+input rather than executing anything.
+
 Entry #54 added the Assistant's `comment_on_task` tool, reusing
 `CreateTaskCommentAction` so notifications are inherited, and moving the comment
 body rules into `TaskCommentData::bodyRules()` so the HTTP request and the tool
@@ -5467,7 +5473,114 @@ assertions** (1053 -> 1074, +21). `tests/Feature/Tasks` and
 pre-existing `TS2688` `tsconfig.json` errors from entry #24, unchanged and
 unrelated; no other TypeScript errors.
 
-## Next recommended task (updated 2026-08-20, after entry #54)
+### 55. Slash-command picker for the Assistant
+
+Eighteen tools existed and nothing in the product told anyone they did. The
+only way to discover what the Assistant could do was to guess a phrasing and
+hope. Typing `/` in the chat input now opens a searchable picker of the actions
+this user is actually allowed to run.
+
+**The list is authorization-filtered server-side, not in the browser.**
+`GET /assistant/commands` builds a `ToolContext` and returns
+`ToolRegistry::availableFor()`, which is the same gate the LLM's tool list goes
+through. A member is not offered `invite_user`; a client is not offered
+`get_analytics`. Shipping the full list and hiding rows in Vue would have
+leaked the shape of the admin surface to every member, so the endpoint never
+sends what the caller cannot run.
+
+**Presentation is separate from the tool contract.** A tool's `description()`
+is a prompt written for the model, not user-facing copy — `useAiAssitant.ts`
+already said so where it builds confirmation summaries. Rather than widen
+`AssistantTool` with display methods across eighteen classes, `CommandCatalog`
+maps tool name -> label, one-line description, category, search keywords and a
+starting phrase, and `AssistantCommandData` carries it to the client. A test
+asserts the catalogue and the registry describe exactly the same set in both
+directions, so adding a tool without copy fails the suite rather than silently
+vanishing from the picker.
+
+**Picking a command writes a phrase, it does not execute anything.** Choosing
+"Create a workspace" puts `Create a new workspace called ` in the input and
+leaves the cursor there. Arguments are still gathered conversationally, tools
+still run through the normal chat round, and writes still stop for
+confirmation. A picker that fired actions directly would have to reimplement
+argument collection and the confirmation gate for every tool, and would give
+the `/` menu more authority than the chat itself.
+
+**Search had to survive how people actually type.** The requirement was that
+"want to create workspace" finds the workspace tool, so exact substring
+matching was never going to work. `resources/js/lib/command-search.ts` drops
+filler words (`i`, `want`, `to`, `a`, `please` ...), scores each remaining
+token against label, curated keywords, tool name and description with
+descending weights, gives a bonus for prefix matches, and multiplies by how
+many tokens matched so a command answering more of the phrase outranks one
+matching a single common word. It is deliberately simpler than the server's
+`FuzzyMatcher`: eighteen curated entries with hand-written synonyms do not need
+edit distance, and filtering locally keeps the picker instant instead of firing
+a request per keystroke.
+
+The ranking logic lives in a framework-free module rather than inside the
+composable specifically so it could be verified: with no JS test runner in the
+project — and dependencies not being something to add unasked — it was checked
+by bundling the shipped module with esbuild and running it in node against the
+real catalogue dumped from PHP. **13 of 15 natural-language queries put the
+expected command first**, and both misses are defensible rather than broken:
+"add someone to the team" ranks `add_project_member` first because its label
+literally reads *"Add someone to a project"* (`invite_user` is second), and
+"what's overdue" ranks `find_tasks` above `get_analytics`, which is arguably
+the better answer — someone asking that usually wants the list, not the count.
+Empty query returns everything; gibberish returns nothing.
+
+**Interaction.** Both the panel and the dock support it, so `/` is never dead
+input. Up/down moves, Enter picks, Escape clears, the mouse follows the
+keyboard selection, results are grouped by category, and a small lock glyph
+marks the commands that will ask before changing anything. While `/` is
+active, Enter picks a command instead of sending the raw `/...` text as a
+message.
+
+**Files**: `AssistantCommandData`, `CommandCatalog`,
+`CommandCatalogController` + `CommandCatalogRequest`, the `assistant.commands`
+route, `command-search.ts`, `useAssistantCommands.ts`,
+`AssistantCommandPalette.vue`, and the input wiring in `AssistantPanel.vue` and
+`AssistantDock.vue`.
+
+**Tests** — `AssistantCommandCatalogTest`, 12 cases: every registered tool has
+copy and the catalogue describes no tool that does not exist (both directions);
+guests refused; an owner sees the write commands; a member is not offered
+`invite_user`; a client is not offered `get_analytics`; every command carries
+the copy the picker renders; the confirmation flag matches the registered tool
+so the lock glyph cannot lie; a foreign `workspace_id` and another user's
+`conversation_id` are both rejected; the conversation's workspace decides the
+list; and a user with no workspace still gets `create_workspace`.
+
+**Verification**: `php artisan test --compact` -> **1086 passed, 5069
+assertions** (1074 -> 1086, +12). `vendor/bin/pint --dirty --format agent`
+passed. `npm run lint:check` clean. `npm run build` succeeded.
+`npx vue-tsc --noEmit` -> exactly the two pre-existing `TS2688`
+`tsconfig.json` errors from entry #24, unchanged. `npm run format:check`
+reports 8 files, **none of them touched by this entry** — pre-existing
+formatting drift in `app.ts`, `NotificationBell.vue`, the two project modals,
+`TaskCommentThread.vue` and three pages; worth a separate `npm run format`
+pass.
+
+## Next recommended task (updated 2026-08-20, after entry #55)
+
+**`update_project` — close the last create-only loop.**
+
+Unchanged from entry #54: the picker now advertises `create_project` with no
+way to rename or re-describe what it makes, which makes the gap more visible
+rather than less. Reuse the existing project update action so the
+`project.updated` audit entry keeps being written, take `project_id`, `name`
+and `description` with omitted fields left untouched, let the existing project
+policy authorize it, and show old and new values side by side in the
+confirmation.
+
+Adding it is now also a one-line catalogue entry — and the completeness test
+added in this entry will fail until that copy exists, which is the intended
+prompt.
+
+After that, `manage_board_columns` remains the last P1 conversational gap.
+
+## Superseded next-task note (after entry #54)
 
 **`update_project` — close the last create-only loop.**
 

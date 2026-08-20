@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Assistant\Http\Controllers\ChatController;
+use App\Modules\Assistant\Http\Controllers\CommandCatalogController;
 use App\Modules\Assistant\Http\Controllers\ConfirmActionController;
 use App\Modules\Assistant\Http\Controllers\SpeechController;
 use App\Modules\Assistant\Http\Controllers\VoiceTranscriptionController;
@@ -14,6 +15,7 @@ Route::middleware(['auth', 'verified', 'throttle:assistant-chat'])
     ->group(function () {
         Route::post('chat', ChatController::class)->name('chat');
         Route::post('confirm', ConfirmActionController::class)->name('confirm');
+        Route::get('commands', CommandCatalogController::class)->name('commands');
     });
 
 Route::middleware(['auth', 'verified', 'throttle:assistant-voice'])

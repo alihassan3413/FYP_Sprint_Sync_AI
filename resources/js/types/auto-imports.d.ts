@@ -53,6 +53,7 @@ declare global {
   const isSupportedTimezone: typeof import('../lib/timezones').isSupportedTimezone
   const isValidMeetingLink: typeof import('../lib/meetings').isValidMeetingLink
   const markRaw: typeof import('vue').markRaw
+  const meaningfulTokens: typeof import('../lib/command-search').meaningfulTokens
   const memberPresence: typeof import('../lib/members').memberPresence
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
@@ -76,6 +77,8 @@ declare global {
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
   const router: typeof import('@inertiajs/vue3').router
+  const scoreCommand: typeof import('../lib/command-search').scoreCommand
+  const searchCommands: typeof import('../lib/command-search').searchCommands
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
@@ -93,11 +96,13 @@ declare global {
   const toRefs: typeof import('vue').toRefs
   const toSpeakableText: typeof import('../composables/useVoiceOutput').toSpeakableText
   const toValue: typeof import('vue').toValue
+  const tokenize: typeof import('../lib/command-search').tokenize
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
   const updateTheme: typeof import('../composables/useAppearance').updateTheme
   const useAiAssistant: typeof import('../composables/useAiAssitant').useAiAssistant
   const useAppearance: typeof import('../composables/useAppearance').useAppearance
+  const useAssistantCommands: typeof import('../composables/useAssistantCommands').useAssistantCommands
   const useAssistantPageContext: typeof import('../composables/useAiAssitant').useAssistantPageContext
   const useAttrs: typeof import('vue').useAttrs
   const useClipboard: typeof import('@vueuse/core').useClipboard
@@ -138,6 +143,9 @@ declare global {
   export type { AssistantState, PendingTool, AssistantMessage } from '../composables/useAiAssitant'
   import('../composables/useAiAssitant')
   // @ts-ignore
+  export type { AssistantCommand, CommandGroup } from '../composables/useAssistantCommands'
+  import('../composables/useAssistantCommands')
+  // @ts-ignore
   export type { TaskStatusUpdatedPayload } from '../composables/useProjectTaskStream'
   import('../composables/useProjectTaskStream')
   // @ts-ignore
@@ -158,6 +166,9 @@ declare global {
   // @ts-ignore
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
+  // @ts-ignore
+  export type { SearchableCommand } from '../lib/command-search'
+  import('../lib/command-search')
   // @ts-ignore
   export type { MeetingParticipant, MeetingTranscript, Meeting } from '../lib/meetings'
   import('../lib/meetings')
@@ -230,6 +241,7 @@ declare module 'vue' {
     readonly isSupportedTimezone: UnwrapRef<typeof import('../lib/timezones')['isSupportedTimezone']>
     readonly isValidMeetingLink: UnwrapRef<typeof import('../lib/meetings')['isValidMeetingLink']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly meaningfulTokens: UnwrapRef<typeof import('../lib/command-search')['meaningfulTokens']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
@@ -253,6 +265,8 @@ declare module 'vue' {
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly router: UnwrapRef<typeof import('@inertiajs/vue3')['router']>
+    readonly scoreCommand: UnwrapRef<typeof import('../lib/command-search')['scoreCommand']>
+    readonly searchCommands: UnwrapRef<typeof import('../lib/command-search')['searchCommands']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
@@ -270,11 +284,13 @@ declare module 'vue' {
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toSpeakableText: UnwrapRef<typeof import('../composables/useVoiceOutput')['toSpeakableText']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly tokenize: UnwrapRef<typeof import('../lib/command-search')['tokenize']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateTheme: UnwrapRef<typeof import('../composables/useAppearance')['updateTheme']>
     readonly useAiAssistant: UnwrapRef<typeof import('../composables/useAiAssitant')['useAiAssistant']>
     readonly useAppearance: UnwrapRef<typeof import('../composables/useAppearance')['useAppearance']>
+    readonly useAssistantCommands: UnwrapRef<typeof import('../composables/useAssistantCommands')['useAssistantCommands']>
     readonly useAssistantPageContext: UnwrapRef<typeof import('../composables/useAiAssitant')['useAssistantPageContext']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>

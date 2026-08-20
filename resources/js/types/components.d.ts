@@ -48,6 +48,7 @@ declare module 'vue' {
     AppSwitch: typeof import('./../components/ui/AppSwitch.vue')['default']
     AppToaster: typeof import('./../components/ui/AppToaster.vue')['default']
     AssigneePicker: typeof import('./../components/tasks/AssigneePicker.vue')['default']
+    AssistantCommandPalette: typeof import('./../components/ai/AssistantCommandPalette.vue')['default']
     AssistantDock: typeof import('./../components/ai/AssistantDock.vue')['default']
     AssistantFab: typeof import('./../components/ai/AssistantFab.vue')['default']
     AssistantMicButton: typeof import('./../components/ai/AssistantMicButton.vue')['default']

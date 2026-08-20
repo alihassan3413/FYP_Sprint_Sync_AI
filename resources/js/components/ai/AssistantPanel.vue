@@ -28,11 +28,29 @@ function shouldShowThinking(msg: { role: string; isLoading?: boolean; content?: 
     return msg.role === 'assistant' && msg.isLoading && !msg.content?.trim() && !msg.pendingTool;
 }
 
-const { inputValue, messages, isStreaming, submit, openDock, collapse, clearConversation, confirmTool } = useAiAssistant();
+const { inputValue, messages, isStreaming, submit, openDock, collapse, clearConversation, confirmTool, conversationId, pageContext } =
+    useAiAssistant();
 
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
+const paletteRef = ref<InstanceType<typeof AssistantCommandPalette> | null>(null);
 const isFocused = ref(false);
+
+const COMMAND_PREFIX = '/';
+
+const isCommandMode = computed(() => inputValue.value.startsWith(COMMAND_PREFIX));
+const commandQuery = computed(() => (isCommandMode.value ? inputValue.value.slice(COMMAND_PREFIX.length) : ''));
+
+function applyCommand(command: AssistantCommand) {
+    inputValue.value = command.template;
+    nextTick(() => focusInput());
+}
+
+function dismissCommands() {
+    if (isCommandMode.value) {
+        inputValue.value = '';
+    }
+}
 
 const hasMessages = computed(() => messages.value.length > 0);
 const isActive = computed(() => isFocused.value || inputValue.value.trim().length > 0);
@@ -74,7 +92,7 @@ watch(inputValue, () => nextTick(autoGrow));
 
 function onSubmitClick() {
     const prompt = inputValue.value.trim();
-    if (!prompt || isStreaming.value) return;
+    if (!prompt || isStreaming.value || isCommandMode.value) return;
     submit(prompt);
     scrollToLatest(true);
 }
@@ -85,6 +103,29 @@ function selectSuggestion(text: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+    if (isCommandMode.value) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            paletteRef.value?.move(e.key === 'ArrowDown' ? 1 : -1);
+
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            dismissCommands();
+
+            return;
+        }
+
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && paletteRef.value?.hasResults) {
+            e.preventDefault();
+            paletteRef.value?.choose();
+
+            return;
+        }
+    }
+
     if (e.key !== 'Enter') return;
 
     if (e.ctrlKey || e.metaKey) {
@@ -322,53 +363,65 @@ watch(
         </div>
 
         <!-- Input bar -->
-        <div
-            class="flex items-center justify-between gap-2 rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
-            @click="focusInput"
-        >
-            <motion.div
-                layout-id="assistant-icon"
-                :transition="{ type: 'spring', stiffness: 400, damping: 30 }"
-                class="bg-custom-blue flex size-11 shrink-0 items-center justify-center rounded-full"
-            >
-                <Sparkles class="size-4 text-white" :stroke-width="2" />
-            </motion.div>
-
-            <textarea
-                ref="inputRef"
-                v-model="inputValue"
-                rows="1"
-                :placeholder="props.placeholder"
-                :disabled="isStreaming"
-                aria-label="Message the assistant"
-                class="h-auto! min-w-0 flex-1 resize-none border-0! bg-transparent! px-2! py-0! text-center text-[16px] font-normal tracking-tight text-white outline-none [scrollbar-width:none] placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0! disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
-                @focus="isFocused = true"
-                @blur="isFocused = false"
-                @keydown="onKeydown"
+        <div class="relative">
+            <AssistantCommandPalette
+                v-if="isCommandMode"
+                ref="paletteRef"
+                :query="commandQuery"
+                :workspace-id="pageContext.workspace_id ?? null"
+                :conversation-id="conversationId"
+                @select="applyCommand"
+                @dismiss="dismissCommands"
             />
 
-            <AssistantMicButton />
-
-            <button
-                type="button"
-                :disabled="!inputValue.trim() || isStreaming"
-                class="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/30 text-white transition-all hover:bg-white/20 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Send message"
-                @click.stop="onSubmitClick"
+            <div
+                class="flex items-center justify-between gap-2 rounded-4xl bg-[rgba(34,34,34,0.15)] px-2 py-1.75 text-[12.5px] text-white/70"
+                @click="focusInput"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="size-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                <motion.div
+                    layout-id="assistant-icon"
+                    :transition="{ type: 'spring', stiffness: 400, damping: 30 }"
+                    class="bg-custom-blue flex size-11 shrink-0 items-center justify-center rounded-full"
                 >
-                    <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
-            </button>
+                    <Sparkles class="size-4 text-white" :stroke-width="2" />
+                </motion.div>
+
+                <textarea
+                    ref="inputRef"
+                    v-model="inputValue"
+                    rows="1"
+                    :placeholder="props.placeholder"
+                    :disabled="isStreaming"
+                    aria-label="Message the assistant"
+                    class="h-auto! min-w-0 flex-1 resize-none border-0! bg-transparent! px-2! py-0! text-center text-[16px] font-normal tracking-tight text-white outline-none [scrollbar-width:none] placeholder:text-white focus-visible:ring-0! focus-visible:ring-offset-0! disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
+                    @focus="isFocused = true"
+                    @blur="isFocused = false"
+                    @keydown="onKeydown"
+                />
+
+                <AssistantMicButton />
+
+                <button
+                    type="button"
+                    :disabled="!inputValue.trim() || isStreaming"
+                    class="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/30 text-white transition-all hover:bg-white/20 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Send message"
+                    @click.stop="onSubmitClick"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="size-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M5 12h14M13 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
         </div>
     </motion.div>
 </template>

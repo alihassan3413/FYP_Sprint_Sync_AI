@@ -26,6 +26,15 @@ export type ArchiveRecordData = {
     occurred_at: string;
     url: string;
 };
+export type AssistantCommandData = {
+    name: string;
+    label: string;
+    description: string;
+    category: string;
+    keywords: Array<string>;
+    template: string;
+    requires_confirmation: boolean;
+};
 export type AssistantUsageData = {
     conversations_total: number;
     messages_total: number;
