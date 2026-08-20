@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Deferred } from '@inertiajs/vue3';
-import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, FolderKanban, ListTodo, Mail, Plus, Rocket, Sparkles, Users } from 'lucide-vue-next';
+import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, FolderKanban, ListTodo, Mail, Rocket, Sparkles, Users } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -132,37 +132,48 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
             <!-- =========================================================== -->
             <!-- Hero greeting                                                 -->
             <!-- =========================================================== -->
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div class="min-w-0">
-                    <p class="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
-                        {{ formatDateEyebrow() }}
-                    </p>
-                    <h1 class="mt-1 text-2xl font-extrabold tracking-[-0.02em] sm:text-[30px]">
-                        {{ greeting() }}, <span class="dash-mark">{{ firstName }}</span>
-                    </h1>
-                    <p class="text-muted-foreground mt-1 text-sm">
-                        Here's what's happening across
-                        <span class="text-foreground font-medium">{{ workspaceMeta.name }}</span>
-                        today.
-                    </p>
-                </div>
+            <!-- =========================================================== -->
+            <!-- Hero band — the landing page's lavender panel, scaled down    -->
+            <!-- =========================================================== -->
+            <section class="dash-hero relative overflow-hidden rounded-[24px] p-5 sm:rounded-[28px] sm:p-7">
+                <div class="dash-glow" aria-hidden="true"></div>
 
-                <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    <span
-                        class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
-                    >
-                        <component :is="isPersonalScope ? ListTodo : Users" class="size-3" />
-                        {{ isPersonalScope ? 'My dashboard' : 'Team dashboard' }}
-                    </span>
+                <div class="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-extrabold tracking-[0.16em] uppercase opacity-45">[ {{ formatDateEyebrow() }} ]</p>
 
-                    <Button v-if="capabilities.canInviteMembers" as-child size="sm" class="gap-1.5 rounded-full">
-                        <Link :href="workspaceRoute('workspace.invitations.create')">
-                            <Plus class="size-3.5" />
+                        <h1 class="mt-3 text-[clamp(1.75rem,3.6vw,2.5rem)] leading-[1.02] font-extrabold tracking-[-0.03em]">
+                            {{ greeting() }}, <span class="dash-mark">{{ firstName }}</span>
+                        </h1>
+
+                        <p class="mt-2.5 max-w-[52ch] text-[14px] leading-relaxed font-medium opacity-65">
+                            Here's what's happening across
+                            <span class="font-bold opacity-100">{{ workspaceMeta.name }}</span>
+                            today.
+                        </p>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-2 text-[11.5px] font-bold dark:bg-white/10">
+                            <component :is="isPersonalScope ? ListTodo : Users" class="size-3.5" />
+                            {{ isPersonalScope ? 'My dashboard' : 'Team dashboard' }}
+                        </span>
+
+                        <Link
+                            v-if="capabilities.canInviteMembers"
+                            :href="workspaceRoute('workspace.invitations.create')"
+                            class="group inline-flex items-center gap-2 rounded-full bg-[#0B0B0F] py-2 pr-2 pl-4 text-[13px] font-bold text-white transition-transform hover:-translate-y-0.5 dark:bg-white dark:text-[#0B0B0F]"
+                        >
                             Invite teammate
+                            <span
+                                class="grid size-6 place-items-center rounded-full bg-[#BAFF1A] transition-transform duration-300 group-hover:rotate-45"
+                            >
+                                <ArrowUpRight class="size-3.5 text-[#0B0B0F]" :stroke-width="3" />
+                            </span>
                         </Link>
-                    </Button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
             <!-- =========================================================== -->
             <!-- What the assistant noticed — one finding, computed server-side -->
@@ -227,6 +238,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
             <!-- =========================================================== -->
             <div v-if="!showWorkspaceOverview" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <AppStatCard
+                    tone="lavender"
                     :label="isPersonalScope ? 'My tasks' : 'Team tasks'"
                     :value="taskProgress.total"
                     :hint="taskProgress.total === 1 ? 'assigned' : 'assigned'"
@@ -234,35 +246,35 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                     <template #icon><ListTodo class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Completed" :value="taskProgress.completed" :hint="`${taskProgress.completion_percentage}% done`">
-                    <template #icon><CheckCircle2 class="size-3.5 text-emerald-500" /></template>
+                <AppStatCard tone="lime" label="Completed" :value="taskProgress.completed" :hint="`${taskProgress.completion_percentage}% done`">
+                    <template #icon><CheckCircle2 class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Overdue" :value="taskProgress.overdue" :hint="taskProgress.overdue === 1 ? 'task' : 'tasks'">
-                    <template #icon><AlertTriangle class="size-3.5 text-amber-500" /></template>
+                <AppStatCard tone="ink" label="Overdue" :value="taskProgress.overdue" :hint="taskProgress.overdue === 1 ? 'task' : 'tasks'">
+                    <template #icon><AlertTriangle class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Projects" :value="projects.length" :hint="projects.length === 1 ? 'assigned' : 'assigned'">
+                <AppStatCard tone="indigo" label="Projects" :value="projects.length" :hint="projects.length === 1 ? 'assigned' : 'assigned'">
                     <template #icon><FolderKanban class="size-3.5" /></template>
                 </AppStatCard>
             </div>
 
             <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <AppStatCard label="Team" :value="teamMembers.length" :hint="teamMembers.length === 1 ? 'member' : 'members'">
+                <AppStatCard tone="lavender" label="Team" :value="teamMembers.length" :hint="teamMembers.length === 1 ? 'member' : 'members'">
                     <template #icon><Users class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Online" :value="onlineMembers.length" hint="right now">
+                <AppStatCard tone="lime" label="Online" :value="onlineMembers.length" hint="right now">
                     <template #icon>
-                        <Activity class="size-3.5 text-emerald-500" />
+                        <Activity class="size-3.5" />
                     </template>
                 </AppStatCard>
 
-                <AppStatCard label="Pending" :value="pendingInvitesCount" :hint="pendingInvitesCount === 1 ? 'invite' : 'invites'">
+                <AppStatCard tone="ink" label="Pending" :value="pendingInvitesCount" :hint="pendingInvitesCount === 1 ? 'invite' : 'invites'">
                     <template #icon><Mail class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Workspace age" :value="workspaceAge" :hint="workspaceAge === 1 ? 'day old' : 'days old'">
+                <AppStatCard tone="indigo" label="Workspace age" :value="workspaceAge" :hint="workspaceAge === 1 ? 'day old' : 'days old'">
                     <template #icon><Rocket class="size-3.5" /></template>
                 </AppStatCard>
             </div>
@@ -315,7 +327,32 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
 </template>
 
 <style scoped>
-/* A quiet nod to the landing page: the lime swipe under the name. */
+/*
+ * A scaled-down version of the landing page's lavender hero panel. The landing
+ * page forces light; the dashboard has a real dark mode, so every colour here
+ * needs both halves rather than being pinned to one.
+ */
+.dash-hero {
+    background: #e4e3ff;
+    color: #0b0b0f;
+}
+
+:global(.dark) .dash-hero {
+    background: color-mix(in oklab, var(--color-card) 82%, #365aff 18%);
+    color: var(--color-foreground);
+}
+
+/* Lime and indigo bleeding in from opposite corners, as on the landing hero. */
+.dash-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(45% 65% at 92% 6%, rgba(54, 90, 255, 0.16), transparent 70%),
+        radial-gradient(38% 55% at 2% 98%, rgba(186, 255, 26, 0.3), transparent 70%);
+}
+
+/* The lime swipe under the first name. */
 .dash-mark {
     position: relative;
     display: inline-block;
@@ -324,10 +361,10 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
 .dash-mark::after {
     content: '';
     position: absolute;
-    inset: auto -0.1em 0.04em;
-    height: 0.34em;
+    inset: auto -0.1em 0.06em;
+    height: 0.32em;
     border-radius: 3px;
-    background: oklch(0.86 0.22 122 / 0.55);
+    background: #baff1a;
     z-index: -1;
 }
 </style>
