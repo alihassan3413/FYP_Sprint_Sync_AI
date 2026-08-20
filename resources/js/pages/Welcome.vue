@@ -707,7 +707,7 @@ const commandGroups = [
                     <span class="rounded-full bg-[var(--ss-ink)] px-4 py-2 text-[13px] font-extrabold text-white">sprintsync</span>
                     <span class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">AI-native sprint management.</span>
                 </div>
-                <p class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">© 2026 SprintSync · Built with Laravel and Claude.</p>
+                <p class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">© 2026 SprintSync · Powered by ITG.</p>
             </div>
         </footer>
     </div>
