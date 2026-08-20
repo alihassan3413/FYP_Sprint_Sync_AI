@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, FolderKanban, ListTodo, User, Users } from 'lucide-vue-next';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, FolderKanban, ListTodo, Sparkles, User, Users } from 'lucide-vue-next';
 
+import { Deferred } from '@inertiajs/vue3';
+
+import ProjectHealthCard from '@/components/analytics/ProjectHealthCard.vue';
 import AppDataTable, { type Column } from '@/components/ui/AppDataTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Analytics, AnalyticsFilters, AnalyticsProjectOption, AnalyticsSprintOption, ProjectSummary } from '@/lib/analytics';
+import type { ProjectHealth } from '@/lib/health';
 import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
@@ -11,6 +15,8 @@ const props = defineProps<{
     filters: AnalyticsFilters;
     projects: AnalyticsProjectOption[];
     sprints: AnalyticsSprintOption[];
+    /** Deferred: each assessment costs queries, and the totals are useful first. */
+    health?: ProjectHealth[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -77,6 +83,13 @@ const sprintSelectOptions = computed(() => props.sprints.filter((sprint) => proj
 
 const isPersonalScope = computed(() => props.analytics.scope === 'personal');
 
+/** Projects needing attention lead; the calm ones follow. */
+const rankedHealth = computed(() => {
+    const order: Record<string, number> = { critical: 0, at_risk: 1, watch: 2, healthy: 3, no_data: 4 };
+
+    return [...(props.health ?? [])].sort((a, b) => order[a.verdict] - order[b.verdict]);
+});
+
 const projectColumns: Column<ProjectSummary>[] = [
     { key: 'name', label: 'Project' },
     { key: 'total_tasks', label: 'Tasks', align: 'right', width: '90px' },
@@ -108,6 +121,39 @@ const projectColumns: Column<ProjectSummary>[] = [
                     </span>
                 </template>
             </AppPageHeader>
+
+            <!-- Project health — the judgement, not just the totals -->
+            <section>
+                <div class="mb-3 flex items-center gap-2">
+                    <span class="grid size-6 place-items-center rounded-full bg-lime-400/20">
+                        <Sparkles class="size-3.5 text-lime-600 dark:text-lime-400" />
+                    </span>
+                    <h2 class="text-[15px] font-semibold tracking-tight">How each project is going</h2>
+                    <AppBadge variant="purple" size="sm">AI</AppBadge>
+                </div>
+
+                <Deferred data="health">
+                    <template #fallback>
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div v-for="n in 2" :key="n" class="bg-card animate-pulse rounded-xl border p-6">
+                                <div class="bg-muted h-4 w-40 rounded"></div>
+                                <div class="bg-muted mt-4 h-1.5 w-full rounded-full"></div>
+                                <div class="mt-4 grid grid-cols-3 gap-2">
+                                    <div class="bg-muted h-12 rounded-lg"></div>
+                                    <div class="bg-muted h-12 rounded-lg"></div>
+                                    <div class="bg-muted h-12 rounded-lg"></div>
+                                </div>
+                                <div class="bg-muted mt-5 h-16 w-full rounded-lg"></div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div v-if="rankedHealth.length > 0" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <ProjectHealthCard v-for="item in rankedHealth" :key="item.project_id" :health="item" />
+                    </div>
+                    <p v-else class="text-muted-foreground text-xs">No projects to assess yet.</p>
+                </Deferred>
+            </section>
 
             <div class="bg-card flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center">
                 <select

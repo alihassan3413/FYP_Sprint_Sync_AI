@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Trash2, Users } from 'lucide-vue-next';
+import { Deferred } from '@inertiajs/vue3';
+import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Sparkles, Trash2, Users } from 'lucide-vue-next';
 
+import ProjectHealthCard from '@/components/analytics/ProjectHealthCard.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { ProjectHealth } from '@/lib/health';
 import type { Meeting } from '@/lib/meetings';
 import type { Project, ProjectMember } from '@/lib/projects';
 import type { Sprint, SprintReport } from '@/lib/sprints';
@@ -10,6 +13,8 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 
 const props = defineProps<{
     project: Project;
+    /** Deferred: the board matters first. */
+    health?: ProjectHealth;
     canManageProjects: boolean;
     canDeleteProject: boolean;
     canManageTasks: boolean;
@@ -249,6 +254,28 @@ function onDeleted() {
 
                     <!-- Meetings -->
                     <TabsContent value="sprints">
+                        <!-- How the project is really going, above the sprint detail -->
+                        <Deferred data="health">
+                            <template #fallback>
+                                <div class="bg-card mb-4 animate-pulse rounded-xl border p-6">
+                                    <div class="bg-muted h-4 w-44 rounded"></div>
+                                    <div class="bg-muted mt-4 h-1.5 w-full rounded-full"></div>
+                                    <div class="bg-muted mt-5 h-16 w-full rounded-lg"></div>
+                                </div>
+                            </template>
+
+                            <div v-if="health" class="mb-4">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <span class="grid size-6 place-items-center rounded-full bg-lime-400/20">
+                                        <Sparkles class="size-3.5 text-lime-600 dark:text-lime-400" />
+                                    </span>
+                                    <h3 class="text-[15px] font-semibold tracking-tight">Project health</h3>
+                                    <AppBadge variant="purple" size="sm">AI</AppBadge>
+                                </div>
+                                <ProjectHealthCard :health="health" hide-title />
+                            </div>
+                        </Deferred>
+
                         <SprintPanel
                             :project-id="project.id"
                             :sprints="sprints"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Activity, AlertTriangle, CheckCircle2, FolderKanban, ListTodo, Mail, Plus, Rocket, Users } from 'lucide-vue-next';
+import { Deferred } from '@inertiajs/vue3';
+import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, FolderKanban, ListTodo, Mail, Plus, Rocket, Sparkles, Users } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -30,6 +31,15 @@ const props = defineProps<{
     taskProgress: TaskProgress;
     projects: DashboardProjectSummary[];
     scope: 'team' | 'personal';
+    /** Deferred: the most serious finding across this person's projects, or null. */
+    insight?: {
+        severity: 'critical' | 'warning';
+        headline: string;
+        detail: string;
+        suggestion: string | null;
+        project_id: number;
+        project_name: string;
+    } | null;
     capabilities: {
         canInviteMembers: boolean;
         canCreateProjects: boolean;
@@ -110,6 +120,8 @@ const onboardingSteps = computed<ChecklistStep[]>(() => [
 ]);
 
 const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
+
+const insightIsCritical = computed(() => props.insight?.severity === 'critical');
 </script>
 
 <template>
@@ -125,7 +137,9 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     <p class="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
                         {{ formatDateEyebrow() }}
                     </p>
-                    <h1 class="mt-1 text-2xl font-semibold tracking-tight sm:text-[28px]">{{ greeting() }}, {{ firstName }}.</h1>
+                    <h1 class="mt-1 text-2xl font-extrabold tracking-[-0.02em] sm:text-[30px]">
+                        {{ greeting() }}, <span class="dash-mark">{{ firstName }}</span>
+                    </h1>
                     <p class="text-muted-foreground mt-1 text-sm">
                         Here's what's happening across
                         <span class="text-foreground font-medium">{{ workspaceMeta.name }}</span>
@@ -141,7 +155,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                         {{ isPersonalScope ? 'My dashboard' : 'Team dashboard' }}
                     </span>
 
-                    <Button v-if="capabilities.canInviteMembers" as-child size="sm" class="gap-1.5">
+                    <Button v-if="capabilities.canInviteMembers" as-child size="sm" class="gap-1.5 rounded-full">
                         <Link :href="workspaceRoute('workspace.invitations.create')">
                             <Plus class="size-3.5" />
                             Invite teammate
@@ -149,6 +163,64 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     </Button>
                 </div>
             </div>
+
+            <!-- =========================================================== -->
+            <!-- What the assistant noticed — one finding, computed server-side -->
+            <!-- =========================================================== -->
+            <Deferred data="insight">
+                <template #fallback>
+                    <div class="bg-card animate-pulse rounded-2xl border p-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-muted size-9 rounded-xl"></div>
+                            <div class="flex-1 space-y-2">
+                                <div class="bg-muted h-3 w-52 rounded"></div>
+                                <div class="bg-muted h-3 w-80 max-w-full rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div
+                    v-if="insight"
+                    class="relative overflow-hidden rounded-2xl border p-4 sm:p-5"
+                    :class="
+                        insightIsCritical
+                            ? 'via-card to-card border-rose-500/30 bg-linear-to-br from-rose-500/[0.07]'
+                            : 'via-card to-card border-amber-500/30 bg-linear-to-br from-amber-400/[0.09]'
+                    "
+                >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div class="flex min-w-0 flex-1 items-start gap-3">
+                            <span
+                                class="grid size-9 shrink-0 place-items-center rounded-xl"
+                                :class="insightIsCritical ? 'bg-rose-500/15 text-rose-500' : 'bg-lime-400/25 text-lime-700 dark:text-lime-300'"
+                            >
+                                <Sparkles class="size-4" />
+                            </span>
+
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="text-[14px] font-bold tracking-tight">{{ insight.headline }}</p>
+                                    <AppBadge :variant="insightIsCritical ? 'danger' : 'warning'" size="sm">
+                                        {{ insight.project_name }}
+                                    </AppBadge>
+                                </div>
+                                <p class="text-muted-foreground mt-1 text-[12.5px] leading-relaxed">{{ insight.detail }}</p>
+                                <p v-if="insight.suggestion" class="mt-1 text-[12.5px] leading-relaxed font-medium">
+                                    {{ insight.suggestion }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <Button v-if="capabilities.canViewAnalytics" as-child size="sm" variant="outline" class="shrink-0 gap-1.5 rounded-full">
+                            <Link :href="workspaceRoute('workspace.analytics.index')">
+                                See the breakdown
+                                <ArrowUpRight class="size-3.5" />
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+            </Deferred>
 
             <!-- =========================================================== -->
             <!-- Stat cards — every number is real, no fake data               -->
@@ -208,7 +280,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     <OnBoardingCheckList v-if="capabilities.canManageWorkspace" :steps="onboardingSteps" />
 
                     <!-- Activity feed -->
-                    <div v-if="showWorkspaceOverview" class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
+                    <div v-if="showWorkspaceOverview" class="bg-card rounded-2xl border p-5 shadow-sm sm:p-6">
                         <div class="mb-4 flex items-center justify-between">
                             <h3 class="text-[15px] font-semibold tracking-tight">Recent workspace activity</h3>
                             <button type="button" class="text-muted-foreground hover:text-foreground text-[11.5px] font-medium transition-colors">
@@ -228,7 +300,7 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
                     <OnlineNowCard v-if="showWorkspaceOverview" :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
 
                     <!-- Tip card — small, only shows when relevant -->
-                    <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-xl border border-dashed p-4 text-xs">
+                    <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-2xl border border-dashed p-4 text-xs">
                         <p class="text-foreground font-medium">💡 Pro tip</p>
                         <p class="text-muted-foreground mt-1 leading-relaxed">
                             Press
@@ -241,3 +313,21 @@ const allDone = computed(() => onboardingSteps.value.every((s) => s.done));
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* A quiet nod to the landing page: the lime swipe under the name. */
+.dash-mark {
+    position: relative;
+    display: inline-block;
+}
+
+.dash-mark::after {
+    content: '';
+    position: absolute;
+    inset: auto -0.1em 0.04em;
+    height: 0.34em;
+    border-radius: 3px;
+    background: oklch(0.86 0.22 122 / 0.55);
+    z-index: -1;
+}
+</style>

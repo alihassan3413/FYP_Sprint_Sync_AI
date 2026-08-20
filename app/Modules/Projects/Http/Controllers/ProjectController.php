@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Projects\Http\Controllers;
 
 use App\Models\User;
+use App\Modules\Analytics\Actions\EvaluateProjectHealth;
 use App\Modules\Meetings\Data\MeetingData;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Actions\BuildSprintReport;
@@ -42,8 +43,13 @@ final class ProjectController
         ]);
     }
 
-    public function show(Request $request, Workspace $workspace, Project $project, BuildSprintReport $sprintReport): Response
-    {
+    public function show(
+        Request $request,
+        Workspace $workspace,
+        Project $project,
+        BuildSprintReport $sprintReport,
+        EvaluateProjectHealth $health,
+    ): Response {
         $user = $request->user();
 
         abort_unless($user->can('view', $project), 403);
@@ -59,6 +65,8 @@ final class ProjectController
 
         return Inertia::render('projects/show', [
             'project' => ProjectData::fromModel($project),
+            /* Deferred: the board matters first, and this costs a few queries. */
+            'health' => Inertia::defer(fn () => $health->handle($project)),
             'canManageProjects' => $user->can('update', $project),
             'canDeleteProject' => $user->can('delete', $project),
             'canManageTasks' => $canManageTasks,

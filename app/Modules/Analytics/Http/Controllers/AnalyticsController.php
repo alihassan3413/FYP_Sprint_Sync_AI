@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Analytics\Http\Controllers;
 
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
+use App\Modules\Analytics\Actions\EvaluateProjectHealth;
 use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Projects\Models\Sprint;
 use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
@@ -15,12 +16,16 @@ use Inertia\Response;
 
 final class AnalyticsController
 {
+    /** Each assessment costs a handful of queries; the page is a summary, not an audit. */
+    private const MAX_HEALTH_PROJECTS = 8;
+
     public function index(
         Request $request,
         Workspace $workspace,
         BuildAnalyticsAction $action,
         ResolveAnalyticsScope $resolveScope,
         ResolveWorkspaceCapabilities $resolveCapabilities,
+        EvaluateProjectHealth $evaluateHealth,
     ): Response {
         $user = $request->user();
 
@@ -36,8 +41,23 @@ final class AnalyticsController
         $scope = $resolveScope->handle($workspace, $user);
         $accessibleProjects = $scope->accessibleProjects;
 
+        /*
+         * Health is per project, so the filter narrows it the same way it
+         * narrows the totals. Deferred because evaluating every project costs a
+         * query each and the page is useful before it arrives.
+         */
+        $healthProjects = isset($filters['project_id'])
+            ? $accessibleProjects->where('id', (int) $filters['project_id'])
+            : $accessibleProjects;
+
         return Inertia::render('analytics/index', [
             'analytics' => $action->handle($scope, $filters),
+            'health' => Inertia::defer(
+                fn () => $healthProjects
+                    ->take(self::MAX_HEALTH_PROJECTS)
+                    ->map(fn ($project) => $evaluateHealth->handle($project))
+                    ->values(),
+            ),
             'filters' => [
                 'project_id' => $filters['project_id'] ?? null,
                 'sprint_id' => $filters['sprint_id'] ?? null,

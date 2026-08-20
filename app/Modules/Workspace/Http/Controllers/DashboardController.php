@@ -6,6 +6,7 @@ namespace App\Modules\Workspace\Http\Controllers;
 
 use App\Models\User;
 use App\Modules\Analytics\Actions\BuildAnalyticsAction;
+use App\Modules\Analytics\Actions\EvaluateProjectHealth;
 use App\Modules\Analytics\Actions\ResolveAnalyticsScope;
 use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
@@ -21,12 +22,16 @@ use Inertia\Response;
 
 final class DashboardController
 {
+    /** Each assessment costs queries; a dashboard strip does not need an audit. */
+    private const INSIGHT_PROJECT_LIMIT = 6;
+
     public function __invoke(
         Request $request,
         Workspace $workspace,
         BuildAnalyticsAction $analytics,
         ResolveAnalyticsScope $resolveScope,
         ResolveWorkspaceCapabilities $resolveCapabilities,
+        EvaluateProjectHealth $health,
     ): Response {
         $user = $request->user();
 
@@ -66,7 +71,59 @@ final class DashboardController
             'projects' => $summary->projects,
             'scope' => $summary->scope,
             'capabilities' => $capabilities->forDashboard(),
+            /*
+             * One finding, chosen server-side: the single most serious thing
+             * across the projects this person can see. Deferred so the dashboard
+             * paints before the assessment runs, and withheld from clients —
+             * team workload is not theirs to see.
+             */
+            'insight' => $capabilities->viewAnalytics && ! $isClient
+                ? Inertia::defer(fn () => $this->insight($workspace, $user, $health))
+                : null,
         ]);
+    }
+
+    /**
+     * The one thing most worth saying on a dashboard.
+     *
+     * Scans the projects this user can see and returns the highest-severity
+     * finding across all of them, so the strip says something specific
+     * ("Sara holds 8 of 8 open tasks on Website Revamp") rather than a
+     * generic nudge. Null when nothing is worth interrupting them for.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function insight(Workspace $workspace, User $user, EvaluateProjectHealth $health): ?array
+    {
+        $weight = ['critical' => 0, 'warning' => 1];
+        $best = null;
+
+        foreach ($workspace->accessibleProjectsFor($user)->limit(self::INSIGHT_PROJECT_LIMIT)->get() as $project) {
+            $assessment = $health->handle($project);
+
+            foreach ($assessment->signals as $signal) {
+                if (! array_key_exists($signal->severity, $weight)) {
+                    continue;
+                }
+
+                if ($best === null || $weight[$signal->severity] < $weight[$best['severity']]) {
+                    $best = [
+                        'severity' => $signal->severity,
+                        'headline' => $signal->headline,
+                        'detail' => $signal->detail,
+                        'suggestion' => $signal->suggestion,
+                        'project_id' => $assessment->project_id,
+                        'project_name' => $assessment->project_name,
+                    ];
+                }
+
+                if ($best['severity'] === 'critical') {
+                    return $best;
+                }
+            }
+        }
+
+        return $best;
     }
 
     /**

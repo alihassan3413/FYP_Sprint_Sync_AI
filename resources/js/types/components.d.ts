@@ -152,6 +152,7 @@ declare module 'vue' {
     OnlineNowCard: typeof import('./../components/dashboard/OnlineNowCard.vue')['default']
     PlaceholderPattern: typeof import('./../components/PlaceholderPattern.vue')['default']
     ProjectActionsMenu: typeof import('./../components/projects/ProjectActionsMenu.vue')['default']
+    ProjectHealthCard: typeof import('./../components/analytics/ProjectHealthCard.vue')['default']
     ProjectMemberActionsMenu: typeof import('./../components/projects/ProjectMemberActionsMenu.vue')['default']
     ProjectSummaryList: typeof import('./../components/dashboard/ProjectSummaryList.vue')['default']
     RemoveMemberDialog: typeof import('./../components/team/RemoveMemberDialog.vue')['default']

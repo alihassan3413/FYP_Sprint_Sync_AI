@@ -72,6 +72,7 @@ declare global {
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
   const parseError: typeof import('../lib/errors/handleError').parseError
   const provide: typeof import('vue').provide
+  const rankFindings: typeof import('../lib/health').rankFindings
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
@@ -79,9 +80,12 @@ declare global {
   const router: typeof import('@inertiajs/vue3').router
   const scoreCommand: typeof import('../lib/command-search').scoreCommand
   const searchCommands: typeof import('../lib/command-search').searchCommands
+  const severityDot: typeof import('../lib/health').severityDot
+  const severityStyles: typeof import('../lib/health').severityStyles
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const shareTone: typeof import('../lib/health').shareTone
   const sprintHealthStyles: typeof import('../lib/sprints').sprintHealthStyles
   const sprintStatusLabel: typeof import('../lib/sprints').sprintStatusLabel
   const sprintStatusStyles: typeof import('../lib/sprints').sprintStatusStyles
@@ -129,6 +133,7 @@ declare global {
   const useUserTimezone: typeof import('../composables/useUserTimezone').useUserTimezone
   const useVoiceInput: typeof import('../composables/useVoiceInput').useVoiceInput
   const useVoiceOutput: typeof import('../composables/useVoiceOutput').useVoiceOutput
+  const verdictStyles: typeof import('../lib/health').verdictStyles
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -169,6 +174,9 @@ declare global {
   // @ts-ignore
   export type { SearchableCommand } from '../lib/command-search'
   import('../lib/command-search')
+  // @ts-ignore
+  export type { HealthVerdict, FindingSeverity, HealthFinding, WorkloadEntry, ProjectHealth } from '../lib/health'
+  import('../lib/health')
   // @ts-ignore
   export type { MeetingParticipant, MeetingTranscript, Meeting } from '../lib/meetings'
   import('../lib/meetings')
@@ -260,6 +268,7 @@ declare module 'vue' {
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
+    readonly rankFindings: UnwrapRef<typeof import('../lib/health')['rankFindings']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
@@ -267,9 +276,12 @@ declare module 'vue' {
     readonly router: UnwrapRef<typeof import('@inertiajs/vue3')['router']>
     readonly scoreCommand: UnwrapRef<typeof import('../lib/command-search')['scoreCommand']>
     readonly searchCommands: UnwrapRef<typeof import('../lib/command-search')['searchCommands']>
+    readonly severityDot: UnwrapRef<typeof import('../lib/health')['severityDot']>
+    readonly severityStyles: UnwrapRef<typeof import('../lib/health')['severityStyles']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly shareTone: UnwrapRef<typeof import('../lib/health')['shareTone']>
     readonly sprintHealthStyles: UnwrapRef<typeof import('../lib/sprints')['sprintHealthStyles']>
     readonly sprintStatusLabel: UnwrapRef<typeof import('../lib/sprints')['sprintStatusLabel']>
     readonly sprintStatusStyles: UnwrapRef<typeof import('../lib/sprints')['sprintStatusStyles']>
@@ -317,6 +329,7 @@ declare module 'vue' {
     readonly useUserTimezone: UnwrapRef<typeof import('../composables/useUserTimezone')['useUserTimezone']>
     readonly useVoiceInput: UnwrapRef<typeof import('../composables/useVoiceInput')['useVoiceInput']>
     readonly useVoiceOutput: UnwrapRef<typeof import('../composables/useVoiceOutput')['useVoiceOutput']>
+    readonly verdictStyles: UnwrapRef<typeof import('../lib/health')['verdictStyles']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>
