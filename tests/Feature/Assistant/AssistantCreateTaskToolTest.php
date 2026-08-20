@@ -65,6 +65,15 @@ final class AssistantCreateTaskToolTest extends TestCase
      */
     private function create(User $user, array $args, ?Workspace $workspace = null): array
     {
+        /*
+         * These tests are about assignees, sprints, audit trails and duplicates,
+         * not about where on the board a task lands. create_task asks which
+         * column to use when a project has more than one, so a default is
+         * supplied here; the question itself is covered by
+         * AssistantCreateTaskPlacementTest.
+         */
+        $args += ['board_column' => 'default'];
+
         return app(CreateTaskTool::class)->execute($args, $this->contextFor($user, $workspace));
     }
 

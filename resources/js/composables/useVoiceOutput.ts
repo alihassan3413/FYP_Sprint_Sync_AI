@@ -7,9 +7,9 @@ import { ref } from 'vue';
  * Audio comes from the server's neural text-to-speech endpoint, which sounds
  * far better than the voices a browser ships with. Synthesis costs about 1.5
  * seconds per request no matter how short the text, so replies are split into
- * chunks: the first is kept small to start talking quickly, and later chunks
- * are synthesised while the previous one is still playing. Only the first
- * chunk's latency is ever heard.
+ * chunks: the first sentence is dispatched the instant it is complete, and
+ * later chunks are batched and synthesised while the previous one is still
+ * playing. Only the first chunk's latency is ever heard.
  *
  * If the endpoint is unavailable or fails, playback silently degrades to the
  * browser's own speech synthesis for the rest of the session. The assistant
@@ -21,12 +21,20 @@ const STORAGE_KEY = 'assistant.voice.enabled';
 const SENTENCE_BOUNDARY = /([.!?]+["')\]]*\s+|\n+)/;
 
 /**
- * The opening chunk trades length for time-to-first-word; later chunks are
- * larger because they are synthesised during playback and cost a round trip
- * each.
+ * Later chunks are batched, because each costs a round trip and they are
+ * synthesised while the previous one is still playing — nobody is waiting on
+ * them. The first utterance is never batched: see {@see speakChunk}.
  */
-const FIRST_CHUNK_TARGET = 120;
 const CHUNK_TARGET = 340;
+
+/**
+ * How far the first utterance may run without a sentence ending before it is
+ * cut at a clause instead. A reply that opens with a long run-on would
+ * otherwise stay silent until the whole thing had streamed in.
+ */
+const FIRST_CHUNK_CLAUSE_LIMIT = 140;
+
+const CLAUSE_BOUNDARY = /[,;:]\s+/g;
 
 /** Server-side cap on a single utterance. Keep in sync with assistant.speech. */
 const MAX_CHUNK_CHARACTERS = 1000;
@@ -272,8 +280,6 @@ function speakChunk(chunk: string) {
 
     pendingBuffer += chunk;
 
-    const target = hasSpokenThisReply ? CHUNK_TARGET : FIRST_CHUNK_TARGET;
-
     for (;;) {
         const match = pendingBuffer.match(SENTENCE_BOUNDARY);
 
@@ -282,12 +288,36 @@ function speakChunk(chunk: string) {
         const end = match.index + match[0].length;
 
         // Hold short sentences back so later requests carry a full breath of
-        // text rather than costing a round trip each.
-        if (end < target && pendingBuffer.length < target) break;
+        // text rather than costing a round trip each. Never the first one:
+        // time-to-first-word is the whole of what a listener perceives as
+        // responsiveness, and most replies are shorter than one batch, so
+        // batching the opener meant waiting for the entire reply.
+        if (hasSpokenThisReply && end < CHUNK_TARGET && pendingBuffer.length < CHUNK_TARGET) break;
 
         enqueue(pendingBuffer.slice(0, end));
         pendingBuffer = pendingBuffer.slice(end);
         hasSpokenThisReply = true;
+    }
+
+    // Nothing spoken yet and no sentence in sight: start on a clause so the
+    // voice comes in on time even when the reply opens with a run-on.
+    if (!hasSpokenThisReply && pendingBuffer.length > FIRST_CHUNK_CLAUSE_LIMIT) {
+        CLAUSE_BOUNDARY.lastIndex = 0;
+        let cut = 0;
+
+        for (let m = CLAUSE_BOUNDARY.exec(pendingBuffer); m !== null; m = CLAUSE_BOUNDARY.exec(pendingBuffer)) {
+            const candidate = m.index + m[0].length;
+
+            if (candidate > FIRST_CHUNK_CLAUSE_LIMIT) break;
+
+            cut = candidate;
+        }
+
+        if (cut > 0) {
+            enqueue(pendingBuffer.slice(0, cut));
+            pendingBuffer = pendingBuffer.slice(cut);
+            hasSpokenThisReply = true;
+        }
     }
 
     // A long clause with no terminator (a list, a run-on) would otherwise stay

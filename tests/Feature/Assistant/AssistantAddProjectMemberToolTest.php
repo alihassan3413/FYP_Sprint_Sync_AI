@@ -99,6 +99,8 @@ final class AssistantAddProjectMemberToolTest extends TestCase
             'project_id' => $this->project->id,
             'title' => 'Wire up the settings page',
             'assignee_email' => $this->teammate->email,
+            /* Placement is not what this test is about; see AssistantCreateTaskPlacementTest. */
+            'board_column' => 'default',
         ], $this->contextFor($this->owner));
 
         $this->assertTrue($retry['success']);

@@ -9,6 +9,7 @@ use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Data\StoreTaskData;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Notifications\NotificationChannel;
 use App\Notifications\NotificationPreferenceGate;
@@ -28,12 +29,7 @@ final class CreateTaskAction
 
     public function handle(Project $project, User $creator, StoreTaskData $data): Task
     {
-        $defaultColumn = $project->boardColumns()
-            ->where('is_default', true)
-            ->orderBy('position')
-            ->first();
-
-        $defaultColumnId = $defaultColumn?->id;
+        $column = $this->resolveColumn($project, $data->board_column_id);
 
         $task = $project->tasks()->create([
             'title' => $data->title,
@@ -41,8 +37,8 @@ final class CreateTaskAction
             'assigned_to' => $data->assigned_to,
             'due_date' => $data->due_date,
             'sprint_id' => $data->sprint_id,
-            'board_column_id' => $defaultColumnId,
-            'completed_at' => $defaultColumn?->is_done === true ? now() : null,
+            'board_column_id' => $column?->id,
+            'completed_at' => $column?->is_done === true ? now() : null,
             'workspace_id' => $project->workspace_id,
         ]);
 
@@ -69,6 +65,27 @@ final class CreateTaskAction
         $this->notifyAssignment($task, $project, $creator);
 
         return $task;
+    }
+
+    /**
+     * The caller may name a column; anything else starts where new work starts.
+     * An unknown or foreign column id falls back rather than throwing, because
+     * a task landing in the wrong column is recoverable and losing it is not.
+     */
+    private function resolveColumn(Project $project, ?int $columnId): ?BoardColumn
+    {
+        if ($columnId !== null) {
+            $chosen = $project->boardColumns()->whereKey($columnId)->first();
+
+            if ($chosen !== null) {
+                return $chosen;
+            }
+        }
+
+        return $project->boardColumns()
+            ->where('is_default', true)
+            ->orderBy('position')
+            ->first();
     }
 
     private function notifyAssignment(Task $task, Project $project, User $actor): void

@@ -282,6 +282,8 @@ final class AssistantSprintToolsTest extends TestCase
             'project_id' => $this->project->id,
             'title' => 'Wire up the payment step',
             'sprint' => 'current',
+            /* Placement is not what this test is about; see AssistantCreateTaskPlacementTest. */
+            'board_column' => 'default',
         ], $this->context());
 
         $this->assertTrue($result['success']);

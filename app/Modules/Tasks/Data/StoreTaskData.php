@@ -26,5 +26,9 @@ final class StoreTaskData extends Data
 
         #[Rule(['nullable', 'integer'])]
         public ?int $sprint_id = null,
+
+        /** Null means "wherever new work starts" — the project's default column. */
+        #[Rule(['nullable', 'integer'])]
+        public ?int $board_column_id = null,
     ) {}
 }

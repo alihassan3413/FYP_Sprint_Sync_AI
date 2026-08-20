@@ -15,9 +15,11 @@ use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Data\StoreTaskData;
+use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\UserRole;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -50,9 +52,10 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             .'if the user is only on one project, it goes there. Pass project_name when the user named a project '
             .'("in CIG Florida") — it is matched loosely. Only when several projects could be meant will this ask, '
             .'and then you should ask the user which one and call again. '
-            .'The task starts in the project\'s first board column. '
-            .'assignee accepts a name or an email address and is matched against the people on the project. '
-            .'Pass sprint="current" to put it in the running sprint.';
+            .'Once the project is known, this asks which board column the task should start in, and — when that '
+            .'project has a sprint running — whether the task belongs in that sprint. Both come back as questions '
+            .'with the options listed: put them to the user, then call again with board_column and sprint set. '
+            .'assignee accepts a name or an email address and is matched against the people on the project.';
     }
 
     /**
@@ -98,9 +101,20 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
                     'format' => 'date',
                     'description' => 'Optional due date as YYYY-MM-DD, resolved against the current date above.',
                 ],
+                'board_column' => [
+                    'type' => 'string',
+                    'description' => 'Which board column the task starts in, as the user said it ("In Progress"). '
+                        .'Matched loosely against that project\'s columns. Use "default" for wherever new work normally starts.',
+                    'maxLength' => 80,
+                ],
+                'board_column_id' => [
+                    'type' => 'integer',
+                    'description' => 'The column ID, when this tool has already handed you the list.',
+                ],
                 'sprint' => [
                     'type' => 'string',
-                    'description' => 'Optional sprint: "current" for the running sprint, or a sprint name.',
+                    'description' => 'Which sprint, once the user has said: "current" for the running sprint, '
+                        .'"none" to leave it in the backlog, or a sprint name.',
                     'maxLength' => 80,
                 ],
             ],
@@ -158,8 +172,15 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             $details['due_date'] = UntrustedText::inline((string) $args['due_date']) ?? '';
         }
 
+        if (isset($args['board_column'])) {
+            $details['column'] = UntrustedText::inline((string) $args['board_column']) ?? '';
+        }
+
         if (isset($args['sprint'])) {
-            $details['sprint'] = UntrustedText::inline((string) $args['sprint']) ?? '';
+            $sprint = trim((string) $args['sprint']);
+            $details['sprint'] = in_array(mb_strtolower($sprint), ['none', 'backlog'], true)
+                ? 'Backlog (not in a sprint)'
+                : (UntrustedText::inline($sprint) ?? '');
         }
 
         return $details;
@@ -239,6 +260,30 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             return $sprint;
         }
 
+        /*
+         * Placement questions come last, after everything the user actually said
+         * has been checked. Asking "which column?" and only then reporting that
+         * the assignee is not on the project wastes a turn and reads as careless.
+         *
+         * A client never sees these: their request lands in the starting column
+         * for the team to triage, and they cannot plan sprints.
+         */
+        $column = null;
+
+        if (! $isClient) {
+            $column = $this->resolveColumn($args, $project);
+
+            if (is_array($column)) {
+                return $column;
+            }
+
+            $sprintChoice = $this->askAboutSprint($args, $project);
+
+            if ($sprintChoice !== null) {
+                return $sprintChoice;
+            }
+        }
+
         $dueDate = null;
 
         if (! empty($args['due_date'])) {
@@ -259,6 +304,7 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
             'assigned_to' => $assignee?->id,
             'due_date' => $dueDate,
             'sprint_id' => $sprint?->id,
+            'board_column_id' => $column?->id,
         ]));
 
         $result = [
@@ -272,6 +318,7 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
                 'due_date' => $task->due_date?->toDateString(),
                 'sprint_id' => $task->sprint_id,
                 'sprint_name' => UntrustedText::inline($sprint?->name),
+                'board_column' => UntrustedText::inline($task->boardColumn?->name),
             ],
             'url' => route('workspace.projects.show', [
                 'workspace' => $workspace->slug,
@@ -291,6 +338,135 @@ final class CreateTaskTool implements AssistantTool, ProvidesConfirmationDetails
         }
 
         return $result;
+    }
+
+    /**
+     * Which column the task starts in.
+     *
+     * Returns the column, or a tool payload asking the user to pick one. A
+     * project with a single column is not worth a question, and neither is one
+     * where the user already said where it goes.
+     *
+     * @param  array<string, mixed>  $args
+     * @return BoardColumn|array<string, mixed>|null
+     */
+    private function resolveColumn(array $args, Project $project): mixed
+    {
+        $columns = $project->boardColumns()->orderBy('position')->get();
+
+        if ($columns->isEmpty()) {
+            return null;
+        }
+
+        if (isset($args['board_column_id'])) {
+            $chosen = $columns->firstWhere('id', (int) $args['board_column_id']);
+
+            if ($chosen !== null) {
+                return $chosen;
+            }
+        }
+
+        $named = isset($args['board_column']) ? trim((string) $args['board_column']) : '';
+
+        if ($named !== '') {
+            if (in_array(mb_strtolower($named), ['default', 'first', 'backlog'], true)) {
+                return $this->startingColumn($columns);
+            }
+
+            $ranked = FuzzyMatcher::rank($named, $columns, fn (BoardColumn $column) => [$column->name], self::NAME_FLOOR);
+
+            if ($ranked !== []) {
+                return $ranked[0]['item'];
+            }
+
+            return [
+                'success' => false,
+                'error_code' => 'column_not_found',
+                'error' => "\"{$project->name}\" has no column like \"{$named}\".",
+                'columns' => $this->summariseColumns($columns),
+                'next_step' => 'Show the user these columns and ask which one, then call again with board_column_id.',
+            ];
+        }
+
+        if ($columns->count() === 1) {
+            return $columns->first();
+        }
+
+        return [
+            'success' => false,
+            'error_code' => 'column_required',
+            'error' => "Which column should this start in on {$project->name}?",
+            'columns' => $this->summariseColumns($columns),
+            'next_step' => 'Ask the user which of these columns the task should go in, listing them in order. '
+                .'Then call create_task again with the same details plus board_column_id. '
+                .'If they do not mind, use the one marked is_starting_column.',
+        ];
+    }
+
+    /**
+     * A running sprint is a decision the user should make knowingly: work put in
+     * it is committed scope, and work left out of it is not.
+     *
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>|null
+     */
+    private function askAboutSprint(array $args, Project $project): ?array
+    {
+        if (isset($args['sprint']) && trim((string) $args['sprint']) !== '') {
+            return null;
+        }
+
+        $active = $project->sprints()->active()->first();
+
+        if ($active === null) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'error_code' => 'sprint_choice_required',
+            'error' => "\"{$active->name}\" is running on {$project->name}. Should this task go into it?",
+            'sprint' => [
+                'id' => $active->id,
+                'name' => UntrustedText::inline($active->name),
+                'ends_on' => $active->ends_on?->toDateString(),
+            ],
+            'next_step' => 'Ask the user whether to add the task to this running sprint or leave it in the backlog. '
+                .'Then call create_task again with the same details plus sprint="current" for the sprint, '
+                .'or sprint="none" to keep it out.',
+        ];
+    }
+
+    /**
+     * `is_default` marks the three columns every project ships with, not where
+     * new work lands, so handing it to the assistant would mislead it. What it
+     * needs is which column a task goes to when nobody picks — the same one
+     * CreateTaskAction falls back to.
+     *
+     * @param  Collection<int, BoardColumn>  $columns
+     * @return array<int, array<string, mixed>>
+     */
+    private function summariseColumns($columns): array
+    {
+        $starting = $this->startingColumn($columns);
+
+        return $columns
+            ->map(fn (BoardColumn $column) => [
+                'id' => $column->id,
+                'name' => UntrustedText::inline($column->name),
+                'is_starting_column' => $column->id === $starting?->id,
+                'is_done_column' => $column->is_done,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, BoardColumn>  $columns
+     */
+    private function startingColumn($columns): ?BoardColumn
+    {
+        return $columns->firstWhere('is_default', true) ?? $columns->first();
     }
 
     /**
