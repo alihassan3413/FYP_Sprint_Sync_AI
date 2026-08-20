@@ -142,7 +142,8 @@ async function streamOut(text: string): Promise<void> {
 
 function applyEffect(effect: Scene['effect']): void {
     if (effect === 'task') {
-        todo.value = ['Fix the login redirect', ...todo.value];
+        /* Capped: the column has a reserved height, so it must never grow. */
+        todo.value = ['Fix the login redirect', ...todo.value].slice(0, 3);
     }
 
     if (effect === 'sprint') {
@@ -250,6 +251,12 @@ const navLinks = [
     { label: 'For agencies', href: '#agencies' },
 ];
 
+const boardColumns = computed(() => [
+    { name: 'To Do', items: todo.value },
+    { name: 'In Progress', items: doing.value },
+    { name: 'Done', items: done.value },
+]);
+
 const pillars = [
     {
         t: 'It asks before it acts.',
@@ -282,149 +289,82 @@ const commandGroups = [
     <Head title="SprintSync — run your sprint by saying so" />
 
     <div class="ss">
-        <!-- ============================ NAV ============================ -->
-        <header class="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
-            <nav
-                class="mx-auto flex max-w-[1200px] items-center justify-between gap-3 rounded-full transition-all duration-300"
-                :class="scrolled ? 'bg-white/80 px-3 py-2.5 shadow-[0_8px_30px_rgba(11,11,15,0.10)] backdrop-blur-xl' : 'px-1 py-2'"
-            >
-                <Link :href="route('home')" class="group flex shrink-0 items-center gap-2">
-                    <span
-                        class="flex items-center gap-2 rounded-full bg-[var(--ss-ink)] py-2.5 pr-3 pl-4 text-[15px] font-extrabold tracking-tight text-white transition-transform duration-300 group-hover:-translate-y-0.5"
-                    >
-                        sprintsync
-                    </span>
-                    <span
-                        class="grid size-9 place-items-center rounded-full bg-[var(--ss-lime)] transition-transform duration-300 group-hover:rotate-12"
-                    >
-                        <Sparkles class="size-4 text-[var(--ss-ink)]" :stroke-width="2.5" />
-                    </span>
-                </Link>
+        <div class="mx-auto max-w-[1320px] px-3 py-3 sm:px-4 sm:py-4">
+            <!-- ==================== HERO SHELL ==================== -->
+            <section class="relative overflow-hidden rounded-[28px] bg-[var(--ss-lavender)] p-4 sm:rounded-[40px] sm:p-6 lg:p-8">
+                <div class="ss-grain" aria-hidden="true"></div>
 
-                <div class="hidden items-center gap-2 md:flex">
+                <!-- nav, inside the card -->
+                <nav class="relative flex items-center justify-between gap-3">
+                    <Link :href="route('home')" class="group flex shrink-0 items-center gap-2.5">
+                        <span
+                            class="grid size-9 place-items-center rounded-full bg-[var(--ss-ink)] transition-transform duration-300 group-hover:rotate-12"
+                        >
+                            <Sparkles class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
+                        </span>
+                        <span class="text-[17px] font-extrabold tracking-tight text-[var(--ss-ink)]">sprintsync</span>
+                    </Link>
+
+                    <div class="hidden items-center gap-1 md:flex">
+                        <a
+                            v-for="link in navLinks"
+                            :key="link.href"
+                            :href="link.href"
+                            class="rounded-full px-5 py-2.5 text-[14px] font-bold text-[var(--ss-ink)]/70 transition-all duration-200 hover:bg-white hover:text-[var(--ss-ink)]"
+                        >
+                            {{ link.label }}
+                        </a>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <Link
+                            :href="route('login')"
+                            class="hidden rounded-full px-5 py-2.5 text-[14px] font-bold text-[var(--ss-ink)]/70 transition-colors hover:text-[var(--ss-ink)] sm:block"
+                        >
+                            Log in
+                        </Link>
+                        <Link
+                            :href="route('register')"
+                            class="group flex items-center gap-2 rounded-full bg-[var(--ss-ink)] py-2.5 pr-2.5 pl-5 text-[14px] font-bold text-white transition-transform duration-200 hover:-translate-y-0.5"
+                        >
+                            Get started
+                            <span
+                                class="grid size-7 place-items-center rounded-full bg-[var(--ss-lime)] transition-transform duration-300 group-hover:rotate-45"
+                            >
+                                <ArrowUpRight class="size-3.5 text-[var(--ss-ink)]" :stroke-width="3" />
+                            </span>
+                        </Link>
+
+                        <button
+                            type="button"
+                            class="grid size-10 place-items-center rounded-full bg-white text-[var(--ss-ink)] md:hidden"
+                            :aria-expanded="menuOpen"
+                            aria-label="Menu"
+                            @click="menuOpen = !menuOpen"
+                        >
+                            <component :is="menuOpen ? X : Menu" class="size-5" :stroke-width="2.5" />
+                        </button>
+                    </div>
+                </nav>
+
+                <div v-if="menuOpen" class="relative mt-3 rounded-3xl bg-white p-2 md:hidden">
                     <a
                         v-for="link in navLinks"
                         :key="link.href"
                         :href="link.href"
-                        class="rounded-full bg-white px-5 py-2.5 text-[14px] font-bold text-[var(--ss-ink)] shadow-[0_1px_0_rgba(11,11,15,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-ink)] hover:text-white"
+                        class="block rounded-2xl px-4 py-3 text-[15px] font-bold text-[var(--ss-ink)] hover:bg-[var(--ss-lavender)]"
+                        @click="menuOpen = false"
                     >
                         {{ link.label }}
                     </a>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <Link
-                        :href="route('login')"
-                        class="group hidden items-center gap-2 rounded-full bg-[var(--ss-ink)] py-2.5 pr-5 pl-2.5 text-[14px] font-bold text-white transition-transform duration-200 hover:-translate-y-0.5 sm:flex"
-                    >
-                        <span class="grid size-7 place-items-center rounded-full bg-white/15 transition-colors group-hover:bg-[var(--ss-lime)]">
-                            <ArrowUpRight class="size-3.5 transition-colors group-hover:text-[var(--ss-ink)]" :stroke-width="2.5" />
-                        </span>
-                        Log in
-                    </Link>
-
-                    <Link
-                        :href="route('register')"
-                        class="rounded-full bg-[var(--ss-indigo)] px-5 py-2.5 text-[14px] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-indigo-hot)]"
-                    >
-                        Get started
-                    </Link>
-
-                    <button
-                        type="button"
-                        class="grid size-11 place-items-center rounded-full bg-white text-[var(--ss-ink)] md:hidden"
-                        :aria-expanded="menuOpen"
-                        aria-label="Menu"
-                        @click="menuOpen = !menuOpen"
-                    >
-                        <component :is="menuOpen ? X : Menu" class="size-5" :stroke-width="2.5" />
-                    </button>
-                </div>
-            </nav>
-
-            <div v-if="menuOpen" class="mx-auto mt-2 max-w-[1200px] rounded-3xl bg-white p-3 shadow-[0_20px_60px_rgba(11,11,15,0.16)] md:hidden">
-                <a
-                    v-for="link in navLinks"
-                    :key="link.href"
-                    :href="link.href"
-                    class="block rounded-2xl px-4 py-3 text-[15px] font-bold text-[var(--ss-ink)] hover:bg-[var(--ss-paper)]"
-                    @click="menuOpen = false"
-                >
-                    {{ link.label }}
-                </a>
-            </div>
-        </header>
-
-        <!-- ============================ HERO ============================ -->
-        <section class="relative overflow-hidden px-4 pt-28 pb-6 sm:px-6 sm:pt-36">
-            <div class="ss-grain" aria-hidden="true"></div>
-
-            <div class="relative mx-auto max-w-[1200px]">
-                <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                    <!-- Headline -->
-                    <div class="lg:col-span-7 lg:pt-6">
-                        <span
-                            class="inline-flex items-center gap-2 rounded-full bg-[var(--ss-lavender)] px-4 py-2 text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-indigo)] uppercase"
-                        >
-                            <span class="size-1.5 animate-pulse rounded-full bg-[var(--ss-indigo)]"></span>
-                            AI-native sprint management
-                        </span>
-
-                        <h1 class="mt-6 text-[clamp(2.75rem,6.4vw,5.25rem)] leading-[0.94] font-extrabold tracking-[-0.035em] text-[var(--ss-ink)]">
-                            Run your sprint<br />
-                            by <span class="ss-mark">saying so.</span>
-                        </h1>
-
-                        <p class="mt-6 max-w-[46ch] text-[clamp(1rem,1.35vw,1.2rem)] leading-[1.55] font-medium text-[var(--ss-ink-dim)]">
-                            SprintSync turns one sentence into a task, a sprint, a meeting or a report — inside a permission model that keeps the AI
-                            in its lane.
-                        </p>
-
-                        <div class="mt-8 flex flex-wrap items-center gap-3">
-                            <Link
-                                :href="route('register')"
-                                class="group inline-flex items-center gap-2 rounded-full bg-[var(--ss-indigo)] py-4 pr-4 pl-7 text-[15px] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--ss-indigo-hot)]"
-                            >
-                                Get started free
-                                <span class="grid size-8 place-items-center rounded-full bg-white/18 transition-transform group-hover:rotate-45">
-                                    <ArrowUpRight class="size-4" :stroke-width="2.5" />
-                                </span>
-                            </Link>
-
-                            <a
-                                href="#inside"
-                                class="group inline-flex items-center gap-3 rounded-full bg-white py-4 pr-7 pl-3 text-[15px] font-bold text-[var(--ss-ink)] transition-all duration-200 hover:-translate-y-0.5"
-                            >
-                                <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] text-white">
-                                    <Play class="size-3.5 fill-current" />
-                                </span>
-                                Watch it work
-                            </a>
-                        </div>
-
-                        <!-- Chips drive the demo -->
-                        <div class="mt-9 flex flex-wrap gap-2">
-                            <button
-                                v-for="(item, index) in scenes"
-                                :key="item.id"
-                                type="button"
-                                class="rounded-full border px-4 py-2 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5"
-                                :class="
-                                    active === index
-                                        ? 'border-transparent bg-[var(--ss-ink)] text-white'
-                                        : 'border-[rgba(11,11,15,0.12)] bg-transparent text-[var(--ss-ink-dim)] hover:border-[var(--ss-ink)] hover:text-[var(--ss-ink)]'
-                                "
-                                @click="jumpTo(index)"
-                            >
-                                {{ item.chip }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- The assistant, doing it -->
-                    <div class="lg:col-span-5">
-                        <div class="relative flex h-full min-h-[460px] flex-col rounded-[28px] bg-[var(--ss-ink)] p-5 sm:p-6">
-                            <div class="flex items-center justify-between">
+                <!-- hero body -->
+                <div class="relative mt-8 grid grid-cols-1 items-stretch gap-5 lg:mt-4 lg:grid-cols-12 lg:gap-6">
+                    <!-- the assistant, doing it -->
+                    <div class="order-2 lg:order-1 lg:col-span-5">
+                        <div class="ss-demo flex flex-col rounded-[24px] bg-[var(--ss-ink)] p-5">
+                            <div class="flex h-8 shrink-0 items-center justify-between">
                                 <span class="text-[11px] font-extrabold tracking-[0.16em] text-white/40 uppercase">Live preview</span>
                                 <span class="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/70">
                                     <span class="size-1.5 rounded-full bg-[var(--ss-lime)]"></span>
@@ -432,13 +372,15 @@ const commandGroups = [
                                 </span>
                             </div>
 
-                            <!-- composer -->
-                            <div class="mt-5 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
-                                <p class="min-h-[3.5rem] font-mono text-[14px] leading-[1.5] text-white">
-                                    {{ typed }}<span v-if="phase === 'typing'" class="ss-caret"></span>
-                                </p>
+                            <!-- composer: fixed height, so typing never moves the page -->
+                            <div class="mt-4 shrink-0 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
+                                <div class="h-[92px] overflow-hidden sm:h-[84px]">
+                                    <p class="font-mono text-[13.5px] leading-[1.5] text-white">
+                                        {{ typed }}<span v-if="phase === 'typing'" class="ss-caret"></span>
+                                    </p>
+                                </div>
 
-                                <div class="mt-3 flex items-center justify-between">
+                                <div class="mt-2 flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="rounded-lg bg-white/10 px-2 py-1 font-mono text-[11px] font-bold text-white/60">/</span>
                                         <Mic class="size-4 text-white/40" :stroke-width="2.5" />
@@ -449,19 +391,18 @@ const commandGroups = [
                                 </div>
                             </div>
 
-                            <!-- reply -->
-                            <div class="mt-4 flex-1">
-                                <div v-if="phase === 'thinking'" class="flex items-center gap-2 px-1">
+                            <!-- reply: fixed height -->
+                            <div class="mt-4 h-[96px] shrink-0 overflow-hidden sm:h-[80px]">
+                                <div v-if="phase === 'thinking'" class="flex items-center gap-2 px-1 pt-1">
                                     <span class="ss-dot"></span><span class="ss-dot ss-dot-2"></span><span class="ss-dot ss-dot-3"></span>
                                     <span class="ml-1 text-[12px] font-semibold text-white/40">SprintSync is working</span>
                                 </div>
+                                <p v-else class="px-1 text-[14.5px] leading-[1.5] font-medium text-white/90">{{ streamed }}</p>
+                            </div>
 
-                                <p v-else-if="streamed" class="px-1 text-[15px] leading-[1.55] font-medium text-white/90">
-                                    {{ streamed }}
-                                </p>
-
-                                <!-- confirmation -->
-                                <div v-if="showConfirm" class="ss-pop mt-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-[var(--ss-lime)]/40">
+                            <!-- outcome slot: reserved for the tallest card, so nothing jumps -->
+                            <div class="mt-3 h-[196px] shrink-0">
+                                <div v-if="showConfirm" class="ss-pop rounded-2xl bg-white/[0.07] p-4 ring-1 ring-[var(--ss-lime)]/40">
                                     <div class="flex items-center gap-2">
                                         <Shield class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
                                         <span class="text-[13px] font-extrabold text-white">Confirm this action</span>
@@ -474,7 +415,7 @@ const commandGroups = [
                                         </div>
                                     </dl>
 
-                                    <div class="mt-4 flex justify-end gap-2">
+                                    <div class="mt-3 flex justify-end gap-2">
                                         <span class="rounded-full px-3 py-1.5 text-[12px] font-bold text-white/50">Cancel</span>
                                         <span class="rounded-full bg-[var(--ss-lime)] px-4 py-1.5 text-[12px] font-extrabold text-[var(--ss-ink)]">
                                             Confirm
@@ -483,170 +424,218 @@ const commandGroups = [
                                 </div>
 
                                 <div
-                                    v-if="showDenied"
-                                    class="ss-pop mt-4 rounded-2xl bg-[rgba(251,113,133,0.10)] p-4 ring-1 ring-[var(--ss-rose)]/40"
+                                    v-else-if="showDenied"
+                                    class="ss-pop rounded-2xl bg-[rgba(251,113,133,0.10)] p-4 ring-1 ring-[var(--ss-rose)]/40"
                                 >
-                                    <p class="text-[12px] font-bold text-[var(--ss-rose)]">Blocked by your permissions — nothing was changed.</p>
-                                </div>
-                            </div>
-
-                            <p class="mt-4 text-[11px] leading-relaxed font-medium text-white/30">
-                                Every command shown is a real action the product performs.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ===================== BENTO ROW ===================== -->
-                <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-                    <!-- board -->
-                    <div class="rounded-[28px] bg-white p-5 sm:p-6 lg:col-span-5">
-                        <div class="flex items-center justify-between">
-                            <span class="flex items-center gap-2 text-[12px] font-extrabold tracking-[0.12em] text-[var(--ss-ink-faint)] uppercase">
-                                <Kanban class="size-3.5" :stroke-width="2.5" /> Board
-                            </span>
-                            <span
-                                v-if="meeting"
-                                class="ss-pop flex items-center gap-1.5 rounded-full bg-[var(--ss-lavender)] px-3 py-1.5 text-[11px] font-bold text-[var(--ss-indigo)]"
-                            >
-                                <CalendarDays class="size-3" :stroke-width="2.5" /> {{ meeting.when }}
-                            </span>
-                        </div>
-
-                        <div class="mt-4 grid grid-cols-3 gap-2.5">
-                            <div
-                                v-for="col in [
-                                    { n: 'To Do', i: todo },
-                                    { n: 'In Progress', i: doing },
-                                    { n: 'Done', i: done },
-                                ]"
-                                :key="col.n"
-                            >
-                                <p
-                                    class="mb-2 flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider text-[var(--ss-ink-faint)] uppercase"
-                                >
-                                    {{ col.n }}
-                                    <span class="rounded-full bg-[var(--ss-paper)] px-1.5 py-0.5 text-[10px]">{{ col.i.length }}</span>
-                                </p>
-                                <div class="space-y-2">
-                                    <div
-                                        v-for="card in col.i"
-                                        :key="card"
-                                        class="ss-pop rounded-xl bg-[var(--ss-paper)] p-2.5 text-[11px] leading-snug font-bold text-[var(--ss-ink)]"
-                                    >
-                                        {{ card }}
-                                    </div>
+                                    <p class="text-[12.5px] leading-relaxed font-bold text-[var(--ss-rose)]">
+                                        Blocked by your permissions — nothing was changed.
+                                    </p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- sprint health -->
-                    <div class="flex flex-col justify-between rounded-[28px] bg-[var(--ss-lime)] p-5 sm:p-6 lg:col-span-3">
-                        <div class="flex items-start justify-between">
-                            <span class="text-[12px] font-extrabold tracking-[0.12em] text-[var(--ss-ink)]/60 uppercase">Sprint 4</span>
-                            <span
-                                v-if="sprintLive"
-                                class="ss-pop rounded-full bg-[var(--ss-ink)] px-3 py-1.5 text-[11px] font-extrabold text-[var(--ss-lime)]"
+                    <!-- headline -->
+                    <div class="order-1 flex flex-col justify-center lg:order-2 lg:col-span-7 lg:pl-4">
+                        <span class="text-[12px] font-extrabold tracking-[0.16em] text-[var(--ss-ink)]/45 uppercase">
+                            [ AI-native sprint management ]
+                        </span>
+
+                        <h1 class="mt-5 text-[clamp(2.5rem,5.6vw,4.75rem)] leading-[0.95] font-extrabold tracking-[-0.035em] text-[var(--ss-ink)]">
+                            Run your
+                            <span class="ss-glyph"><Kanban class="size-[0.62em] text-[var(--ss-lime)]" :stroke-width="2.5" /></span>
+                            sprint by <span class="ss-mark">saying so.</span>
+                        </h1>
+
+                        <p class="mt-6 max-w-[44ch] text-[clamp(0.98rem,1.2vw,1.15rem)] leading-[1.55] font-medium text-[var(--ss-ink)]/60">
+                            SprintSync turns one sentence into a task, a sprint, a meeting or a report — inside a permission model that keeps the AI
+                            in its lane.
+                        </p>
+
+                        <div class="mt-8 flex flex-wrap items-center gap-3">
+                            <Link
+                                :href="route('register')"
+                                class="group inline-flex items-center gap-3 rounded-full bg-[var(--ss-lime)] py-4 pr-4 pl-7 text-[15px] font-extrabold text-[var(--ss-ink)] transition-transform duration-200 hover:-translate-y-0.5"
                             >
-                                At risk
-                            </span>
-                        </div>
+                                Get Started
+                                <span
+                                    class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] transition-transform duration-300 group-hover:rotate-45"
+                                >
+                                    <ArrowUpRight class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
+                                </span>
+                            </Link>
 
-                        <div>
-                            <p class="text-[clamp(2.75rem,5vw,3.75rem)] leading-none font-extrabold tracking-tight text-[var(--ss-ink)]">
-                                {{ sprintPct }}<span class="text-[0.5em]">%</span>
-                            </p>
-                            <div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ss-ink)]/15">
-                                <div
-                                    class="h-full rounded-full bg-[var(--ss-ink)] transition-all duration-[900ms] ease-out"
-                                    :style="{ width: sprintPct + '%' }"
-                                ></div>
-                            </div>
-                            <p class="mt-3 text-[13px] font-bold text-[var(--ss-ink)]/70">Scope done against time gone. Three days left.</p>
-                        </div>
-                    </div>
-
-                    <!-- commands -->
-                    <div class="flex flex-col justify-between rounded-[28px] bg-[var(--ss-indigo)] p-5 text-white sm:p-6 lg:col-span-4">
-                        <span class="text-[12px] font-extrabold tracking-[0.12em] text-white/60 uppercase">Ask for anything</span>
-                        <div>
-                            <p class="text-[clamp(2.75rem,5vw,3.75rem)] leading-none font-extrabold tracking-tight">19</p>
-                            <p class="mt-2 text-[15px] leading-snug font-bold text-white/85">
-                                real actions the assistant can take — the same ones the buttons call.
-                            </p>
                             <a
                                 href="#inside"
-                                class="mt-4 inline-flex items-center gap-1 text-[13px] font-extrabold text-[var(--ss-lime)] transition-all hover:gap-2"
+                                class="group inline-flex items-center gap-3 rounded-full bg-white py-4 pr-7 pl-3 text-[15px] font-bold text-[var(--ss-ink)] transition-transform duration-200 hover:-translate-y-0.5"
                             >
-                                See the list <ChevronRight class="size-4" :stroke-width="3" />
+                                <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] text-white">
+                                    <Play class="size-3.5 fill-current" />
+                                </span>
+                                Watch it work
                             </a>
                         </div>
+
+                        <div class="mt-8 flex flex-wrap gap-2">
+                            <button
+                                v-for="(item, index) in scenes"
+                                :key="item.id"
+                                type="button"
+                                class="rounded-full border px-4 py-2 text-[12.5px] font-bold transition-all duration-200 hover:-translate-y-0.5"
+                                :class="
+                                    active === index
+                                        ? 'border-transparent bg-[var(--ss-ink)] text-white'
+                                        : 'border-[rgba(11,11,15,0.14)] text-[var(--ss-ink)]/55 hover:border-[var(--ss-ink)] hover:text-[var(--ss-ink)]'
+                                "
+                                @click="jumpTo(index)"
+                            >
+                                {{ item.chip }}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- ============================ TRUST ============================ -->
-        <section id="how" data-reveal class="ss-reveal px-4 py-20 sm:px-6 sm:py-28">
-            <div class="mx-auto grid max-w-[1200px] gap-10 md:grid-cols-3">
-                <div v-for="pillar in pillars" :key="pillar.t">
-                    <span class="grid size-10 place-items-center rounded-full bg-[var(--ss-lime)]">
-                        <Check class="size-5 text-[var(--ss-ink)]" :stroke-width="3" />
-                    </span>
-                    <h3 class="mt-5 text-[clamp(1.4rem,2vw,1.8rem)] leading-tight font-extrabold tracking-tight text-[var(--ss-ink)]">
-                        {{ pillar.t }}
-                    </h3>
-                    <p class="mt-3 text-[15px] leading-relaxed font-medium text-[var(--ss-ink-dim)]">{{ pillar.d }}</p>
-                </div>
-            </div>
-        </section>
+            <!-- ==================== BENTO ==================== -->
+            <div class="mt-3 grid grid-cols-1 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-12">
+                <!-- board -->
+                <div class="ss-bento flex flex-col rounded-[28px] bg-white p-5 sm:p-6 lg:col-span-5">
+                    <div class="flex h-7 shrink-0 items-center justify-between">
+                        <span class="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.14em] text-[var(--ss-ink)]/40 uppercase">
+                            <Kanban class="size-3.5" :stroke-width="2.5" /> Board
+                        </span>
+                        <span
+                            v-if="meeting"
+                            class="ss-pop flex items-center gap-1.5 rounded-full bg-[var(--ss-lavender)] px-3 py-1.5 text-[11px] font-bold text-[var(--ss-indigo)]"
+                        >
+                            <CalendarDays class="size-3" :stroke-width="2.5" /> {{ meeting.when }}
+                        </span>
+                    </div>
 
-        <!-- ============================ COMMANDS ============================ -->
-        <section id="inside" data-reveal class="ss-reveal px-4 pb-20 sm:px-6 sm:pb-28">
-            <div class="mx-auto max-w-[1200px] rounded-[36px] bg-[var(--ss-ink)] p-6 sm:p-12">
-                <span class="text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-lime)] uppercase">The whole product, in sentences</span>
-                <h2 class="mt-4 max-w-[20ch] text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.02] font-extrabold tracking-[-0.03em] text-white">
-                    Nineteen things you can just ask for.
-                </h2>
-
-                <div class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-                    <div v-for="group in commandGroups" :key="group.group">
-                        <p class="text-[11px] font-extrabold tracking-[0.14em] text-white/35 uppercase">{{ group.group }}</p>
-                        <div class="mt-3 flex flex-wrap gap-1.5">
-                            <span
-                                v-for="item in group.items"
-                                :key="item"
-                                class="rounded-full bg-white/[0.07] px-3 py-1.5 text-[12px] font-bold text-white/80 transition-colors hover:bg-[var(--ss-lime)] hover:text-[var(--ss-ink)]"
-                            >
-                                {{ item }}
-                            </span>
+                    <div class="mt-4 grid flex-1 grid-cols-3 gap-2.5">
+                        <div v-for="col in boardColumns" :key="col.name">
+                            <p class="mb-2 flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider text-[var(--ss-ink)]/35 uppercase">
+                                {{ col.name }}
+                                <span class="rounded-full bg-[var(--ss-paper)] px-1.5 py-0.5">{{ col.items.length }}</span>
+                            </p>
+                            <div class="h-[152px] space-y-2 overflow-hidden">
+                                <div
+                                    v-for="card in col.items"
+                                    :key="card"
+                                    class="ss-pop rounded-xl bg-[var(--ss-paper)] p-2.5 text-[11px] leading-snug font-bold text-[var(--ss-ink)]"
+                                >
+                                    {{ card }}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <p class="mt-10 text-[13px] font-medium text-white/35">
-                    Type <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono font-bold text-white/70">/</span> in the app to search all nineteen
-                    in plain language. "want to start a new sprint" finds the right one.
-                </p>
-            </div>
-        </section>
+                <!-- sprint health -->
+                <div class="ss-bento flex flex-col justify-between rounded-[28px] bg-[var(--ss-indigo)] p-5 text-white sm:p-6 lg:col-span-3">
+                    <div class="flex h-7 shrink-0 items-start justify-between">
+                        <span class="text-[11px] font-extrabold tracking-[0.14em] text-white/55 uppercase">[ Sprint 4 ]</span>
+                        <span
+                            v-if="sprintLive"
+                            class="ss-pop rounded-full bg-[var(--ss-lime)] px-3 py-1 text-[11px] font-extrabold text-[var(--ss-ink)]"
+                        >
+                            At risk
+                        </span>
+                    </div>
 
-        <!-- ============================ AGENCIES ============================ -->
-        <section id="agencies" data-reveal class="ss-reveal px-4 pb-20 sm:px-6 sm:pb-28">
-            <div class="mx-auto grid max-w-[1200px] items-center gap-4 lg:grid-cols-12">
-                <div class="rounded-[28px] bg-[var(--ss-lavender)] p-6 sm:p-10 lg:col-span-7">
-                    <span class="text-[12px] font-extrabold tracking-[0.14em] text-[var(--ss-indigo)] uppercase">For agencies</span>
+                    <div>
+                        <p class="text-[clamp(2.75rem,5vw,3.5rem)] leading-none font-extrabold tracking-tight">
+                            {{ sprintPct }}<span class="text-[0.5em]">%</span>
+                        </p>
+                        <div class="mt-3 h-2 overflow-hidden rounded-full bg-white/20">
+                            <div
+                                class="h-full rounded-full bg-[var(--ss-lime)] transition-all duration-[900ms] ease-out"
+                                :style="{ width: sprintPct + '%' }"
+                            ></div>
+                        </div>
+                        <p class="mt-3 text-[13px] leading-snug font-bold text-white/70">Scope done against time gone. Three days left.</p>
+                    </div>
+                </div>
+
+                <!-- commands -->
+                <div class="ss-bento flex flex-col justify-between rounded-[28px] bg-[var(--ss-ink)] p-5 sm:p-6 lg:col-span-4">
+                    <span class="h-7 shrink-0 text-[11px] font-extrabold tracking-[0.14em] text-white/40 uppercase">[ Ask for anything ]</span>
+                    <div>
+                        <p class="text-[clamp(2.75rem,5vw,3.5rem)] leading-none font-extrabold tracking-tight text-white">19</p>
+                        <p class="mt-2 text-[14.5px] leading-snug font-bold text-white/80">
+                            real actions the assistant can take — the same ones the buttons call.
+                        </p>
+                        <a
+                            href="#inside"
+                            class="mt-4 inline-flex items-center gap-1 text-[13px] font-extrabold text-[var(--ss-lime)] transition-all hover:gap-2"
+                        >
+                            See the list <ChevronRight class="size-4" :stroke-width="3" />
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== TRUST ==================== -->
+            <section id="how" data-reveal class="ss-reveal px-2 py-20 sm:px-4 sm:py-28">
+                <div class="grid gap-10 md:grid-cols-3">
+                    <div v-for="pillar in pillars" :key="pillar.t">
+                        <span class="grid size-10 place-items-center rounded-full bg-[var(--ss-lime)]">
+                            <Check class="size-5 text-[var(--ss-ink)]" :stroke-width="3" />
+                        </span>
+                        <h3 class="mt-5 text-[clamp(1.4rem,2vw,1.8rem)] leading-tight font-extrabold tracking-tight text-white">{{ pillar.t }}</h3>
+                        <p class="mt-3 text-[15px] leading-relaxed font-medium text-white/50">{{ pillar.d }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== COMMANDS ==================== -->
+            <section id="inside" data-reveal class="ss-reveal">
+                <div class="rounded-[28px] bg-white p-6 sm:rounded-[40px] sm:p-12">
+                    <span class="text-[12px] font-extrabold tracking-[0.16em] text-[var(--ss-indigo)] uppercase"
+                        >[ The whole product, in sentences ]</span
+                    >
+                    <h2
+                        class="mt-4 max-w-[20ch] text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.02] font-extrabold tracking-[-0.03em] text-[var(--ss-ink)]"
+                    >
+                        Nineteen things you can just ask for.
+                    </h2>
+
+                    <div class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                        <div v-for="group in commandGroups" :key="group.group">
+                            <p class="text-[11px] font-extrabold tracking-[0.14em] text-[var(--ss-ink)]/35 uppercase">{{ group.group }}</p>
+                            <div class="mt-3 flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="item in group.items"
+                                    :key="item"
+                                    class="rounded-full bg-[var(--ss-paper)] px-3 py-1.5 text-[12px] font-bold text-[var(--ss-ink)]/75 transition-colors hover:bg-[var(--ss-lime)] hover:text-[var(--ss-ink)]"
+                                >
+                                    {{ item }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="mt-10 text-[13px] font-medium text-[var(--ss-ink)]/40">
+                        Type <span class="rounded bg-[var(--ss-paper)] px-1.5 py-0.5 font-mono font-bold text-[var(--ss-ink)]/70">/</span> in the app
+                        to search all nineteen in plain language. "want to start a new sprint" finds the right one.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ==================== AGENCIES ==================== -->
+            <section id="agencies" data-reveal class="ss-reveal mt-3 grid grid-cols-1 items-stretch gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-12">
+                <div class="rounded-[28px] bg-[var(--ss-lavender)] p-6 sm:rounded-[40px] sm:p-10 lg:col-span-7">
+                    <span class="text-[12px] font-extrabold tracking-[0.16em] text-[var(--ss-indigo)] uppercase">[ For agencies ]</span>
                     <h2 class="mt-4 text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.04] font-extrabold tracking-[-0.03em] text-[var(--ss-ink)]">
                         Give the client the board.<br />Not your Slack.
                     </h2>
-                    <p class="mt-4 max-w-[52ch] text-[15px] leading-relaxed font-medium text-[var(--ss-ink-dim)]">
+                    <p class="mt-4 max-w-[52ch] text-[15px] leading-relaxed font-medium text-[var(--ss-ink)]/60">
                         Clients are a role of their own, not a member you hope behaves. They never see your team roster, your other projects, or your
                         workspace settings — and you pick exactly what they can do inside the projects they're on.
                     </p>
                 </div>
 
-                <div class="rounded-[28px] bg-white p-6 sm:p-10 lg:col-span-5">
+                <div class="rounded-[28px] bg-white p-6 sm:rounded-[40px] sm:p-10 lg:col-span-5">
                     <div
                         v-for="capability in clientCapabilities"
                         :key="capability"
@@ -657,59 +646,58 @@ const commandGroups = [
                         </span>
                         <span class="text-[14px] font-bold text-[var(--ss-ink)]">{{ capability }}</span>
                     </div>
-                    <p class="mt-4 text-[13px] font-medium text-[var(--ss-ink-faint)]">
+                    <p class="mt-4 text-[13px] font-medium text-[var(--ss-ink)]/40">
                         Off by default. A new client sees the board and nothing else until you say otherwise.
                     </p>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- ============================ CTA ============================ -->
-        <section data-reveal class="ss-reveal px-4 pb-16 sm:px-6">
-            <div class="relative mx-auto max-w-[1200px] overflow-hidden rounded-[36px] bg-[var(--ss-ink)] px-6 py-20 text-center sm:px-12">
-                <div class="ss-glow" aria-hidden="true"></div>
-
-                <h2
-                    class="relative mx-auto max-w-[16ch] text-[clamp(2.25rem,5.2vw,4rem)] leading-[0.98] font-extrabold tracking-[-0.035em] text-white"
-                >
-                    Stop managing the tool.
-                </h2>
-                <p class="relative mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed font-medium text-white/60">
-                    Set up a workspace, invite your team, and run your first sprint by talking to it.
-                </p>
-
-                <div class="relative mt-8 flex flex-wrap justify-center gap-3">
-                    <Link
-                        :href="route('register')"
-                        class="group inline-flex items-center gap-2 rounded-full bg-[var(--ss-lime)] py-4 pr-4 pl-7 text-[15px] font-extrabold text-[var(--ss-ink)] transition-transform duration-200 hover:-translate-y-0.5"
+            <!-- ==================== CTA ==================== -->
+            <section data-reveal class="ss-reveal mt-3 sm:mt-4">
+                <div class="rounded-[28px] bg-[var(--ss-lime)] px-6 py-20 text-center sm:rounded-[40px] sm:px-12">
+                    <h2
+                        class="mx-auto max-w-[16ch] text-[clamp(2.25rem,5.2vw,4rem)] leading-[0.98] font-extrabold tracking-[-0.035em] text-[var(--ss-ink)]"
                     >
-                        Get started free
-                        <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-ink)] transition-transform group-hover:rotate-45">
-                            <ArrowUpRight class="size-4 text-[var(--ss-lime)]" :stroke-width="2.5" />
-                        </span>
-                    </Link>
-                    <Link
-                        :href="route('login')"
-                        class="rounded-full px-7 py-4 text-[15px] font-bold text-white/70 transition-colors hover:text-white"
-                    >
-                        Sign in
-                    </Link>
-                </div>
-            </div>
-        </section>
+                        Stop managing the tool.
+                    </h2>
+                    <p class="mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed font-medium text-[var(--ss-ink)]/65">
+                        Set up a workspace, invite your team, and run your first sprint by talking to it.
+                    </p>
 
-        <!-- ============================ FOOTER ============================ -->
-        <footer class="px-4 pb-10 sm:px-6">
-            <div
-                class="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-4 border-t border-[rgba(11,11,15,0.08)] pt-8 sm:flex-row"
-            >
-                <div class="flex items-center gap-2">
-                    <span class="rounded-full bg-[var(--ss-ink)] px-4 py-2 text-[13px] font-extrabold text-white">sprintsync</span>
-                    <span class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">AI-native sprint management.</span>
+                    <div class="mt-8 flex flex-wrap justify-center gap-3">
+                        <Link
+                            :href="route('register')"
+                            class="group inline-flex items-center gap-3 rounded-full bg-[var(--ss-ink)] py-4 pr-4 pl-7 text-[15px] font-extrabold text-white transition-transform duration-200 hover:-translate-y-0.5"
+                        >
+                            Get started free
+                            <span
+                                class="grid size-8 place-items-center rounded-full bg-[var(--ss-lime)] transition-transform duration-300 group-hover:rotate-45"
+                            >
+                                <ArrowUpRight class="size-4 text-[var(--ss-ink)]" :stroke-width="2.5" />
+                            </span>
+                        </Link>
+                        <Link
+                            :href="route('login')"
+                            class="rounded-full px-7 py-4 text-[15px] font-bold text-[var(--ss-ink)]/60 transition-colors hover:text-[var(--ss-ink)]"
+                        >
+                            Sign in
+                        </Link>
+                    </div>
                 </div>
-                <p class="text-[13px] font-semibold text-[var(--ss-ink-faint)]">© 2026 SprintSync · Powered by ITG.</p>
-            </div>
-        </footer>
+            </section>
+
+            <!-- ==================== FOOTER ==================== -->
+            <footer class="mt-4 flex flex-col items-center justify-between gap-4 px-2 py-8 sm:flex-row sm:px-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="grid size-8 place-items-center rounded-full bg-[var(--ss-lime)]">
+                        <Sparkles class="size-4 text-[var(--ss-ink)]" :stroke-width="2.5" />
+                    </span>
+                    <span class="text-[14px] font-extrabold text-white">sprintsync</span>
+                    <span class="text-[13px] font-semibold text-white/35">AI-native sprint management.</span>
+                </div>
+                <p class="text-[13px] font-semibold text-white/35">© 2026 SprintSync · Built with Laravel and Claude.</p>
+            </footer>
+        </div>
     </div>
 </template>
 
@@ -730,10 +718,45 @@ const commandGroups = [
     --ss-indigo-hot: #2647e6;
     --ss-rose: #fb7185;
 
-    background: var(--ss-paper);
+    background: var(--ss-ink);
     color: var(--ss-ink);
-    font-feature-settings: 'ss01', 'cv01';
     min-height: 100vh;
+}
+
+/*
+ * Every region the demo writes into has a reserved height. The typed command,
+ * the streamed reply and the confirmation card all change size as the loop
+ * runs, and without this the whole page would shift under the reader.
+ */
+.ss-demo {
+    height: 560px;
+}
+
+.ss-bento {
+    min-height: 260px;
+}
+
+@media (min-width: 1024px) {
+    .ss-demo {
+        height: 100%;
+        min-height: 560px;
+    }
+
+    .ss-bento {
+        height: 300px;
+    }
+}
+
+/* Inline glyph sitting in the headline, like a word made of product. */
+.ss-glyph {
+    display: inline-grid;
+    place-items: center;
+    vertical-align: baseline;
+    width: 1.05em;
+    height: 1.05em;
+    border-radius: 0.26em;
+    background: var(--ss-ink);
+    transform: translateY(0.08em) rotate(-4deg);
 }
 
 .ss-grain {
@@ -741,16 +764,8 @@ const commandGroups = [
     inset: 0;
     pointer-events: none;
     background:
-        radial-gradient(60% 40% at 70% 0%, rgba(54, 90, 255, 0.09), transparent 70%),
-        radial-gradient(40% 40% at 5% 20%, rgba(186, 255, 26, 0.16), transparent 70%);
-}
-
-.ss-glow {
-    position: absolute;
-    inset: -40% 20% auto 20%;
-    height: 420px;
-    background: radial-gradient(50% 50% at 50% 50%, rgba(186, 255, 26, 0.16), transparent 70%);
-    pointer-events: none;
+        radial-gradient(50% 60% at 88% 8%, rgba(54, 90, 255, 0.16), transparent 70%),
+        radial-gradient(40% 50% at 4% 96%, rgba(186, 255, 26, 0.28), transparent 70%);
 }
 
 /* Marker swipe behind the emphasised words. */
