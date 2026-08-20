@@ -19,6 +19,18 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #54 added the Assistant's `comment_on_task` tool, reusing
+`CreateTaskCommentAction` so notifications are inherited, and moving the comment
+body rules into `TaskCommentData::bodyRules()` so the HTTP request and the tool
+validate identically. **No FR status changes.** The Assistant now exposes 18
+tools.
+
+Entry #53 added the Assistant's `get_analytics` tool, giving the conversational
+agent a read-only window onto the existing Analytics module. **No FR status
+changes** — FR20-05 (role-scoped analytics) was already Complete and the tool
+reuses `ResolveAnalyticsScope` and `BuildAnalyticsAction` rather than adding
+metrics. The Assistant now exposes 17 tools.
+
 Entry #52 closed **FR10**, the first of the four deferred AI-pipeline
 requirements, moving it from Not started to Complete. Its one caveat is
 recorded in that entry: SprintSync does not host calls, so the meeting
@@ -5267,7 +5279,251 @@ assertions** (732 → 752, +20). `vendor/bin/pint --dirty` passed.
 `tsconfig.json` errors from entry #24, unchanged and unrelated.
 `ModuleBoundaryTest` passes.
 
-## Next recommended task (updated 2026-08-19, after entry #52)
+### 53. `get_analytics` — the Assistant reads the Analytics module
+
+The Assistant could report on a *sprint* (`get_sprint_report`, entry #51) but
+had no way to answer the broader question — "how are we doing?", "what is
+overdue?", "which project is behind?", "how am I doing?". An entire Analytics
+module existed with those numbers and no conversational entry point.
+
+**No analytics were re-implemented.** The tool is a thin adapter:
+
+    get_analytics
+      -> conversation workspace (never a model-supplied workspace_id)
+      -> ResolveWorkspaceCapabilities   (may I see analytics at all?)
+      -> ResolveAnalyticsScope          (which rows am I allowed to count?)
+      -> BuildAnalyticsAction           (the existing calculations)
+      -> compact, untrusted-text-safe payload
+
+`BuildAnalyticsAction` needed **no adaptation** — it already takes an
+`AnalyticsScope` plus a filter array and returns `AnalyticsData`, so the tool
+calls it exactly as `AnalyticsController` does. The Assistant contributes only
+context resolution, authorization, and result shaping. `ModuleBoundaryTest`
+passes: `Analytics\Actions` and `Analytics\Data` are public segments.
+
+**Authorization and scope.** Role logic is not reproduced in the tool.
+`ResolveAnalyticsScope` remains the single authority, so the existing tiering
+holds unchanged: Owner/Admin get team-wide totals across accessible projects;
+a project manager gets team-wide data for projects they manage and
+personal-only data for projects where they are merely a member; a plain member
+gets personal analytics. FR35 custom roles keep working because
+`accessibleProjectsFor()` already applies `WorkspacePermission::ProjectsView`,
+and clients are refused outright — `ResolveWorkspaceCapabilities` sets
+`viewAnalytics: false` for them.
+
+**One deliberate widening, documented here because it diverges from the page.**
+`viewAnalytics` is defined as `hasAccessibleProjects`, so the analytics *page*
+403s for a member — or an owner of an empty workspace — who can see no
+projects. Refusing a conversational question on those grounds produces a
+misleading "you are not permitted" when the truth is "there is nothing here
+yet". `authorize()` therefore returns true in exactly one extra case: a
+non-client workspace member with **provably zero** accessible projects, who
+then receives an empty-state message. Since the scope is empty, the widening
+exposes no row that the capability would have protected. Everywhere data
+exists, tool access and page access are identical.
+
+**Inputs are deliberately small.** `project_id` and `scope` only. The tool
+does not accept `workspace_id`, a `user_id`, a role or any permission flag —
+the workspace comes from the conversation. A `project_id` outside the caller's
+accessible set returns the same `project_not_found` shape as a nonexistent id,
+so the two are indistinguishable. `scope` accepts `auto` (default,
+role-resolved) or `personal`; `personal` can only ever *narrow*, because it
+rebuilds `AnalyticsScope` from the already-resolved `accessibleProjects` with
+an empty team-project list, which is how "how am I doing?" is answered for an
+Owner without granting anyone a wider view.
+
+**Result shape** carries only metrics the Analytics module genuinely computes:
+scope plus a plain-language `scope_explanation`, task totals
+(total/completed/open/overdue/completion percentage), the board-column split,
+the assignee breakdown, a per-project breakdown, accessible project count,
+meeting counts, and current-sprint progress from `SprintProgressData`. No
+metric was invented. Velocity, blocker frequency and action-item counts are
+**not** returned — FR20-03 and the remaining half of FR20-04 are still Blocked
+by FR10-FR13, and `BuildAnalyticsAction` does not calculate them. Names pass
+through `UntrustedText::inline()`; no email address is emitted, and a test
+asserts it. Every result carries a `note` stating the figures are current
+state, because `BuildAnalyticsAction` applies `from`/`to` to meetings only and
+never to tasks — so the tool does not expose a date filter and the system
+prompt tells the model to say plainly that "this week" is not filtered.
+
+**Zero states are answers, not errors**: no accessible projects, no tasks, a
+filtered project with no tasks, and a user with nothing assigned each return
+`success: true` with zeroes and a message.
+
+**No frontend change was needed.** `summarizeTool()` and `getToolIntro()` are
+only reached from the `tool_pending` branch, and `ProcessChatMessage` emits
+`tool_pending` solely for tools where `requiresConfirmation()` is true. A
+read-only tool never takes that path, so adding UI cases would have been dead
+code.
+
+**Assistant tool inventory — 17 tools** (6 read-only, 11 confirmed):
+
+| Read-only | Requires confirmation |
+|---|---|
+| `get_workspace_info`, `list_projects`, `list_meetings`, `find_tasks`, `get_sprint_report`, **`get_analytics`** | `create_workspace`, `invite_user`, `create_project`, `create_task`, `update_task`, `delete_task`, `schedule_meeting`, `edit_meeting`, `cancel_meeting`, `add_project_member`, `manage_sprint` |
+
+**Tests** — `AssistantAnalyticsToolTest`, 21 cases: registration; read-only;
+schema rejects workspace/user/role arguments; Owner and Admin team-wide
+totals; manager sees team data in a managed project; manager does **not** see
+a colleague's tasks in a project where they are only a member; member gets
+personal analytics; `personal` narrows an Owner and cannot widen a member;
+project filter; inaccessible project byte-identical to nonexistent;
+cross-workspace isolation; client refused and not offered the tool;
+FR35 custom role with `projects.view` still served; empty workspace; projects
+without tasks; no emails in the payload; prompt-injection text neutralised;
+and totals asserted equal to `BuildAnalyticsAction` for the same scope.
+
+**Verification**: `php artisan test --compact` -> **1053 passed, 4855
+assertions** (1032 -> 1053, +21). Existing `tests/Feature/Analytics` and
+`ModuleBoundaryTest` green (39 passed together).
+`vendor/bin/pint --dirty --format agent` passed. `npm run lint:check` clean.
+`npm run build` succeeded. `npx vue-tsc --noEmit` -> exactly the two
+pre-existing `TS2688` `tsconfig.json` errors from entry #24, unchanged and
+unrelated; no other TypeScript errors. No frontend files were modified.
+
+### 54. `comment_on_task` — the Assistant joins the discussion it starts
+
+Entry #53's next-task note called this the clearest remaining conversational
+gap: the Assistant could create, move, reassign and delete a task but could not
+say anything on one, so it triggered work and then dropped out of the thread.
+
+**No comment logic was re-implemented.** The tool resolves and authorizes, then
+hands off to `CreateTaskCommentAction` — the same action the HTTP controller
+calls — so the notification fan-out (`ResolveTaskRecipients` ->
+`NotificationPreferenceGate` -> `TaskCommentPostedNotification`) is inherited
+rather than duplicated. Task comments are **not** audited today and this entry
+did not start auditing them; that would have been a new feature, not preserved
+behaviour.
+
+**Validation is now single-sourced.** `StoreTaskCommentRequest` lives in `Http`,
+which `ModuleBoundaryTest` treats as a private segment, so the Assistant cannot
+import it. Rather than copy `min:1|max:2000` into a second place, the rules moved
+to `TaskCommentData::bodyRules()` and the constant `BODY_MAX_LENGTH` in the
+public `Data` segment; the FormRequest and the tool now both call it, and the
+tool's JSON schema derives its `maxLength` from the same constant. That is the
+whole domain change.
+
+**Authorship cannot be redirected.** The comment is written with
+`$context->user`, never a value from the model. A test posts a body that
+explicitly instructs the assistant to attribute it to the workspace owner and
+asserts the row is still authored by the caller.
+
+**Resolution and error parity.** `resolveTask()` scopes by
+`accessibleProjectsFor()`, so a task in a project the caller cannot see and a
+task that does not exist both fall out as `null` and produce a byte-identical
+`task_not_found` payload — asserted with `assertSame` on the whole array.
+Authorization is the existing `TaskCommentPolicy::create`, which is what keeps
+a client without `client.tasks.comment` out while letting a client whose role
+grants it through.
+
+**Confirmation, and what happens at confirmation time.** The tool requires
+confirmation and implements `ProvidesConfirmationDetails`, showing project,
+task title, the **full** comment body (`UntrustedText::block()` at the 2000-char
+domain limit, so nothing is truncated), who it will be posted as, and who will
+see it. Nothing about the proposal is trusted when the user says yes:
+`ConfirmActionController` re-validates the stored args through
+`ToolArgumentValidator`, `ExecuteToolCall` re-runs `authorize()`, and
+`execute()` re-resolves the task and re-checks the policy from scratch. Three
+tests cover the consequences — rejecting writes nothing, a `task_id` tampered
+in the stored args to point at another workspace fails with nothing created,
+and a caller whose project access is revoked between proposal and confirmation
+is refused at confirmation.
+
+**Result shape** is deliberately thin: comment id, task id, neutralised task
+title and project name, and a short message. It does not echo the comment body
+back, does not name who was notified, and contains no email address — all three
+asserted.
+
+**Frontend.** Unlike `get_analytics`, this tool writes, so it does take the
+`tool_pending` path: `summarizeTool()` and `getToolIntro()` in
+`useAiAssitant.ts` gained a `comment_on_task` case, the intro making clear the
+comment goes out under the user's own name.
+
+**Assistant tool inventory — 18 tools** (6 read-only, 12 confirmed):
+
+| Read-only | Requires confirmation |
+|---|---|
+| `get_workspace_info`, `list_projects`, `list_meetings`, `find_tasks`, `get_sprint_report`, `get_analytics` | `create_workspace`, `invite_user`, `create_project`, `create_task`, `update_task`, `delete_task`, **`comment_on_task`**, `schedule_meeting`, `edit_meeting`, `cancel_meeting`, `add_project_member`, `manage_sprint` |
+
+**Tests** — `AssistantCommentOnTaskToolTest`, 21 cases: registration and
+confirmation flag; schema limited to `task_id` and `body`; an authorized member
+comments and is recorded as author; authorship survives a body that asks for
+someone else; client refused without the permission and served with it;
+inaccessible task byte-identical to nonexistent; cross-workspace task refused;
+empty, whitespace-only and over-length bodies rejected with nothing written;
+body stored trimmed; assignee notified and author not; commenting on your own
+task notifies nobody; confirmation shows project, task and untruncated body;
+untrusted text neutralised in the confirmation; result free of emails and of
+the body; no-workspace writes nothing; reject writes nothing; tampered
+`task_id` writes nothing; revoked access at confirmation writes nothing; and a
+confirmed comment is written exactly once by the caller.
+
+**Verification**: `php artisan test --compact` -> **1074 passed, 4917
+assertions** (1053 -> 1074, +21). `tests/Feature/Tasks` and
+`ModuleBoundaryTest` green (92 passed together), so the `TaskCommentData` /
+`StoreTaskCommentRequest` change did not disturb the HTTP path.
+`vendor/bin/pint --dirty --format agent` passed. `npm run lint:check` clean.
+`npm run build` succeeded. `npx vue-tsc --noEmit` -> exactly the two
+pre-existing `TS2688` `tsconfig.json` errors from entry #24, unchanged and
+unrelated; no other TypeScript errors.
+
+## Next recommended task (updated 2026-08-20, after entry #54)
+
+**`update_project` — close the last create-only loop.**
+
+With `comment_on_task` done, the remaining pattern worth fixing is that several
+Assistant flows are **create-only**: the agent can call `create_project` and
+then never rename or re-describe what it made, exactly as it could create a
+task but not comment on one. `update_project` is the smallest of those and the
+same adapter shape as the last two entries.
+
+The domain already exists — `UpdateProjectRequest`, the project update route,
+and the `project.updated` audit action are all in place, so unlike task
+comments this one **does** have audit behaviour to preserve; reuse the existing
+update action rather than writing to the model directly, or the audit entry
+will silently stop being written.
+
+Three things to settle before starting:
+
+- **Inputs.** `project_id`, `name`, `description`, with omitted fields left
+  untouched — the same partial-update semantics `update_task` and
+  `edit_meeting` already use, rather than replacing the whole record.
+- **Authorization.** The existing project policy governs it; a plain member
+  must not be able to rename a project they merely belong to.
+- **Confirmation.** Renaming is visible to the whole workspace, so it should
+  show the old and new value side by side, not just the new one.
+
+After that, `manage_board_columns` is the remaining P1 conversational gap, and
+it is a larger piece: create, rename, reorder and delete are four operations
+against the board's structure, and deleting a column has to decide what happens
+to the tasks inside it.
+
+## Superseded next-task note (after entry #53)
+
+**`comment_on_task` — let the Assistant join the conversation it starts.**
+
+`get_analytics` closed the read side of the product's reporting. The clearest
+remaining conversational gap is the opposite one: the Assistant can create,
+move, reassign and delete a task but cannot say anything on one, so it can
+trigger work and then drop out of the discussion.
+
+Task comments already exist end to end (`task_comments`, the comment
+endpoints, and the notification fan-out that tells watchers a comment landed),
+so this is another adapter rather than new domain work — the same shape as
+this entry. Two things to settle before writing it:
+
+- **Confirmation.** A comment is written under the user's own name and is
+  visible to everyone on the project, so it should require confirmation like
+  every other write tool, and the confirmation card should show the full
+  comment body rather than a truncated summary.
+- **Authorship.** The comment must be attributed to the caller, never to a
+  system or assistant identity, and the existing task-comment policy should
+  authorize it rather than a new rule.
+
+After that, `manage_board_columns` and `update_project` are the two remaining
+P1 conversational gaps — both are create-only loops today.
+
+## Superseded next-task note (after entry #52)
 
 **FR11 — generate AI summary.**
 

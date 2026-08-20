@@ -155,6 +155,8 @@ function summarizeTool(name: string, args: Record<string, unknown>): string {
         }
         case 'delete_task':
             return 'Delete this task permanently';
+        case 'comment_on_task':
+            return 'Post this comment on the task';
         case 'update_task': {
             const parts: string[] = [];
 
@@ -197,6 +199,9 @@ function getToolIntro(name: string): string {
 
         case 'create_task':
             return 'I can add this task to the project. Please confirm the details first.';
+
+        case 'comment_on_task':
+            return 'I can post this comment under your name, where everyone on the task will see it. Please check the wording first.';
 
         case 'create_project':
             return 'I can create this project for you. Please confirm first.';

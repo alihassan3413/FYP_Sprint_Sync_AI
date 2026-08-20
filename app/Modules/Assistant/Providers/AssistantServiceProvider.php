@@ -13,12 +13,14 @@ use App\Modules\Assistant\Exceptions\AiProviderException;
 use App\Modules\Assistant\Exceptions\SpeechException;
 use App\Modules\Assistant\Tools\AddProjectMemberTool;
 use App\Modules\Assistant\Tools\CancelMeetingTool;
+use App\Modules\Assistant\Tools\CommentOnTaskTool;
 use App\Modules\Assistant\Tools\CreateProjectTool;
 use App\Modules\Assistant\Tools\CreateTaskTool;
 use App\Modules\Assistant\Tools\CreateWorkspaceTool;
 use App\Modules\Assistant\Tools\DeleteTaskTool;
 use App\Modules\Assistant\Tools\EditMeetingTool;
 use App\Modules\Assistant\Tools\FindTasksTool;
+use App\Modules\Assistant\Tools\GetAnalyticsTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
 use App\Modules\Assistant\Tools\InvitationTool;
 use App\Modules\Assistant\Tools\ListMeetingsTool;
@@ -51,11 +53,13 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         FindTasksTool::class,
         UpdateTaskTool::class,
         DeleteTaskTool::class,
+        CommentOnTaskTool::class,
         ScheduleMeetingTool::class,
         EditMeetingTool::class,
         CancelMeetingTool::class,
         AddProjectMemberTool::class,
         SprintReportTool::class,
+        GetAnalyticsTool::class,
         ManageSprintTool::class,
     ];
 

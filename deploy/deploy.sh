@@ -67,6 +67,9 @@ as_app npm --prefix "$APP_DIR" run build
 log "Migrating and recaching"
 as_app "$PHP_BIN" "${APP_DIR}/artisan" down --retry=15 || true
 as_app "$PHP_BIN" "${APP_DIR}/artisan" migrate --force --no-interaction
+# Idempotent: creates the platform administrator on first deploy, and only
+# re-asserts the flag afterwards. It never resets an existing password.
+as_app "$PHP_BIN" "${APP_DIR}/artisan" db:seed --class=SuperAdminSeeder --force --no-interaction
 as_app "$PHP_BIN" "${APP_DIR}/artisan" optimize
 as_app "$PHP_BIN" "${APP_DIR}/artisan" up
 

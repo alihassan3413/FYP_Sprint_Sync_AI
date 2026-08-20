@@ -11,6 +11,16 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 #[TypeScript]
 final class TaskCommentData extends Data
 {
+    public const BODY_MAX_LENGTH = 2000;
+
+    /**
+     * @return array<int, string>
+     */
+    public static function bodyRules(): array
+    {
+        return ['required', 'string', 'min:1', 'max:'.self::BODY_MAX_LENGTH];
+    }
+
     public function __construct(
         public int $id,
         public string $body,
