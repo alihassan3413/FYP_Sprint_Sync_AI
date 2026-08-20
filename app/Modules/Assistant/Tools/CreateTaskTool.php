@@ -53,9 +53,9 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
             .'if the user is only on one project, it goes there. Pass project_name when the user named a project '
             .'("in CIG Florida") — it is matched loosely. Only when several projects could be meant will this ask, '
             .'and then you should ask the user which one and call again. '
-            .'Once the project is known, this asks which board column the task should start in, and — when that '
+            .'Once the project is known, this asks which list on the board the task should start in, and — when that '
             .'project has a sprint running — whether the task belongs in that sprint. Both come back as questions '
-            .'with the options listed: put them to the user, then call again with board_column and sprint set. '
+            .'with the options listed: put them to the user, then call again with board_list and sprint set. '
             .'assignee accepts a name or an email address and is matched against the people on the project.';
     }
 
@@ -102,15 +102,25 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
                     'format' => 'date',
                     'description' => 'Optional due date as YYYY-MM-DD, resolved against the current date above.',
                 ],
+                'board_list' => [
+                    'type' => 'string',
+                    'description' => 'Which list on the board the task starts in, as the user said it ("In Progress"). '
+                        .'Users call these lists, and some say columns — either is fine. Matched loosely against that '
+                        .'project\'s lists. Use "default" for wherever new work normally starts.',
+                    'maxLength' => 80,
+                ],
                 'board_column' => [
                     'type' => 'string',
-                    'description' => 'Which board column the task starts in, as the user said it ("In Progress"). '
-                        .'Matched loosely against that project\'s columns. Use "default" for wherever new work normally starts.',
+                    'description' => 'Older name for board_list. Prefer board_list.',
                     'maxLength' => 80,
+                ],
+                'board_list_id' => [
+                    'type' => 'integer',
+                    'description' => 'The list ID, when this tool has already handed you the options.',
                 ],
                 'board_column_id' => [
                     'type' => 'integer',
-                    'description' => 'The column ID, when this tool has already handed you the list.',
+                    'description' => 'Older name for board_list_id. Prefer board_list_id.',
                 ],
                 'sprint' => [
                     'type' => 'string',
@@ -220,8 +230,8 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
             $details['due_date'] = UntrustedText::inline((string) $args['due_date']) ?? '';
         }
 
-        if (isset($args['board_column'])) {
-            $details['column'] = UntrustedText::inline((string) $args['board_column']) ?? '';
+        if ($this->namedList($args) !== '') {
+            $details['list'] = UntrustedText::inline((string) $this->namedList($args)) ?? '';
         }
 
         if (isset($args['sprint'])) {
@@ -366,7 +376,7 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
                 'due_date' => $task->due_date?->toDateString(),
                 'sprint_id' => $task->sprint_id,
                 'sprint_name' => UntrustedText::inline($sprint?->name),
-                'board_column' => UntrustedText::inline($task->boardColumn?->name),
+                'board_list' => UntrustedText::inline($task->boardColumn?->name),
             ],
             'url' => route('workspace.projects.show', [
                 'workspace' => $workspace->slug,
@@ -406,15 +416,17 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
             return null;
         }
 
-        if (isset($args['board_column_id'])) {
-            $chosen = $columns->firstWhere('id', (int) $args['board_column_id']);
+        $chosenId = $args['board_list_id'] ?? $args['board_column_id'] ?? null;
+
+        if ($chosenId !== null) {
+            $chosen = $columns->firstWhere('id', (int) $chosenId);
 
             if ($chosen !== null) {
                 return $chosen;
             }
         }
 
-        $named = isset($args['board_column']) ? trim((string) $args['board_column']) : '';
+        $named = $this->namedList($args);
 
         if ($named !== '') {
             if (in_array(mb_strtolower($named), ['default', 'first', 'backlog'], true)) {
@@ -429,11 +441,11 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
 
             return [
                 'success' => false,
-                'error_code' => 'column_not_found',
+                'error_code' => 'list_not_found',
                 'awaiting_input' => true,
-                'error' => "\"{$project->name}\" has no column like \"{$named}\".",
-                'columns' => $this->summariseColumns($columns),
-                'next_step' => 'Show the user these columns and ask which one, then call again with board_column_id.',
+                'error' => "\"{$project->name}\" has no list like \"{$named}\".",
+                'lists' => $this->summariseColumns($columns),
+                'next_step' => 'Show the user these lists and ask which one, then call again with board_list_id.',
             ];
         }
 
@@ -443,13 +455,13 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
 
         return [
             'success' => false,
-            'error_code' => 'column_required',
+            'error_code' => 'list_required',
             'awaiting_input' => true,
-            'error' => "Which column should this start in on {$project->name}?",
-            'columns' => $this->summariseColumns($columns),
-            'next_step' => 'Ask the user which of these columns the task should go in, listing them in order. '
-                .'Then call create_task again with the same details plus board_column_id. '
-                .'If they do not mind, use the one marked is_starting_column.',
+            'error' => "Which list should this start in on {$project->name}?",
+            'lists' => $this->summariseColumns($columns),
+            'next_step' => 'Ask the user which of these lists the task should go in, listing them in order. '
+                .'Then call create_task again with the same details plus board_list_id. '
+                .'If they do not mind, use the one marked is_starting_list.',
         ];
     }
 
@@ -505,11 +517,22 @@ final class CreateTaskTool implements AssistantTool, DefersConfirmation, Provide
             ->map(fn (BoardColumn $column) => [
                 'id' => $column->id,
                 'name' => UntrustedText::inline($column->name),
-                'is_starting_column' => $column->id === $starting?->id,
-                'is_done_column' => $column->is_done,
+                'is_starting_list' => $column->id === $starting?->id,
+                'is_done_list' => $column->is_done,
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * People call these lists; some still say columns, and the model may echo
+     * back either name. Both spellings of the argument are accepted.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    private function namedList(array $args): string
+    {
+        return trim((string) ($args['board_list'] ?? $args['board_column'] ?? ''));
     }
 
     /**

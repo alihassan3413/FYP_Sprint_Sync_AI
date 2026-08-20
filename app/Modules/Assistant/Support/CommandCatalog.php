@@ -78,9 +78,9 @@ final class CommandCatalog
         ],
         'update_task' => [
             'label' => 'Update a task',
-            'description' => 'Reassign, move, rename, or set a due date or sprint.',
+            'description' => 'Reassign, move to another list, rename, or set a due date or sprint.',
             'category' => 'Tasks',
-            'keywords' => ['task', 'update', 'change', 'edit', 'move', 'assign', 'reassign', 'rename', 'due', 'date', 'done', 'complete', 'status', 'column'],
+            'keywords' => ['task', 'update', 'change', 'edit', 'move', 'assign', 'reassign', 'rename', 'due', 'date', 'done', 'complete', 'status', 'list', 'column'],
             'template' => 'Update the task ',
         ],
         'comment_on_task' => [

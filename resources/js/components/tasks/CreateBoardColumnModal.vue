@@ -43,12 +43,12 @@ function handleClose(value: boolean) {
 </script>
 
 <template>
-    <AppModal :open="open" title="Add column" description="Add a new stage to this project's board." size="sm" @update:open="handleClose">
+    <AppModal :open="open" title="Add list" description="Add a new stage to this project's board." size="sm" @update:open="handleClose">
         <form id="create-board-column-form" class="pt-2" @submit.prevent="submit">
             <AppFormInput
                 id="board-column-name"
                 v-model="form.name"
-                label="Column name"
+                label="List name"
                 placeholder="e.g. QA"
                 :error="form.errors.name"
                 required
@@ -62,7 +62,7 @@ function handleClose(value: boolean) {
 
             <Button type="submit" form="create-board-column-form" :disabled="form.processing || form.name.trim().length < 1">
                 <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ form.processing ? 'Adding…' : 'Add column' }}
+                {{ form.processing ? 'Adding…' : 'Add list' }}
             </Button>
         </template>
     </AppModal>

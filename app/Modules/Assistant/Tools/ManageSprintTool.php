@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Assistant\Tools;
 
 use App\Modules\Assistant\Contracts\AssistantTool;
+use App\Modules\Assistant\Contracts\DefersConfirmation;
 use App\Modules\Assistant\Contracts\ProvidesConfirmationDetails;
+use App\Modules\Assistant\Support\ProjectResolver;
 use App\Modules\Assistant\Support\ToolContext;
 use App\Modules\Assistant\Support\UntrustedText;
 use App\Modules\Projects\Actions\CompleteSprintAction;
@@ -26,7 +28,7 @@ use Throwable;
  * goes through the same domain actions the UI uses, so the rules (one active
  * sprint per project, frozen history, carry-over) hold here too.
  */
-final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetails
+final class ManageSprintTool implements AssistantTool, DefersConfirmation, ProvidesConfirmationDetails
 {
     private const DEFAULT_LENGTH_DAYS = 14;
 
@@ -34,6 +36,7 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
         private readonly CreateSprintAction $createSprint,
         private readonly StartSprintAction $startSprint,
         private readonly CompleteSprintAction $completeSprint,
+        private readonly ProjectResolver $projectResolver,
     ) {}
 
     public function name(): string
@@ -43,9 +46,10 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
 
     public function description(): string
     {
-        return 'Creates, starts or completes a sprint. Use action="create" to plan a new sprint (call list_projects '
-            .'first for the project_id; the sprint is two weeks long unless the user says otherwise, and starts out '
-            .'planned, not running). Use action="start" to commit the sprint and begin it — a project can only have '
+        return 'Creates, starts or completes a sprint. Use action="create" to plan a new sprint. The project is '
+            .'worked out for you: leave project_id and project_name out when the user did not name one, and pass '
+            .'project_name when they did. A sprint runs two weeks from today unless the user gives dates, and starts '
+            .'out planned, not running — tell the user both of those things. Use action="start" to commit the sprint and begin it — a project can only have '
             .'one running sprint. Use action="complete" to close a running sprint, which freezes its numbers and '
             .'moves unfinished work either to the backlog or into the next planned sprint (carry_over). '
             .'Get sprint_id from get_sprint_report, never invent one.';
@@ -63,6 +67,11 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
                     'type' => 'string',
                     'enum' => ['create', 'start', 'complete'],
                     'description' => 'What to do with the sprint.',
+                ],
+                'project_name' => [
+                    'type' => 'string',
+                    'description' => 'The project as the user said it, when you do not have its ID. Matched loosely.',
+                    'maxLength' => 100,
                 ],
                 'project_id' => [
                     'type' => 'integer',
@@ -123,6 +132,22 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
     }
 
     /**
+     * Planning a sprint without naming a project is normal. Ask which one
+     * before showing a card, rather than after the user has approved it.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    public function needsMoreInformation(array $args, ToolContext $context): bool
+    {
+        if ((string) ($args['action'] ?? 'create') !== 'create') {
+            return false;
+        }
+
+        return $context->workspace !== null
+            && ! $this->projectResolver->resolve($context, $args, 'this sprint')->isResolved();
+    }
+
+    /**
      * @param  array<string, mixed>  $args
      * @return array<string, string>
      */
@@ -144,6 +169,7 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
                 'project' => $project === null ? 'Unknown project' : (UntrustedText::inline($project->name) ?? 'Unknown project'),
                 'sprint' => UntrustedText::inline((string) ($args['name'] ?? 'Untitled sprint')) ?? 'Untitled sprint',
                 'dates' => "{$startsOn} to {$endsOn}",
+                'length' => $this->describeLength($startsOn, $endsOn, $args),
                 'note' => 'It will be created as planned. Nothing starts until you start it.',
             ];
         }
@@ -213,15 +239,13 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
      */
     private function create(array $args, ToolContext $context, Workspace $workspace): array
     {
-        $project = $this->resolveProject($workspace, $args, $context);
+        $resolution = $this->projectResolver->resolve($context, $args, 'this sprint');
 
-        if ($project === null) {
-            return [
-                'success' => false,
-                'error_code' => 'project_not_found',
-                'error' => 'That project does not exist or you do not have access to it. Use list_projects to see available projects.',
-            ];
+        if (! $resolution->isResolved()) {
+            return $resolution->toolPayload();
         }
+
+        $project = $resolution->project;
 
         if (! $context->user->can('create', [Sprint::class, $project])) {
             return [
@@ -268,8 +292,13 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
         return [
             'success' => true,
             'sprint' => $this->summarise($sprint, $workspace),
-            'message' => "Planned \"{$sprint->name}\" in {$project->name} from {$startsOn} to {$endsOn}. "
-                .'It is not running yet — start it when the team is ready.',
+            'message' => "Planned \"{$sprint->name}\" in {$project->name}: "
+                .$this->describeLength($startsOn, $endsOn, $args)
+                .", {$startsOn} to {$endsOn}. It is not running yet — start it when the team is ready.",
+            'next_step' => isset($args['starts_on']) || isset($args['ends_on'])
+                ? null
+                : 'The user did not give dates, so tell them plainly that it was planned as a two-week sprint '
+                    .'and that they can ask for different dates.',
         ];
     }
 
@@ -347,15 +376,18 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
     /**
      * @param  array<string, mixed>  $args
      */
+    /**
+     * Was: return null whenever project_id was absent — which the caller then
+     * reported as "that project does not exist or you do not have access to
+     * it". A workspace owner planning a sprint without naming a project got
+     * told they had no access to their own project. Now it infers the project
+     * the same way task creation does, and asks only when genuinely unclear.
+     *
+     * @param  array<string, mixed>  $args
+     */
     private function resolveProject(Workspace $workspace, array $args, ToolContext $context): ?Project
     {
-        if (! isset($args['project_id'])) {
-            return null;
-        }
-
-        return $workspace->accessibleProjectsFor($context->user)
-            ->whereKey((int) $args['project_id'])
-            ->first();
+        return $this->projectResolver->resolve($context, $args, 'this sprint')->project;
     }
 
     /**
@@ -374,6 +406,24 @@ final class ManageSprintTool implements AssistantTool, ProvidesConfirmationDetai
             ->whereIn('project_id', $projectIds)
             ->whereKey((int) $args['sprint_id'])
             ->first();
+    }
+
+    /**
+     * Spells the length out in words. A date range on its own does not tell
+     * someone they have just been handed the two-week default.
+     *
+     * @param  array<string, mixed>  $args
+     */
+    private function describeLength(string $startsOn, string $endsOn, array $args): string
+    {
+        $days = (int) Carbon::parse($startsOn)->diffInDays(Carbon::parse($endsOn)) + 1;
+        $chosen = isset($args['starts_on']) || isset($args['ends_on']);
+
+        $length = $days % 7 === 0
+            ? (int) ($days / 7).' week'.($days === 7 ? '' : 's')
+            : $days.' days';
+
+        return $chosen ? $length : "{$length} (the default)";
     }
 
     /**

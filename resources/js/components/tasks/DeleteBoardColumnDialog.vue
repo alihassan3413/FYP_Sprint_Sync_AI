@@ -44,8 +44,8 @@ function handleClose(value: boolean) {
 <template>
     <AppModal
         :open="open"
-        title="Delete column"
-        :description="column ? `“${column.name}” will be permanently deleted. This only works if the column is empty.` : undefined"
+        title="Delete list"
+        :description="column ? `“${column.name}” will be permanently deleted. This only works if the list is empty.` : undefined"
         size="sm"
         @update:open="handleClose"
     >

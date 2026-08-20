@@ -70,7 +70,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         $this->assertTrue($result['awaiting_input'], 'The UI keys off this to avoid showing a warning.');
     }
 
-    public function test_no_confirmation_card_is_shown_while_a_column_is_outstanding(): void
+    public function test_no_confirmation_card_is_shown_while_a_list_is_outstanding(): void
     {
         $tool = $this->tool();
         $context = new ToolContext($this->owner, $this->workspace);
@@ -78,7 +78,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         $this->assertInstanceOf(DefersConfirmation::class, $tool);
         $this->assertTrue(
             $tool->needsMoreInformation(['title' => 'Fix the login redirect'], $context),
-            'Asking for a column must come before the confirmation card, not after it.',
+            'Asking for a list must come before the confirmation card, not after it.',
         );
     }
 
@@ -87,7 +87,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
         $this->assertTrue($this->tool()->needsMoreInformation(
-            ['title' => 'Fix it', 'board_column' => 'To Do'],
+            ['title' => 'Fix it', 'board_list' => 'To Do'],
             new ToolContext($this->owner, $this->workspace),
         ));
     }
@@ -97,7 +97,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
         $this->assertFalse($this->tool()->needsMoreInformation(
-            ['title' => 'Fix it', 'board_column' => 'To Do', 'sprint' => 'none'],
+            ['title' => 'Fix it', 'board_list' => 'To Do', 'sprint' => 'none'],
             new ToolContext($this->owner, $this->workspace),
         ), 'With nothing left to ask, the user must get a confirmation card before anything is written.');
 
@@ -118,6 +118,18 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         ));
     }
 
+    public function test_both_list_and_column_are_accepted_from_the_user(): void
+    {
+        foreach (['board_list', 'board_column'] as $argument) {
+            Task::query()->delete();
+
+            $result = $this->create(['title' => 'Fix it '.$argument, $argument => 'In Progress']);
+
+            $this->assertTrue($result['success'], "The assistant must accept \"{$argument}\".");
+            $this->assertSame('In Progress', $result['task']['board_list']);
+        }
+    }
+
     public function test_it_asks_which_project_when_several_could_be_meant(): void
     {
         Project::factory()->forWorkspace($this->workspace)->create(['name' => 'Mobile App']);
@@ -130,51 +142,51 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         $this->assertContains('Website Revamp', array_column($result['projects'], 'name'));
     }
 
-    public function test_it_asks_which_column_once_the_project_is_known(): void
+    public function test_it_asks_which_list_once_the_project_is_known(): void
     {
         $result = $this->create(['title' => 'Fix the login redirect']);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('column_required', $result['error_code']);
-        $this->assertSame(['To Do', 'In Progress', 'Done'], array_column($result['columns'], 'name'));
-        $this->assertTrue($result['columns'][0]['is_starting_column'], 'To Do is where new work lands.');
-        $this->assertFalse($result['columns'][1]['is_starting_column']);
-        $this->assertTrue($result['columns'][2]['is_done_column']);
+        $this->assertSame('list_required', $result['error_code']);
+        $this->assertSame(['To Do', 'In Progress', 'Done'], array_column($result['lists'], 'name'));
+        $this->assertTrue($result['lists'][0]['is_starting_list'], 'To Do is where new work lands.');
+        $this->assertFalse($result['lists'][1]['is_starting_list']);
+        $this->assertTrue($result['lists'][2]['is_done_list']);
         $this->assertSame(0, Task::query()->count(), 'Nothing may be written while a question is outstanding.');
     }
 
-    public function test_a_named_column_is_matched_loosely_and_used(): void
+    public function test_a_named_list_is_matched_loosely_and_used(): void
     {
-        $result = $this->create(['title' => 'Fix the login redirect', 'board_column' => 'in progres']);
+        $result = $this->create(['title' => 'Fix the login redirect', 'board_list' => 'in progres']);
 
         $this->assertTrue($result['success']);
-        $this->assertSame('In Progress', $result['task']['board_column']);
+        $this->assertSame('In Progress', $result['task']['board_list']);
     }
 
-    public function test_a_column_id_places_the_task_there(): void
+    public function test_a_list_id_places_the_task_there(): void
     {
         $done = BoardColumn::query()->where('name', 'Done')->firstOrFail();
 
-        $result = $this->create(['title' => 'Ship it', 'board_column_id' => $done->id]);
+        $result = $this->create(['title' => 'Ship it', 'board_list_id' => $done->id]);
 
         $this->assertTrue($result['success']);
-        $this->assertSame('Done', $result['task']['board_column']);
+        $this->assertSame('Done', $result['task']['board_list']);
 
         $task = Task::query()->firstOrFail();
         $this->assertSame($done->id, $task->board_column_id);
         $this->assertNotNull($task->completed_at, 'Landing in a done column completes the task.');
     }
 
-    public function test_an_unknown_column_name_returns_the_real_ones(): void
+    public function test_an_unknown_list_name_returns_the_real_ones(): void
     {
-        $result = $this->create(['title' => 'Fix it', 'board_column' => 'Quality Assurance']);
+        $result = $this->create(['title' => 'Fix it', 'board_list' => 'Quality Assurance']);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('column_not_found', $result['error_code']);
-        $this->assertSame(['To Do', 'In Progress', 'Done'], array_column($result['columns'], 'name'));
+        $this->assertSame('list_not_found', $result['error_code']);
+        $this->assertSame(['To Do', 'In Progress', 'Done'], array_column($result['lists'], 'name'));
     }
 
-    public function test_a_single_column_project_is_not_asked_about(): void
+    public function test_a_single_list_project_is_not_asked_about(): void
     {
         $solo = Project::factory()->forWorkspace($this->workspace)->create(['name' => 'Solo']);
         $solo->boardColumns()->delete();
@@ -183,14 +195,14 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         $result = $this->create(['title' => 'Just do it', 'project_id' => $solo->id]);
 
         $this->assertTrue($result['success']);
-        $this->assertSame('Only', $result['task']['board_column']);
+        $this->assertSame('Only', $result['task']['board_list']);
     }
 
     public function test_it_asks_about_a_running_sprint_after_the_column_is_settled(): void
     {
         $sprint = Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
-        $result = $this->create(['title' => 'Fix the login redirect', 'board_column' => 'To Do']);
+        $result = $this->create(['title' => 'Fix the login redirect', 'board_list' => 'To Do']);
 
         $this->assertFalse($result['success']);
         $this->assertSame('sprint_choice_required', $result['error_code']);
@@ -203,7 +215,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
     {
         $sprint = Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
-        $result = $this->create(['title' => 'Fix it', 'board_column' => 'To Do', 'sprint' => 'current']);
+        $result = $this->create(['title' => 'Fix it', 'board_list' => 'To Do', 'sprint' => 'current']);
 
         $this->assertTrue($result['success']);
         $this->assertSame($sprint->id, $result['task']['sprint_id']);
@@ -213,7 +225,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
     {
         Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
-        $result = $this->create(['title' => 'Fix it', 'board_column' => 'To Do', 'sprint' => 'none']);
+        $result = $this->create(['title' => 'Fix it', 'board_list' => 'To Do', 'sprint' => 'none']);
 
         $this->assertTrue($result['success']);
         $this->assertNull($result['task']['sprint_id']);
@@ -221,13 +233,13 @@ final class AssistantCreateTaskPlacementTest extends TestCase
 
     public function test_no_sprint_question_when_none_is_running(): void
     {
-        $result = $this->create(['title' => 'Fix it', 'board_column' => 'To Do']);
+        $result = $this->create(['title' => 'Fix it', 'board_list' => 'To Do']);
 
         $this->assertTrue($result['success']);
         $this->assertNull($result['task']['sprint_id']);
     }
 
-    public function test_a_client_is_never_asked_and_lands_in_the_default_column(): void
+    public function test_a_client_is_never_asked_and_lands_in_the_starting_list(): void
     {
         Sprint::factory()->forProject($this->project)->running()->create(['name' => 'Sprint 4']);
 
@@ -246,7 +258,7 @@ final class AssistantCreateTaskPlacementTest extends TestCase
         $result = $this->create(['title' => 'Please fix the checkout', 'project_id' => $this->project->id], $client->refresh());
 
         $this->assertTrue($result['success'], json_encode($result));
-        $this->assertSame('To Do', $result['task']['board_column']);
+        $this->assertSame('To Do', $result['task']['board_list']);
         $this->assertNull($result['task']['sprint_id']);
     }
 }

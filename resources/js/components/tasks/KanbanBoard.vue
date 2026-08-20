@@ -257,7 +257,7 @@ function reorderColumns(fromIndex: number, toIndex: number) {
                     v-if="canManageBoardColumns && !column.is_default"
                     type="button"
                     class="text-muted-foreground hover:text-destructive shrink-0 rounded p-1 transition-colors"
-                    aria-label="Delete column"
+                    aria-label="Delete list"
                     @click.stop="emit('delete-column', column)"
                 >
                     <Trash2 class="size-3.5" />
@@ -305,7 +305,7 @@ function reorderColumns(fromIndex: number, toIndex: number) {
             @click="emit('create-column')"
         >
             <Plus class="size-3.5" />
-            Add column
+            Add list
         </button>
     </div>
 </template>

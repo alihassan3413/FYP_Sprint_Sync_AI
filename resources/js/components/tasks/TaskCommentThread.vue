@@ -40,15 +40,18 @@ const deletingId = ref<number | null>(null);
 function remove(comment: TaskComment) {
     deletingId.value = comment.id;
 
-    router.delete(workspaceRoute('workspace.projects.tasks.comments.destroy', { project: props.projectId, task: props.taskId, comment: comment.id }), {
-        preserveScroll: true,
-        onError: () => {
-            notify.error("Couldn't delete that comment. Please try again.");
+    router.delete(
+        workspaceRoute('workspace.projects.tasks.comments.destroy', { project: props.projectId, task: props.taskId, comment: comment.id }),
+        {
+            preserveScroll: true,
+            onError: () => {
+                notify.error("Couldn't delete that comment. Please try again.");
+            },
+            onFinish: () => {
+                deletingId.value = null;
+            },
         },
-        onFinish: () => {
-            deletingId.value = null;
-        },
-    });
+    );
 }
 
 function canDelete(comment: TaskComment): boolean {
@@ -67,7 +70,10 @@ function formatTimestamp(iso: string): string {
             <span v-if="localComments.length > 0" class="text-muted-foreground text-xs tabular-nums">{{ localComments.length }}</span>
         </div>
 
-        <div v-if="localComments.length === 0" class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10 text-center">
+        <div
+            v-if="localComments.length === 0"
+            class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10 text-center"
+        >
             <MessageSquare class="text-muted-foreground/30 size-6" />
             <p class="text-muted-foreground text-xs">No comments yet — start the conversation.</p>
         </div>

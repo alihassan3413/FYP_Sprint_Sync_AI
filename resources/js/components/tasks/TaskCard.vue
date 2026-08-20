@@ -88,7 +88,7 @@ const moveItems = computed<DropdownEntry[]>(() =>
                 </AppBadge>
 
                 <div v-if="draggable && !pending && otherColumns.length > 0" @click.stop>
-                    <AppDropDown :items="moveItems" heading="Move to" align="end" width="w-44" trigger-label="Move task to another column">
+                    <AppDropDown :items="moveItems" heading="Move to" align="end" width="w-44" trigger-label="Move task to another list">
                         <template #trigger>
                             <button type="button" class="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1 transition-colors">
                                 <ArrowRightLeft class="size-3.5" />
