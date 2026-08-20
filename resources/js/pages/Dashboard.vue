@@ -133,39 +133,37 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
             <!-- Hero greeting                                                 -->
             <!-- =========================================================== -->
             <!-- =========================================================== -->
-            <!-- Header — restraint on purpose: type sets the hierarchy        -->
+            <!-- Header                                                        -->
             <!-- =========================================================== -->
-            <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <header class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
-                    <p class="text-muted-foreground text-[10.5px] font-semibold tracking-[0.14em] uppercase">
-                        {{ formatDateEyebrow() }}
+                    <p class="text-muted-foreground text-[13.5px] font-medium">
+                        {{ greeting() }}, {{ firstName }} — here's {{ workspaceMeta.name }} today.
                     </p>
-
-                    <h1 class="mt-2.5 text-[clamp(1.6rem,3vw,2.125rem)] leading-[1.05] font-semibold tracking-[-0.025em]">
-                        {{ greeting() }}, <span class="dash-mark">{{ firstName }}</span>
+                    <h1 class="mt-1 text-[clamp(1.9rem,4vw,2.75rem)] leading-[1.02] font-semibold tracking-[-0.035em]">
+                        {{ isPersonalScope ? 'My' : 'Team' }} <span class="dash-mark">Dashboard</span>
                     </h1>
-
-                    <p class="text-muted-foreground mt-2 max-w-[56ch] text-[13.5px] leading-relaxed">
-                        Here's what's happening across
-                        <span class="text-foreground font-medium">{{ workspaceMeta.name }}</span>
-                        today.
-                    </p>
                 </div>
 
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    <span
-                        class="border-border text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-medium"
-                    >
-                        <component :is="isPersonalScope ? ListTodo : Users" class="size-3" />
-                        {{ isPersonalScope ? 'My dashboard' : 'Team dashboard' }}
+                    <span class="border-border/70 bg-card inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12px] font-medium">
+                        <component :is="isPersonalScope ? ListTodo : Users" class="text-muted-foreground size-3.5" />
+                        {{ formatDateEyebrow() }}
                     </span>
 
-                    <Button v-if="capabilities.canInviteMembers" as-child size="sm" class="gap-1.5 rounded-full">
-                        <Link :href="workspaceRoute('workspace.invitations.create')">
-                            <Plus class="size-3.5" />
-                            Invite teammate
-                        </Link>
-                    </Button>
+                    <!-- The one deliberately distinctive control on the page -->
+                    <Link
+                        v-if="capabilities.canInviteMembers"
+                        :href="workspaceRoute('workspace.invitations.create')"
+                        class="invite-pill group inline-flex items-center gap-2.5 rounded-full py-2 pr-2 pl-5 text-[13px] font-semibold text-white"
+                    >
+                        Invite teammate
+                        <span
+                            class="grid size-7 place-items-center rounded-full bg-[#BAFF1A] transition-transform duration-300 group-hover:rotate-90"
+                        >
+                            <Plus class="size-4 text-[#0B0B0F]" :stroke-width="3" />
+                        </span>
+                    </Link>
                 </div>
             </header>
 
@@ -185,7 +183,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                     </div>
                 </template>
 
-                <div v-if="insight" class="bg-card relative overflow-hidden rounded-xl border p-4 pl-5 shadow-sm">
+                <div v-if="insight" class="bg-card relative overflow-hidden rounded-2xl border p-4 pl-5">
                     <span
                         class="absolute inset-y-0 left-0 w-[3px]"
                         :class="insightIsCritical ? 'bg-rose-500' : 'bg-amber-400'"
@@ -222,6 +220,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
             <!-- =========================================================== -->
             <div v-if="!showWorkspaceOverview" class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <AppStatCard
+                    tone="lavender"
                     :label="isPersonalScope ? 'My tasks' : 'Team tasks'"
                     :value="taskProgress.total"
                     :hint="taskProgress.total === 1 ? 'assigned' : 'assigned'"
@@ -229,35 +228,35 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                     <template #icon><ListTodo class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Completed" :value="taskProgress.completed" :hint="`${taskProgress.completion_percentage}% done`">
+                <AppStatCard tone="lime" label="Completed" :value="taskProgress.completed" :hint="`${taskProgress.completion_percentage}% done`">
                     <template #icon><CheckCircle2 class="size-3.5 text-emerald-500" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Overdue" :value="taskProgress.overdue" :hint="taskProgress.overdue === 1 ? 'task' : 'tasks'">
+                <AppStatCard tone="rose" label="Overdue" :value="taskProgress.overdue" :hint="taskProgress.overdue === 1 ? 'task' : 'tasks'">
                     <template #icon><AlertTriangle class="size-3.5 text-amber-500" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Projects" :value="projects.length" :hint="projects.length === 1 ? 'assigned' : 'assigned'">
+                <AppStatCard tone="indigo" label="Projects" :value="projects.length" :hint="projects.length === 1 ? 'assigned' : 'assigned'">
                     <template #icon><FolderKanban class="size-3.5" /></template>
                 </AppStatCard>
             </div>
 
             <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <AppStatCard label="Team" :value="teamMembers.length" :hint="teamMembers.length === 1 ? 'member' : 'members'">
+                <AppStatCard tone="lavender" label="Team" :value="teamMembers.length" :hint="teamMembers.length === 1 ? 'member' : 'members'">
                     <template #icon><Users class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Online" :value="onlineMembers.length" hint="right now">
+                <AppStatCard tone="lime" label="Online" :value="onlineMembers.length" hint="right now">
                     <template #icon>
                         <Activity class="size-3.5 text-emerald-500" />
                     </template>
                 </AppStatCard>
 
-                <AppStatCard label="Pending" :value="pendingInvitesCount" :hint="pendingInvitesCount === 1 ? 'invite' : 'invites'">
+                <AppStatCard tone="indigo" label="Pending" :value="pendingInvitesCount" :hint="pendingInvitesCount === 1 ? 'invite' : 'invites'">
                     <template #icon><Mail class="size-3.5" /></template>
                 </AppStatCard>
 
-                <AppStatCard label="Workspace age" :value="workspaceAge" :hint="workspaceAge === 1 ? 'day old' : 'days old'">
+                <AppStatCard tone="neutralSoft" label="Workspace age" :value="workspaceAge" :hint="workspaceAge === 1 ? 'day old' : 'days old'">
                     <template #icon><Rocket class="size-3.5" /></template>
                 </AppStatCard>
             </div>
@@ -268,14 +267,14 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
                 <!-- LEFT: 2/3 width on lg -->
                 <div class="flex flex-col gap-4 lg:col-span-2">
-                    <TaskProgressCard :progress="taskProgress" />
+                    <TaskProgressCard :progress="taskProgress" :href="workspaceRoute('workspace.projects.index')" />
 
                     <ProjectSummaryList :projects="projects" />
 
                     <OnBoardingCheckList v-if="capabilities.canManageWorkspace" :steps="onboardingSteps" />
 
                     <!-- Activity feed -->
-                    <div v-if="showWorkspaceOverview" class="bg-card rounded-xl border p-5 shadow-sm sm:p-6">
+                    <div v-if="showWorkspaceOverview" class="bg-card rounded-3xl border p-5 sm:p-6">
                         <div class="mb-4 flex items-center justify-between">
                             <h3 class="text-[15px] font-semibold tracking-tight">Recent workspace activity</h3>
                             <button type="button" class="text-muted-foreground hover:text-foreground text-[11.5px] font-medium transition-colors">
@@ -295,7 +294,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                     <OnlineNowCard v-if="showWorkspaceOverview" :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
 
                     <!-- Tip card — small, only shows when relevant -->
-                    <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-xl border border-dashed p-4 text-xs">
+                    <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-3xl border border-dashed p-4 text-xs">
                         <p class="text-foreground font-medium">💡 Pro tip</p>
                         <p class="text-muted-foreground mt-1 leading-relaxed">
                             Press
@@ -310,11 +309,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
 </template>
 
 <style scoped>
-/*
- * One accent, used once. The lime underline is the only brand colour on the
- * page — everything else earns its hierarchy from type and spacing, which is
- * what keeps a dense dashboard calm.
- */
+/* The lime swipe, reused from the landing page's headline. */
 .dash-mark {
     position: relative;
     display: inline-block;
@@ -323,9 +318,30 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
 .dash-mark::after {
     content: '';
     position: absolute;
-    inset: auto 0 0.08em;
-    height: 0.18em;
+    inset: auto -0.06em 0.1em;
+    height: 0.2em;
     border-radius: 2px;
     background: #baff1a;
+}
+
+/*
+ * The invite control is the one place the page raises its voice, so it gets the
+ * landing page's ink-and-lime treatment rather than the default button.
+ */
+.invite-pill {
+    background: linear-gradient(135deg, #1b1c22 0%, #0b0b0f 100%);
+    transition:
+        transform 200ms ease,
+        box-shadow 200ms ease;
+    box-shadow: 0 1px 2px rgba(11, 11, 15, 0.2);
+}
+
+.invite-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(11, 11, 15, 0.18);
+}
+
+:global(.dark) .invite-pill {
+    background: linear-gradient(135deg, #2a2c36 0%, #16171d 100%);
 }
 </style>
