@@ -53,7 +53,7 @@ const trendClasses = computed(() => {
     :class="toneClasses[tone]"
   >
     <div
-      class="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.1em]"
+      class="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]"
       :class="mutedOnTone"
     >
       <slot name="icon" />
@@ -61,7 +61,7 @@ const trendClasses = computed(() => {
     </div>
 
     <div class="mt-2 flex items-baseline gap-2">
-      <span class="text-[28px] font-extrabold leading-none tracking-[-0.02em] tabular-nums">
+      <span class="text-[26px] font-semibold leading-none tracking-[-0.025em] tabular-nums">
         {{ value }}
       </span>
       <span v-if="fraction" class="text-xs tabular-nums" :class="mutedOnTone">
