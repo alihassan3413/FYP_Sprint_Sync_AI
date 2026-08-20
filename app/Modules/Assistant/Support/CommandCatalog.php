@@ -13,6 +13,13 @@ final class CommandCatalog
      * @var array<string, array{label: string, description: string, category: string, keywords: array<int, string>, template: string}>
      */
     private const ENTRIES = [
+        'get_guide' => [
+            'label' => 'Teach me how to use SprintSync',
+            'description' => 'A guided walkthrough, or the answer to one "how do I" question.',
+            'category' => 'Learn',
+            'keywords' => ['help', 'guide', 'teach', 'train', 'learn', 'how', 'how do i', 'tutorial', 'walkthrough', 'onboard', 'start', 'new', 'explain', 'show me', 'what can i do', 'documentation', 'manual', 'lost', 'confused'],
+            'template' => 'Teach me how to use SprintSync',
+        ],
         'create_workspace' => [
             'label' => 'Create a workspace',
             'description' => 'Start a new workspace for a separate team or client.',

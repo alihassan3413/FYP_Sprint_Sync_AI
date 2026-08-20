@@ -22,6 +22,7 @@ use App\Modules\Assistant\Tools\EditMeetingTool;
 use App\Modules\Assistant\Tools\FindTasksTool;
 use App\Modules\Assistant\Tools\GetAnalyticsTool;
 use App\Modules\Assistant\Tools\GetWorkspaceInfoTool;
+use App\Modules\Assistant\Tools\GuideTool;
 use App\Modules\Assistant\Tools\InvitationTool;
 use App\Modules\Assistant\Tools\ListMeetingsTool;
 use App\Modules\Assistant\Tools\ListProjectsTool;
@@ -43,6 +44,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
      * @var array<int, class-string>
      */
     private const TOOLS = [
+        GuideTool::class,
         CreateWorkspaceTool::class,
         InvitationTool::class,
         GetWorkspaceInfoTool::class,

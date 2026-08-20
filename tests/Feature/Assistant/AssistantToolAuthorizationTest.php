@@ -78,7 +78,7 @@ final class AssistantToolAuthorizationTest extends TestCase
         $this->assertFalse(app(GetWorkspaceInfoTool::class)->authorize(new ToolContext($user, null)));
     }
 
-    public function test_the_create_workspace_tool_is_available_without_a_workspace_context(): void
+    public function test_only_the_guide_and_create_workspace_tools_are_available_without_a_workspace_context(): void
     {
         $user = User::factory()->create();
 
@@ -87,7 +87,9 @@ final class AssistantToolAuthorizationTest extends TestCase
             app(ToolRegistry::class)->availableFor(new ToolContext($user, null)),
         );
 
-        $this->assertSame(['create_workspace'], $names);
+        /* Only the two tools that make sense before a workspace exists: how to
+           use the product, and how to create one. */
+        $this->assertEqualsCanonicalizing(['get_guide', 'create_workspace'], $names);
     }
 
     public function test_the_create_workspace_tool_works_without_an_existing_workspace(): void
