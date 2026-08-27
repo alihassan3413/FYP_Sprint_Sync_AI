@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Sprint Sync">
+  <rect width="100" height="100" rx="22" fill="#baff1a"/>
+  <path d="M68 34C68 27 60 22 50 22C40 22 32 27 32 34C32 41 40 45 50 47C60 49 68 53 68 61C68 68 60 73 50 73C40 73 32 68 32 61"
+        fill="none" stroke="#121216" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -64,6 +64,18 @@ class HandleInertiaRequests extends Middleware
                 ]),
             ] : null,
 
+            /*
+             * Upload limits are shared so the browser can reject a file before
+             * spending a minute sending something the server will refuse.
+             * config/attachments.php stays the only place they are defined.
+             */
+            'attachments' => fn () => [
+                'max_kilobytes' => (int) config('attachments.max_kilobytes'),
+                'allowed_extensions' => array_values((array) config('attachments.allowed_extensions')),
+                'max_per_task' => (int) config('attachments.max_per_task'),
+                'max_per_comment' => (int) config('attachments.max_per_comment'),
+            ],
+
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

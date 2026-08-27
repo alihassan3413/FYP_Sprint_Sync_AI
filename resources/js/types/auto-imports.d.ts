@@ -6,6 +6,7 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const DEFAULT_ATTACHMENT_LIMITS: typeof import('../lib/attachments').DEFAULT_ATTACHMENT_LIMITS
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
@@ -22,7 +23,9 @@ declare global {
   const defineStore: typeof import('pinia').defineStore
   const detectTimezone: typeof import('../lib/timezones').detectTimezone
   const effectScope: typeof import('vue').effectScope
+  const extensionOf: typeof import('../lib/attachments').extensionOf
   const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
+  const formatBytes: typeof import('../lib/attachments').formatBytes
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
   const formatDuration: typeof import('../lib/meetings').formatDuration
@@ -108,6 +111,7 @@ declare global {
   const useAppearance: typeof import('../composables/useAppearance').useAppearance
   const useAssistantCommands: typeof import('../composables/useAssistantCommands').useAssistantCommands
   const useAssistantPageContext: typeof import('../composables/useAiAssitant').useAssistantPageContext
+  const useAttachmentUploads: typeof import('../composables/useAttachmentUploads').useAttachmentUploads
   const useAttrs: typeof import('vue').useAttrs
   const useClipboard: typeof import('@vueuse/core').useClipboard
   const useCssModule: typeof import('vue').useCssModule
@@ -133,6 +137,7 @@ declare global {
   const useUserTimezone: typeof import('../composables/useUserTimezone').useUserTimezone
   const useVoiceInput: typeof import('../composables/useVoiceInput').useVoiceInput
   const useVoiceOutput: typeof import('../composables/useVoiceOutput').useVoiceOutput
+  const validateAttachment: typeof import('../lib/attachments').validateAttachment
   const verdictStyles: typeof import('../lib/health').verdictStyles
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
@@ -151,6 +156,9 @@ declare global {
   export type { AssistantCommand, CommandGroup } from '../composables/useAssistantCommands'
   import('../composables/useAssistantCommands')
   // @ts-ignore
+  export type { UploadedAttachment, PendingUpload } from '../composables/useAttachmentUploads'
+  import('../composables/useAttachmentUploads')
+  // @ts-ignore
   export type { TaskStatusUpdatedPayload } from '../composables/useProjectTaskStream'
   import('../composables/useProjectTaskStream')
   // @ts-ignore
@@ -168,6 +176,9 @@ declare global {
   // @ts-ignore
   export type { ArchiveRecordType, ArchiveRecord, ArchiveProjectOption, ArchiveAssigneeOption, ArchiveFilters, ArchivePage } from '../lib/archive'
   import('../lib/archive')
+  // @ts-ignore
+  export type { CommentAttachment, AttachmentLimits } from '../lib/attachments'
+  import('../lib/attachments')
   // @ts-ignore
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
@@ -202,6 +213,7 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly DEFAULT_ATTACHMENT_LIMITS: UnwrapRef<typeof import('../lib/attachments')['DEFAULT_ATTACHMENT_LIMITS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
@@ -218,7 +230,9 @@ declare module 'vue' {
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly detectTimezone: UnwrapRef<typeof import('../lib/timezones')['detectTimezone']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly extensionOf: UnwrapRef<typeof import('../lib/attachments')['extensionOf']>
     readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
+    readonly formatBytes: UnwrapRef<typeof import('../lib/attachments')['formatBytes']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
     readonly formatDuration: UnwrapRef<typeof import('../lib/meetings')['formatDuration']>
@@ -304,6 +318,7 @@ declare module 'vue' {
     readonly useAppearance: UnwrapRef<typeof import('../composables/useAppearance')['useAppearance']>
     readonly useAssistantCommands: UnwrapRef<typeof import('../composables/useAssistantCommands')['useAssistantCommands']>
     readonly useAssistantPageContext: UnwrapRef<typeof import('../composables/useAiAssitant')['useAssistantPageContext']>
+    readonly useAttachmentUploads: UnwrapRef<typeof import('../composables/useAttachmentUploads')['useAttachmentUploads']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
@@ -329,6 +344,7 @@ declare module 'vue' {
     readonly useUserTimezone: UnwrapRef<typeof import('../composables/useUserTimezone')['useUserTimezone']>
     readonly useVoiceInput: UnwrapRef<typeof import('../composables/useVoiceInput')['useVoiceInput']>
     readonly useVoiceOutput: UnwrapRef<typeof import('../composables/useVoiceOutput')['useVoiceOutput']>
+    readonly validateAttachment: UnwrapRef<typeof import('../lib/attachments')['validateAttachment']>
     readonly verdictStyles: UnwrapRef<typeof import('../lib/health')['verdictStyles']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>

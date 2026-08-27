@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Actions;
 
 use App\Models\User;
+use App\Modules\Attachments\Actions\ClaimAttachmentsAction;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Projects\Models\Project;
@@ -25,6 +26,7 @@ final class CreateTaskAction
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
         private readonly NotificationPreferenceGate $preferences,
         private readonly RecordAuditLogAction $auditLogger,
+        private readonly ClaimAttachmentsAction $claimAttachments,
     ) {}
 
     public function handle(Project $project, User $creator, StoreTaskData $data): Task
@@ -41,6 +43,18 @@ final class CreateTaskAction
             'completed_at' => $column?->is_done === true ? now() : null,
             'workspace_id' => $project->workspace_id,
         ]);
+
+        if ($data->attachment_ids !== []) {
+            $this->claimAttachments->handle(
+                $task,
+                $creator,
+                $data->attachment_ids,
+                (int) config('attachments.max_per_task'),
+                $project->workspace_id,
+            );
+
+            $task->load('attachments');
+        }
 
         $this->auditLogger->handle(
             $project->workspace,

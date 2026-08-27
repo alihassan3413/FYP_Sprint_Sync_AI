@@ -103,6 +103,46 @@ this maps to a distinct FR number either; it's UX/feature depth added on
 top of the existing Tasks FRs at the user's request, beyond what FR14–FR17
 originally specified.
 
+## Attachments: scope is task comments, not Assistant vision
+
+Attachments exist so people can drop a screenshot or a file into the
+**discussion on a task**, Trello-style. That is the whole scope. They are
+attached to a `TaskComment`, they render under that comment, and they are
+readable by exactly the people who can already read the task.
+
+**They are explicitly not an Assistant feature.** An earlier pass wired the
+same infrastructure into the AI chat — a file picker in the composer, Claude
+`image` content blocks, and a windowing scheme to stop replayed conversation
+history from re-billing the same image on every turn. All of that has been
+removed. `AnthropicProvider` emits text blocks only, `Message` has no
+attachments relation, and there is no image-related configuration in
+`config/assistant.php`. The Assistant remains text-in, text-out. Anyone
+reintroducing multimodal behaviour should treat it as a new decision rather
+than a restoration of something that used to work.
+
+**One mechanism, not two.** `app/Modules/Attachments` owns the table, the
+model, the upload endpoint and the policy. It is polymorphic (`attachable`),
+so a second host — a task itself, a meeting, a project — is a relation and a
+claim call, not another system. Nothing else should grow its own uploads.
+
+**How it works.** A file is uploaded before the thing that owns it exists, so
+`POST /attachments` stores it unclaimed and returns an id; the comment then
+claims those ids as it is created. `ClaimAttachmentsAction` only ever claims
+files that are unclaimed, uploaded by that same user, and in that workspace —
+so an id belonging to someone else, or to another workspace, cannot be pulled
+onto a comment. Unclaimed uploads stay private to their uploader and are
+deleted after a day by `attachments:prune`.
+
+**Storage.** Files live on the private disk and stream through a policy check;
+there is no public URL. Images over 1100px also get a downscaled JPEG sibling
+(`preview_path`) written with GD at upload time, which keeps thumbnails cheap
+to serve without adding an image library. `AttachmentPolicy::view` delegates to
+the attachable, so comment attachments inherit task visibility rather than
+carrying a second set of rules.
+
+**No FR status changes.** No requirement in the FYP report covers attachments;
+this is feature depth on top of FR14–FR17, added at the user's request.
+
 ## Completed work log
 
 ### 1. FR01–FR35 implementation audit

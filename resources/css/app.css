@@ -26,6 +26,7 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-primary-text: var(--primary-text);
 
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -97,9 +98,13 @@
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(240 10% 8%);
 
-    /* Lime CTA */
+    /* Lime CTA. Built to be a *background* with --primary-foreground on top:
+       as text on --background it lands at 1.2:1, which is unreadable. Use
+       --primary-text whenever the brand colour has to be the ink instead. */
     --primary: hsl(78 100% 55%);
     --primary-foreground: hsl(240 10% 8%);
+    /* Same hue, darkened to 5.8:1 on --background. */
+    --primary-text: hsl(78 100% 22%);
 
     --secondary: hsl(240 6% 94%);
     --secondary-foreground: hsl(240 10% 8%);
@@ -117,7 +122,9 @@
 
     --border: hsl(240 6% 88%);
     --input: hsl(240 6% 88%);
-    --ring: hsl(78 100% 45%);
+    /* Focus rings need 3:1 against the surface behind them; the old 45%
+       lightness sat at 1.5:1, so the ring was there but nobody could see it. */
+    --ring: hsl(78 100% 30%);
 
     --chart-1: hsl(78 100% 45%);
     --chart-2: hsl(160 70% 40%);
@@ -148,6 +155,8 @@
     --popover-foreground: hsl(210 40% 96%);
     --primary: hsl(213 94% 68%);
     --primary-foreground: hsl(222 47% 11%);
+    /* Already a light blue on a dark ground, so it reads as ink unchanged. */
+    --primary-text: hsl(213 94% 68%);
     --secondary: hsl(223 26% 17%);
     --secondary-foreground: hsl(210 40% 96%);
     --muted: hsl(223 24% 15%);

@@ -18,6 +18,11 @@ final class TaskCommentPolicy
         return $user->can('view', $task);
     }
 
+    public function view(User $user, TaskComment $comment): bool
+    {
+        return $this->viewAny($user, $comment->task);
+    }
+
     public function create(User $user, Task $task): bool
     {
         if (! $this->viewAny($user, $task)) {

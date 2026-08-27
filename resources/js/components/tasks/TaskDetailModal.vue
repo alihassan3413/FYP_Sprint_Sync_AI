@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Sprint } from '@/lib/sprints';
-import { CalendarClock, FolderKanban, Loader2, Pencil, User as UserIcon } from 'lucide-vue-next';
+import { CalendarClock, FolderKanban, Loader2, Paperclip, Pencil, User as UserIcon } from 'lucide-vue-next';
 
+import { formatBytes } from '@/lib/attachments';
 import { formatDueDate, isOverdue, type BoardColumn, type Task, type TaskMember } from '@/lib/tasks';
 
 const props = defineProps<{
@@ -177,6 +178,40 @@ function handleClose(value: boolean) {
                             <FolderKanban class="text-muted-foreground size-3.5" />
                             <span class="truncate">{{ projectName }}</span>
                         </div>
+                    </div>
+                </div>
+
+                <div v-if="task.attachments?.length">
+                    <p class="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Attachments ({{ task.attachments.length }})</p>
+
+                    <div class="mt-2.5 flex flex-wrap gap-2">
+                        <template v-for="attachment in task.attachments" :key="attachment.id">
+                            <a
+                                v-if="attachment.is_image"
+                                :href="attachment.url"
+                                target="_blank"
+                                rel="noopener"
+                                class="border-border/70 hover:border-foreground/25 block overflow-hidden rounded-lg border transition-colors"
+                            >
+                                <img :src="attachment.url" :alt="attachment.name" loading="lazy" class="max-h-44 w-auto object-cover" />
+                            </a>
+
+                            <a
+                                v-else
+                                :href="attachment.url"
+                                target="_blank"
+                                rel="noopener"
+                                class="bg-muted/30 border-border/70 hover:border-foreground/25 flex items-center gap-2 rounded-lg border p-2 pr-3 transition-colors"
+                            >
+                                <span class="bg-background grid size-9 place-items-center rounded">
+                                    <Paperclip class="text-muted-foreground size-4" />
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block max-w-[11rem] truncate text-[12px] font-medium">{{ attachment.name }}</span>
+                                    <span class="text-muted-foreground block text-[11px]">{{ formatBytes(attachment.size) }}</span>
+                                </span>
+                            </a>
+                        </template>
                     </div>
                 </div>
             </div>

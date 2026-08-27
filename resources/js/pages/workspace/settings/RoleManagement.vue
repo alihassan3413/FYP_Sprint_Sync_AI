@@ -280,7 +280,9 @@ function saveRole() {
                                 <p class="text-sm font-medium">{{ role.label }}</p>
                                 <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">{{ role.description }}</p>
                                 <div class="mt-3 flex items-center justify-between">
-                                    <span class="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                                    <span
+                                        class="bg-primary/10 text-primary-text rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase"
+                                    >
                                         System
                                     </span>
                                     <span class="text-muted-foreground flex items-center gap-1 text-[11px] tabular-nums">
@@ -369,9 +371,9 @@ function saveRole() {
 
                         <div class="flex items-center justify-between border-b px-4 py-3">
                             <div class="flex items-center gap-2 text-sm font-medium">
-                                <Shield class="text-primary size-3.5" />
+                                <Shield class="text-primary-text size-3.5" />
                                 Permissions
-                                <span class="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                                <span class="bg-primary/10 text-primary-text rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
                                     {{ enabledCount }} / {{ totalCount }}
                                 </span>
                             </div>

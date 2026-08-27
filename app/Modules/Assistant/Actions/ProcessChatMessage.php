@@ -254,6 +254,11 @@ final class ProcessChatMessage
             ->map(fn (Message $message) => $message->toApiFormat())
             ->values()
             ->all();
+
+        return $messages
+            ->map(fn (Message $message, int $index) => $message->toApiFormat(in_array($index, $withPixels, true)))
+            ->values()
+            ->all();
     }
 
     /**

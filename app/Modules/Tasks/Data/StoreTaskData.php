@@ -30,5 +30,12 @@ final class StoreTaskData extends Data
         /** Null means "wherever new work starts" — the project's default column. */
         #[Rule(['nullable', 'integer'])]
         public ?int $board_column_id = null,
+
+        /**
+         * Ids of already-uploaded attachments to bind to the new task.
+         *
+         * @var array<int, int>
+         */
+        public array $attachment_ids = [],
     ) {}
 }

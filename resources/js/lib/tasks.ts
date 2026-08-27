@@ -1,3 +1,5 @@
+import type { CommentAttachment } from '@/lib/attachments';
+
 /**
  * Task-related types and pure helpers, mirroring `lib/projects.ts`.
  */
@@ -15,6 +17,7 @@ export interface Task {
     assigned_to: number | null;
     assignee_name: string | null;
     comments: TaskComment[];
+    attachments: CommentAttachment[];
     /** ISO datetime */
     created_at: string;
     /** ISO datetime */
@@ -29,6 +32,7 @@ export interface TaskComment {
     user_name: string;
     /** ISO datetime */
     created_at: string;
+    attachments: CommentAttachment[];
 }
 
 export interface TaskMember {

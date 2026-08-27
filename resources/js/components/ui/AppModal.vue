@@ -43,7 +43,11 @@ const sizeClasses = {
                 </slot>
             </DialogHeader>
 
-            <div class="min-h-0 flex-1 overflow-y-auto pb-6">
+            <!-- `overflow-y-auto` also clips horizontally, which sheared the
+                 4px focus ring off both edges of every field inside. The
+                 padding gives the ring room; the matching negative margin
+                 keeps the content aligned with the header and footer. -->
+            <div class="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1 pb-6">
                 <slot />
             </div>
 

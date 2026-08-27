@@ -67,6 +67,15 @@ export interface SharedData extends PageProps {
     workspace: WorkspaceContext | null;
     notifications: NotificationsContext | null;
     navigation: NavigationContext | null;
+    attachments: AttachmentLimits | null;
+}
+
+/** Mirrors config/attachments.php so the browser can pre-validate uploads. */
+export interface AttachmentLimits {
+    max_kilobytes: number;
+    allowed_extensions: string[];
+    max_per_task: number;
+    max_per_comment: number;
 }
 
 export interface User {

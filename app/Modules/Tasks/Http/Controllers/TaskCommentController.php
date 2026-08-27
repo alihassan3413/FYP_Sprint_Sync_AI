@@ -23,7 +23,12 @@ final class TaskCommentController
         Task $task,
         CreateTaskCommentAction $action,
     ): RedirectResponse {
-        $action->handle($task, $request->user(), $request->string('body')->trim()->toString());
+        $action->handle(
+            $task,
+            $request->user(),
+            $request->string('body')->trim()->toString(),
+            $request->array('attachment_ids'),
+        );
 
         return back();
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Actions;
 
 use App\Models\User;
+use App\Modules\Attachments\Actions\ClaimAttachmentsAction;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskComment;
 use App\Notifications\NotificationChannel;
@@ -21,14 +22,30 @@ final class CreateTaskCommentAction
     public function __construct(
         private readonly ResolveTaskRecipients $resolveTaskRecipients,
         private readonly NotificationPreferenceGate $preferences,
+        private readonly ClaimAttachmentsAction $claimAttachments,
     ) {}
 
-    public function handle(Task $task, User $author, string $body): TaskComment
+    /**
+     * @param  array<int, int|string>  $attachmentIds
+     */
+    public function handle(Task $task, User $author, string $body, array $attachmentIds = []): TaskComment
     {
         $comment = $task->comments()->create([
             'body' => $body,
             'user_id' => $author->id,
         ]);
+
+        if ($attachmentIds !== []) {
+            $this->claimAttachments->handle(
+                $comment,
+                $author,
+                $attachmentIds,
+                (int) config('attachments.max_per_comment'),
+                $task->workspace_id,
+            );
+
+            $comment->load('attachments');
+        }
 
         $this->notifyComment($task, $author, $body);
 

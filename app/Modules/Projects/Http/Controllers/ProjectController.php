@@ -98,7 +98,7 @@ final class ProjectController
                 : collect(),
             'tasks' => $canViewBoard
                 ? $project->tasks()
-                    ->with(['assignee:id,name,email', 'comments.user:id,name,email'])
+                    ->with(['assignee:id,name,email', 'attachments', 'comments.user:id,name,email', 'comments.attachments'])
                     ->latest()
                     ->get()
                     ->map(TaskData::fromModel(...))

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Models;
 
 use App\Models\User;
+use App\Modules\Attachments\Models\Attachment;
 use App\Modules\Tasks\Database\Factories\TaskCommentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property int $id
@@ -45,5 +47,10 @@ final class TaskComment extends Model
     protected static function newFactory(): TaskCommentFactory
     {
         return TaskCommentFactory::new();
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
     }
 }

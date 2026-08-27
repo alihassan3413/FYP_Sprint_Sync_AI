@@ -23,6 +23,8 @@ final class StoreTaskCommentRequest extends FormRequest
     {
         return [
             'body' => TaskCommentData::bodyRules(),
+            'attachment_ids' => ['nullable', 'array', 'max:'.(int) config('attachments.max_per_comment')],
+            'attachment_ids.*' => ['integer'],
         ];
     }
 

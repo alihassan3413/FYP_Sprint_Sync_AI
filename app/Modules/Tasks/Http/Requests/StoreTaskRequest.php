@@ -30,6 +30,8 @@ final class StoreTaskRequest extends FormRequest
             'assigned_to' => ['nullable', 'integer'],
             'due_date' => ['nullable', 'date'],
             'sprint_id' => ['nullable', 'integer'],
+            'attachment_ids' => ['nullable', 'array', 'max:'.(int) config('attachments.max_per_task')],
+            'attachment_ids.*' => ['integer'],
         ];
     }
 

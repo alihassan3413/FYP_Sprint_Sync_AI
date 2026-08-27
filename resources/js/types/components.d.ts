@@ -15,6 +15,7 @@ declare module 'vue' {
     AddProjectMemberModal: typeof import('./../components/projects/AddProjectMemberModal.vue')['default']
     AIAssistant: typeof import('./../components/ai/AIAssistant.vue')['default']
     AppAiInsight: typeof import('./../components/ui/AppAiInsight.vue')['default']
+    AppAttachmentPicker: typeof import('./../components/ui/AppAttachmentPicker.vue')['default']
     AppAvatar: typeof import('./../components/ui/AppAvatar.vue')['default']
     AppAvatarStack: typeof import('./../components/ui/AppAvatarStack.vue')['default']
     AppBadge: typeof import('./../components/ui/AppBadge.vue')['default']

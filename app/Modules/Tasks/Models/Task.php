@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Models;
 
 use App\Models\User;
+use App\Modules\Attachments\Models\Attachment;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Database\Factories\TaskFactory;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -81,6 +83,11 @@ final class Task extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(TaskComment::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
     }
 
     public function isAssignedTo(User $user): bool

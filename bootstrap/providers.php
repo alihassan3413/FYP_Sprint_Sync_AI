@@ -5,6 +5,7 @@ use App\Modules\Admin\Providers\AdminServiceProvider;
 use App\Modules\Analytics\Providers\AnalyticsServiceProvider;
 use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
+use App\Modules\Attachments\Providers\AttachmentsServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
@@ -23,6 +24,7 @@ return [
     AssistantServiceProvider::class,
     ArchiveServiceProvider::class,
     AnalyticsServiceProvider::class,
+    AttachmentsServiceProvider::class,
     AuditServiceProvider::class,
     AdminServiceProvider::class,
 ];
