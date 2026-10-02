@@ -36,6 +36,17 @@ final class SeedDemoData extends Command
 
     public function handle(): int
     {
+        // Factories need Faker, which is require-dev and so absent from a
+        // production `composer install --no-dev`. Laravel only defines fake()
+        // when Faker is present, so without this the failure is an undefined
+        // function deep inside a factory.
+        if (! function_exists('fake')) {
+            $this->error('Faker is missing — this command needs dev dependencies.');
+            $this->line('Run: composer install --optimize-autoloader   (as the app user, without --no-dev)');
+
+            return self::FAILURE;
+        }
+
         $email = (string) $this->option('email');
 
         $user = User::firstWhere('email', $email);
