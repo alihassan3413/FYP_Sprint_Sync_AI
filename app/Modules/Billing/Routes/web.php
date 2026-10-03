@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Billing\Http\Controllers\BillingPlanController;
 use App\Modules\Billing\Http\Controllers\ClientController;
 use App\Modules\Billing\Http\Controllers\ClientLogoController;
 use App\Support\Routing\TenantRoute;
@@ -18,4 +19,10 @@ TenantRoute::prefixed('clients', 'workspace.clients.', function () {
     Route::get('{client}/logo', [ClientLogoController::class, 'show'])->name('logo.show');
     Route::post('{client}/logo', [ClientLogoController::class, 'store'])->name('logo.store');
     Route::delete('{client}/logo', [ClientLogoController::class, 'destroy'])->name('logo.destroy');
+
+    // Recurring invoices ("billing plans") are edited on the client page.
+    Route::post('{client}/recurring-invoices', [BillingPlanController::class, 'store'])->name('plans.store');
+    Route::put('{client}/recurring-invoices/{billingPlan}', [BillingPlanController::class, 'update'])->name('plans.update');
+    Route::post('{client}/recurring-invoices/{billingPlan}/pause', [BillingPlanController::class, 'pause'])->name('plans.pause');
+    Route::post('{client}/recurring-invoices/{billingPlan}/resume', [BillingPlanController::class, 'resume'])->name('plans.resume');
 });

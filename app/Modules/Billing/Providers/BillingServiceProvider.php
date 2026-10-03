@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Providers;
 
+use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
+use App\Modules\Billing\Policies\BillingPlanPolicy;
 use App\Modules\Billing\Policies\ClientPolicy;
 use App\Support\Modules\ModuleServiceProvider;
 
@@ -14,5 +16,6 @@ final class BillingServiceProvider extends ModuleServiceProvider
 
     protected array $policies = [
         Client::class => ClientPolicy::class,
+        BillingPlan::class => BillingPlanPolicy::class,
     ];
 }

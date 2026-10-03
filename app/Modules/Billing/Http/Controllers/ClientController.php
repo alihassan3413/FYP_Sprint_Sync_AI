@@ -8,12 +8,16 @@ use App\Modules\Billing\Actions\ArchiveClientAction;
 use App\Modules\Billing\Actions\CreateClientAction;
 use App\Modules\Billing\Actions\RestoreClientAction;
 use App\Modules\Billing\Actions\UpdateClientAction;
+use App\Modules\Billing\Data\BillingPlanData;
 use App\Modules\Billing\Data\ClientData;
 use App\Modules\Billing\Data\Currency;
 use App\Modules\Billing\Http\Requests\StoreClientRequest;
 use App\Modules\Billing\Http\Requests\UpdateClientRequest;
+use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
+use App\Modules\People\Models\Person;
 use App\Modules\Workspace\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -40,11 +44,38 @@ final class ClientController
     {
         abort_unless($request->user()->can('view', $client), 403);
 
+        $canManage = $request->user()->can('update', $client);
+        $today = CarbonImmutable::now($workspace->timezone)->startOfDay();
+
         return Inertia::render('clients/show', [
             'client' => ClientData::fromModel($client),
             'currencies' => Currency::options(),
-            'canManageClients' => $request->user()->can('update', $client),
+            'canManageClients' => $canManage,
+            'plans' => $client->billingPlans()
+                ->with(['lines.person:id,public_id', 'adjustments'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (BillingPlan $plan) => BillingPlanData::fromModel($plan, $today))
+                ->values(),
+            'today' => $today->toDateString(),
+            ...($canManage ? ['teamMembers' => $this->teamMembers($workspace)] : []),
         ]);
+    }
+
+    /**
+     * Team profiles that can be put on a recurring invoice, whether or not they
+     * can sign in to SprintSync. Addressed by public id only.
+     *
+     * @return list<array{public_id: string, name: string, title: string|null}>
+     */
+    private function teamMembers(Workspace $workspace): array
+    {
+        return $workspace->people()
+            ->orderBy('name')
+            ->get(['public_id', 'name', 'title'])
+            ->map(fn (Person $person) => $person->only(['public_id', 'name', 'title']))
+            ->values()
+            ->all();
     }
 
     public function store(StoreClientRequest $request, Workspace $workspace, CreateClientAction $action): RedirectResponse

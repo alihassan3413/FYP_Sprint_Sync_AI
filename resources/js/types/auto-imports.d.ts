@@ -11,7 +11,10 @@ declare global {
   const Head: typeof import('@inertiajs/vue3').Head
   const Link: typeof import('@inertiajs/vue3').Link
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
+  const REMINDER_OPTIONS: typeof import('../lib/billing').REMINDER_OPTIONS
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
+  const basisPointsToInput: typeof import('../lib/billing').basisPointsToInput
+  const calculateTotals: typeof import('../lib/billing').calculateTotals
   const categoryBadgeVariant: typeof import('../lib/audit').categoryBadgeVariant
   const clientInitials: typeof import('../lib/clients').clientInitials
   const cn: typeof import('../lib/utils').cn
@@ -35,7 +38,9 @@ declare global {
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
   const formatMoney: typeof import('../lib/money').formatMoney
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
+  const formatShortDate: typeof import('../lib/billing').formatShortDate
   const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
+  const generationDayFor: typeof import('../lib/billing').generationDayFor
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCsrfToken: typeof import('../lib/csrf').getCsrfToken
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -60,7 +65,10 @@ declare global {
   const markRaw: typeof import('vue').markRaw
   const meaningfulTokens: typeof import('../lib/command-search').meaningfulTokens
   const memberPresence: typeof import('../lib/members').memberPresence
+  const minorToInput: typeof import('../lib/billing').minorToInput
   const minorUnits: typeof import('../lib/money').minorUnits
+  const monthName: typeof import('../lib/billing').monthName
+  const nextCycle: typeof import('../lib/billing').nextCycle
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -76,7 +84,9 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const ordinal: typeof import('../lib/billing').ordinal
   const parseError: typeof import('../lib/errors/handleError').parseError
+  const parseScaled: typeof import('../lib/billing').parseScaled
   const provide: typeof import('vue').provide
   const rankFindings: typeof import('../lib/health').rankFindings
   const reactive: typeof import('vue').reactive
@@ -186,6 +196,9 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals } from '../lib/billing'
+  import('../lib/billing')
+  // @ts-ignore
   export type { Client, CurrencyOption } from '../lib/clients'
   import('../lib/clients')
   // @ts-ignore
@@ -227,7 +240,10 @@ declare module 'vue' {
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
+    readonly REMINDER_OPTIONS: UnwrapRef<typeof import('../lib/billing')['REMINDER_OPTIONS']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
+    readonly basisPointsToInput: UnwrapRef<typeof import('../lib/billing')['basisPointsToInput']>
+    readonly calculateTotals: UnwrapRef<typeof import('../lib/billing')['calculateTotals']>
     readonly categoryBadgeVariant: UnwrapRef<typeof import('../lib/audit')['categoryBadgeVariant']>
     readonly clientInitials: UnwrapRef<typeof import('../lib/clients')['clientInitials']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
@@ -251,7 +267,9 @@ declare module 'vue' {
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
     readonly formatMoney: UnwrapRef<typeof import('../lib/money')['formatMoney']>
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
+    readonly formatShortDate: UnwrapRef<typeof import('../lib/billing')['formatShortDate']>
     readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
+    readonly generationDayFor: UnwrapRef<typeof import('../lib/billing')['generationDayFor']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCsrfToken: UnwrapRef<typeof import('../lib/csrf')['getCsrfToken']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -276,7 +294,10 @@ declare module 'vue' {
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly meaningfulTokens: UnwrapRef<typeof import('../lib/command-search')['meaningfulTokens']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
+    readonly minorToInput: UnwrapRef<typeof import('../lib/billing')['minorToInput']>
     readonly minorUnits: UnwrapRef<typeof import('../lib/money')['minorUnits']>
+    readonly monthName: UnwrapRef<typeof import('../lib/billing')['monthName']>
+    readonly nextCycle: UnwrapRef<typeof import('../lib/billing')['nextCycle']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
@@ -292,7 +313,9 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly ordinal: UnwrapRef<typeof import('../lib/billing')['ordinal']>
     readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
+    readonly parseScaled: UnwrapRef<typeof import('../lib/billing')['parseScaled']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly rankFindings: UnwrapRef<typeof import('../lib/health')['rankFindings']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>

@@ -91,6 +91,10 @@ export enum AuditAction {
     CLIENT_UPDATED = 'client.updated',
     CLIENT_ARCHIVED = 'client.archived',
     CLIENT_RESTORED = 'client.restored',
+    BILLING_PLAN_CREATED = 'billing_plan.created',
+    BILLING_PLAN_UPDATED = 'billing_plan.updated',
+    BILLING_PLAN_PAUSED = 'billing_plan.paused',
+    BILLING_PLAN_RESUMED = 'billing_plan.resumed',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -111,6 +115,44 @@ export type AuditLogEntryData = {
     description: string;
     project_name?: string;
     created_at: string;
+};
+export enum BillingPeriod {
+    PreviousMonth = 'previous_month',
+    CurrentMonth = 'current_month',
+}
+export type BillingPlanAdjustmentData = {
+    kind: 'fee' | 'tax' | 'discount';
+    type: 'percentage' | 'fixed';
+    label: string;
+    value: number;
+};
+export type BillingPlanData = {
+    public_id: string;
+    name: string;
+    currency: string;
+    pricing_mode: 'fixed' | 'hourly';
+    generation_day: number;
+    send_day: number;
+    billing_period: 'previous_month' | 'current_month';
+    due_in_days: number;
+    delivery_mode: 'review_before_sending' | 'auto_send';
+    reminder_days_before?: number;
+    paused: boolean;
+    lines: Array<BillingPlanLineData>;
+    adjustments: Array<BillingPlanAdjustmentData>;
+    subtotal_minor?: number;
+    adjustment_amounts_minor?: number[] | null;
+    total_minor?: number;
+    next_generation_on: string;
+    next_send_on: string;
+    next_period_start: string;
+    next_period_end: string;
+};
+export type BillingPlanLineData = {
+    person_public_id?: string;
+    description: string;
+    role_label?: string;
+    unit_price_minor: number;
 };
 export type BoardColumnData = {
     id: number;
@@ -159,6 +201,10 @@ export type DashboardMeetingData = {
     is_past: boolean;
     url: string;
 };
+export enum DeliveryMode {
+    ReviewBeforeSending = 'review_before_sending',
+    AutoSend = 'auto_send',
+}
 export type DepartmentData = {
     public_id: string;
     name: string;
@@ -250,6 +296,10 @@ export type PlatformMetricsData = {
     meetings_total: number;
     signups: Array<SignupPointData>;
 };
+export enum PricingMode {
+    Fixed = 'fixed',
+    Hourly = 'hourly',
+}
 export type ProjectData = {
     id: number;
     name: string;

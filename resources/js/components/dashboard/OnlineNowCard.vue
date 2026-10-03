@@ -25,10 +25,11 @@ const props = withDefaults(defineProps<Props>(), {
 const visible = computed(() => props.members.slice(0, props.maxVisible));
 const overflow = computed(() => Math.max(0, props.members.length - props.maxVisible));
 
-const roleLabel: Record<Member['role'], string> = {
+const roleLabel: Record<NonNullable<Member['role']>, string> = {
     owner: 'Owner',
     admin: 'Admin',
     member: 'Member',
+    client: 'Client',
     guest: 'Guest',
     billing: 'Billing',
 };
@@ -58,7 +59,7 @@ const roleLabel: Record<Member['role'], string> = {
                         <span v-if="m.is_self" class="text-muted-foreground ml-0.5 text-[10.5px] font-medium"> · you </span>
                     </p>
                     <p class="text-muted-foreground truncate text-[10.5px]">
-                        {{ roleLabel[m.role] }}
+                        {{ m.role ? roleLabel[m.role] : '' }}
                     </p>
                 </div>
             </li>

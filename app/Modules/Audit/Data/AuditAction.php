@@ -50,6 +50,10 @@ enum AuditAction: string
     case CLIENT_UPDATED = 'client.updated';
     case CLIENT_ARCHIVED = 'client.archived';
     case CLIENT_RESTORED = 'client.restored';
+    case BILLING_PLAN_CREATED = 'billing_plan.created';
+    case BILLING_PLAN_UPDATED = 'billing_plan.updated';
+    case BILLING_PLAN_PAUSED = 'billing_plan.paused';
+    case BILLING_PLAN_RESUMED = 'billing_plan.resumed';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -91,7 +95,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
-            str_starts_with($this->value, 'client.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
@@ -152,6 +156,10 @@ enum AuditAction: string
             self::CLIENT_UPDATED => 'Client updated',
             self::CLIENT_ARCHIVED => 'Client archived',
             self::CLIENT_RESTORED => 'Client restored',
+            self::BILLING_PLAN_CREATED => 'Recurring invoice created',
+            self::BILLING_PLAN_UPDATED => 'Recurring invoice updated',
+            self::BILLING_PLAN_PAUSED => 'Recurring invoice paused',
+            self::BILLING_PLAN_RESUMED => 'Recurring invoice resumed',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',

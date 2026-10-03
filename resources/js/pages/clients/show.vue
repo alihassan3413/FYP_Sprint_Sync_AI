@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, ChevronLeft, ChevronRight, Coins, ImageMinus, ImageUp, Loader2, Mail, Pencil, Repeat } from 'lucide-vue-next';
+import { Archive, ArchiveRestore, ChevronLeft, ChevronRight, Coins, ImageMinus, ImageUp, Loader2, Mail, Pencil, Plus, Repeat } from 'lucide-vue-next';
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { TeamMemberOption } from '@/lib/billing';
 import { type Client, type CurrencyOption } from '@/lib/clients';
 import { type BreadcrumbItem } from '@/types';
+import type { BillingPlanData } from '@/types/generated';
 
 const props = defineProps<{
     client: Client;
     currencies: CurrencyOption[];
     canManageClients: boolean;
+    plans: BillingPlanData[];
+    /** Today in the workspace's timezone (Y-m-d). */
+    today: string;
+    /** Team profiles that can go on a recurring invoice; only sent to people who can manage it. */
+    teamMembers?: TeamMemberOption[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -20,6 +27,31 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => [
 ]);
 
 const isEditModalOpen = ref(false);
+
+/* ---- Recurring invoices ------------------------------------------------- */
+
+/* Archived clients keep their recurring invoices visible but read-only. */
+const canManagePlans = computed(() => props.canManageClients && !props.client.archived_at);
+const isPlanSheetOpen = ref(false);
+const editingPlan = ref<BillingPlanData | null>(null);
+
+function openPlan(plan: BillingPlanData | null) {
+    if (!canManagePlans.value) return;
+
+    editingPlan.value = plan;
+    isPlanSheetOpen.value = true;
+}
+
+function setPaused(plan: BillingPlanData, paused: boolean) {
+    router.post(
+        workspaceRoute(paused ? 'workspace.clients.plans.pause' : 'workspace.clients.plans.resume', {
+            client: props.client.public_id,
+            billingPlan: plan.public_id,
+        }),
+        {},
+        { preserveScroll: true },
+    );
+}
 const showDetails = ref(false);
 
 const hasDetails = computed(() => props.client.cc_emails.length > 0 || !!props.client.address || !!props.client.tax_id);
@@ -140,16 +172,44 @@ const actions = computed<DropdownEntry[]>(() =>
                 </div>
             </div>
 
-            <section>
-                <h2 class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.12em] uppercase">Recurring invoices</h2>
-                <div class="bg-card rounded-2xl border border-dashed">
+            <section data-testid="recurring-invoices">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="text-muted-foreground text-[11px] font-semibold tracking-[0.12em] uppercase">Recurring invoices</h2>
+                    <Button v-if="canManagePlans && plans.length" variant="outline" size="sm" class="gap-1.5" @click="openPlan(null)">
+                        <Plus class="size-3.5" />
+                        Recurring invoice
+                    </Button>
+                </div>
+
+                <div v-if="plans.length" class="grid gap-4 lg:grid-cols-2">
+                    <RecurringInvoiceCard
+                        v-for="plan in plans"
+                        :key="plan.public_id"
+                        :plan="plan"
+                        :can-manage="canManagePlans"
+                        @edit="openPlan(plan)"
+                        @pause="setPaused(plan, true)"
+                        @resume="setPaused(plan, false)"
+                    />
+                </div>
+                <div v-else class="bg-card rounded-2xl border border-dashed">
                     <AppEmptyState
                         compact
-                        title="No recurring invoices yet"
-                        :description="`Recurring invoices for ${client.name} will appear here, ready for you to review each month.`"
+                        title="No recurring invoice yet"
+                        :description="
+                            canManagePlans
+                                ? 'Set it up once. SprintSync prepares it every month.'
+                                : `Recurring invoices for ${client.name} will appear here.`
+                        "
                     >
                         <template #icon>
                             <Repeat class="size-5" />
+                        </template>
+                        <template v-if="canManagePlans" #actions>
+                            <Button size="sm" class="gap-1.5" @click="openPlan(null)">
+                                <Plus class="size-3.5" />
+                                Set up a recurring invoice
+                            </Button>
                         </template>
                     </AppEmptyState>
                 </div>
@@ -191,6 +251,15 @@ const actions = computed<DropdownEntry[]>(() =>
     </AppLayout>
 
     <ClientFormModal v-if="canManageClients" v-model:open="isEditModalOpen" :currencies="currencies" :client="client" />
+    <RecurringInvoiceSheet
+        v-if="canManagePlans"
+        v-model:open="isPlanSheetOpen"
+        :client="client"
+        :plan="editingPlan"
+        :team-members="teamMembers ?? []"
+        :currencies="currencies"
+        :today="today"
+    />
     <input
         v-if="canManageClients"
         ref="logoInput"
