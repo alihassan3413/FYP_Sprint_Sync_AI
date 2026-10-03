@@ -11,6 +11,8 @@ use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Exceptions\InvoiceException;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\InvoiceNumberAllocator;
+use App\Modules\Billing\Support\OfficialInvoicePdf;
+use App\Modules\Billing\Support\SenderSnapshot;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,14 @@ use Illuminate\Support\Facades\DB;
  * invoice can change. It does not send email; the delivery step that will call
  * this (once send_after has passed, or on "Send now") tracks delivery
  * separately.
+ *
+ * It requires the cancel window to have passed (or an explicit Send now) and
+ * a complete sender snapshot.
+ *
+ * The official PDF is written after the financial transaction commits, never
+ * inside it: a file cannot be rolled back with the database. If writing it
+ * fails, the invoice is still correctly issued and OfficialInvoicePdf writes it
+ * on the next attempt (another issue call, or the first download).
  *
  * Exactly once, under retries and races:
  * - the number is allocated and the status changed in one transaction, with a
@@ -35,24 +45,30 @@ final class IssueInvoiceAction
     public function __construct(
         private readonly RecordAuditLogAction $auditLogger,
         private readonly InvoiceNumberAllocator $numbers,
+        private readonly OfficialInvoicePdf $pdf,
     ) {}
 
-    public function handle(Invoice $invoice, ?User $actor): Invoice
+    /**
+     * @param  bool  $sendNow  the owner explicitly chose to skip the rest of the cancel window
+     */
+    public function handle(Invoice $invoice, ?User $actor, bool $sendNow = false): Invoice
     {
         try {
-            return retry(3, fn () => DB::transaction(fn () => $this->issue($invoice, $actor)), 0, fn ($exception) => $exception instanceof UniqueConstraintViolationException);
+            $issued = retry(3, fn () => DB::transaction(fn () => $this->issue($invoice, $actor, $sendNow)), 0, fn ($exception) => $exception instanceof UniqueConstraintViolationException);
         } catch (InvoiceException $exception) {
-            $current = $invoice->fresh();
+            $issued = $invoice->fresh();
 
-            if ($current?->isIssued()) {
-                return $current;
+            if (! $issued?->isIssued()) {
+                throw $exception;
             }
-
-            throw $exception;
         }
+
+        $this->pdf->ensureSafely($issued);
+
+        return $issued->refresh();
     }
 
-    private function issue(Invoice $invoice, ?User $actor): Invoice
+    private function issue(Invoice $invoice, ?User $actor, bool $sendNow): Invoice
     {
         $invoice = Invoice::query()->with('workspace')->findOrFail($invoice->getKey());
 
@@ -62,6 +78,14 @@ final class IssueInvoiceAction
 
         if (! $invoice->status->canTransitionTo(InvoiceStatus::Issued)) {
             throw InvoiceException::invalidTransition($invoice->status, InvoiceStatus::Issued);
+        }
+
+        if (! $sendNow && $invoice->send_after?->isFuture()) {
+            throw InvoiceException::sendNotDue();
+        }
+
+        if (! SenderSnapshot::isComplete($invoice->bill_from)) {
+            throw InvoiceException::senderIncomplete('issuing');
         }
 
         $today = CarbonImmutable::now($invoice->workspace->timezone)->startOfDay();

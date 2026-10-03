@@ -54,6 +54,24 @@ final class InvoiceException extends AppException
         return new self(code: ErrorCode::INVOICE_CANNOT_GENERATE, status: 422, message: $reason);
     }
 
+    public static function senderIncomplete(string $step): self
+    {
+        return new self(
+            code: ErrorCode::INVOICE_SENDER_INCOMPLETE,
+            status: 422,
+            message: "Complete invoicing details before {$step} this invoice.",
+        );
+    }
+
+    public static function sendNotDue(): self
+    {
+        return new self(
+            code: ErrorCode::INVOICE_SEND_NOT_DUE,
+            status: 422,
+            message: 'This invoice is still in its cancel window. It can be issued once the window has passed, or with Send now.',
+        );
+    }
+
     public static function negativeTotal(): self
     {
         return new self(

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Billing\Data;
 
 use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Support\InvoicePdfRenderer;
+use App\Modules\Billing\Support\SenderSnapshot;
+use Illuminate\Support\Arr;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -42,6 +45,12 @@ final class InvoiceData extends Data
         public ?string $send_after,
         public ?string $issued_at,
         public ?string $client_public_id,
+        #[LiteralTypeScriptType('{ business_name: string; legal_name: string | null; billing_email: string; phone: string | null; address_line1: string; address_line2: string | null; city: string; region: string | null; postal_code: string | null; country: string; tax_id: string | null } | null')]
+        public ?array $bill_from,
+        public bool $sender_complete,
+        public ?string $logo_url,
+        public string $pdf_url,
+        public string $pdf_filename,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -69,6 +78,15 @@ final class InvoiceData extends Data
             send_after: $invoice->send_after?->toIso8601String(),
             issued_at: $invoice->issued_at?->toIso8601String(),
             client_public_id: $invoice->client?->public_id,
+            /* The logo's storage path stays on the server; the page gets an authorised URL instead. */
+            bill_from: $invoice->bill_from === null ? null : Arr::except($invoice->bill_from, 'logo_path'),
+            sender_complete: SenderSnapshot::isComplete($invoice->bill_from),
+            logo_url: ($invoice->bill_from['logo_path'] ?? null) === null ? null : route('workspace.invoices.logo', [
+                'workspace' => $invoice->workspace->slug,
+                'invoice' => $invoice->public_id,
+            ]),
+            pdf_url: route('workspace.invoices.pdf', ['workspace' => $invoice->workspace->slug, 'invoice' => $invoice->public_id]),
+            pdf_filename: app(InvoicePdfRenderer::class)->filename($invoice),
         );
     }
 }

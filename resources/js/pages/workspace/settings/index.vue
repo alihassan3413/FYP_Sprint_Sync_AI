@@ -2,7 +2,7 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, ReceiptText, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
 
 const props = defineProps<{
     workspaceProfile: {
@@ -18,6 +18,7 @@ const props = defineProps<{
     canManageMembers: boolean;
     canInviteMembers: boolean;
     canViewTeam: boolean;
+    canManageInvoicing: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -80,6 +81,22 @@ const settings = computed<SettingsCard[]>(() => [
                   action: {
                       label: 'Open Team',
                       href: workspaceRoute('workspace.people.index'),
+                  },
+              },
+          ]
+        : []),
+    ...(props.canManageInvoicing
+        ? [
+              {
+                  key: 'invoicing',
+                  icon: ReceiptText,
+                  title: 'Invoicing',
+                  description: 'Your business name, address, tax ID and logo, as they appear on the invoices you send.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Edit invoicing details',
+                      href: workspaceRoute('workspace.invoicing.edit'),
                   },
               },
           ]

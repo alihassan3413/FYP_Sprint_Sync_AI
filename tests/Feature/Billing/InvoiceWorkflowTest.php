@@ -185,7 +185,7 @@ final class InvoiceWorkflowTest extends TestCase
 
     private function issue(Invoice $invoice): Invoice
     {
-        return app(IssueInvoiceAction::class)->handle($invoice, null);
+        return app(IssueInvoiceAction::class)->handle($invoice, null, sendNow: true);
     }
 
     private function auditCount(AuditAction $action): int
@@ -365,7 +365,10 @@ final class InvoiceWorkflowTest extends TestCase
 
         $otherOwner = User::factory()->create();
         $other = Workspace::factory()->ownedBy($otherOwner)->create();
-        $foreign = Invoice::factory()->for(Client::factory()->for($other))->create(['workspace_id' => $other->id]);
+        $foreign = Invoice::factory()->for(Client::factory()->for($other))->create([
+            'workspace_id' => $other->id,
+            'bill_from' => ['business_name' => 'Other Co', 'billing_email' => 'a@b.co', 'address_line1' => '1 Road', 'city' => 'Karachi', 'country' => 'Pakistan'],
+        ]);
         app(ApproveInvoiceAction::class)->handle($foreign, $foreign->version, $otherOwner);
         $this->issue($foreign);
 

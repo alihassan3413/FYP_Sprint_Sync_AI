@@ -15,6 +15,7 @@ use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Data\StoreBillingPlanData;
 use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
+use App\Modules\Billing\Models\InvoicingProfile;
 use App\Modules\People\Models\Person;
 use App\Modules\Workspace\Models\Workspace;
 
@@ -42,6 +43,8 @@ trait BuildsRocketFlood
             'tax_id' => '12-3456789',
         ]);
 
+        $this->invoicingDetails();
+
         foreach ([
             'Ali Hassan' => 'Developer',
             'Aamir Sattar' => 'UI/UX Designer',
@@ -54,6 +57,28 @@ trait BuildsRocketFlood
         ] as $name => $title) {
             $this->team[$name] = Person::factory()->for($this->workspace)->create(['name' => $name, 'title' => $title]);
         }
+    }
+
+    /**
+     * The workspace's own invoicing details (the sender on its invoices).
+     *
+     * @param  array<string, string|null>  $overrides
+     */
+    protected function invoicingDetails(array $overrides = []): InvoicingProfile
+    {
+        $profile = InvoicingProfile::query()->where('workspace_id', $this->workspace->id)->first() ?? new InvoicingProfile;
+        $profile->forceFill([
+            'workspace_id' => $this->workspace->id,
+            'business_name' => 'SprintSync QA',
+            'billing_email' => 'billing@example.com',
+            'address_line1' => '123 Test Street',
+            'city' => 'Lahore',
+            'country' => 'Pakistan',
+            'tax_id' => 'TEST-123',
+            ...$overrides,
+        ])->save();
+
+        return $profile;
     }
 
     protected function devAndOffice(): BillingPlan

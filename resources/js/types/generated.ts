@@ -102,6 +102,7 @@ export enum AuditAction {
     INVOICE_REAPPROVED = 'invoice.reapproved',
     INVOICE_SEND_CANCELLED = 'invoice.send_cancelled',
     INVOICE_ISSUED = 'invoice.issued',
+    INVOICING_UPDATED = 'invoicing.updated',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -265,6 +266,23 @@ export type InvoiceData = {
     send_after?: string;
     issued_at?: string;
     client_public_id?: string;
+    bill_from?: {
+        business_name: string;
+        legal_name: string | null;
+        billing_email: string;
+        phone: string | null;
+        address_line1: string;
+        address_line2: string | null;
+        city: string;
+        region: string | null;
+        postal_code: string | null;
+        country: string;
+        tax_id: string | null;
+    } | null;
+    sender_complete: boolean;
+    logo_url?: string;
+    pdf_url: string;
+    pdf_filename: string;
 };
 export enum InvoiceStatus {
     NeedsHours = 'needs_hours',

@@ -14,6 +14,7 @@ use App\Modules\Billing\Exceptions\InvoiceException;
 use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\InvoiceRecalculator;
+use App\Modules\Billing\Support\SenderSnapshot;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -26,7 +27,8 @@ use LogicException;
  * invoice that already exists instead of creating another.
  *
  * Everything the invoice shows is copied: lines (name, job title, rate or
- * amount), adjustments, who it is billed to and the schedule dates. From here
+ * amount), adjustments, who it is billed to, who it is from (the workspace's
+ * invoicing details, including its logo) and the schedule dates. From here
  * on it never reads the plan, the client or the team to describe itself.
  * Fixed invoices start Ready to review; hourly ones start Needs hours.
  */
@@ -109,6 +111,7 @@ final class GenerateInvoiceFromPlanAction
                 'address' => $client->address,
                 'tax_id' => $client->tax_id,
             ],
+            'bill_from' => SenderSnapshot::from($plan->workspace->invoicingProfile),
         ])->save();
 
         $invoice->lines()->createMany($plan->lines->map(fn ($line) => [

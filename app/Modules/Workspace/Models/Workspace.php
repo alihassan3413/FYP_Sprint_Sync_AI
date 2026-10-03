@@ -7,6 +7,7 @@ namespace App\Modules\Workspace\Models;
 use App\Models\User;
 use App\Modules\Billing\Models\Client;
 use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Models\InvoicingProfile;
 use App\Modules\People\Models\Department;
 use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -117,6 +119,11 @@ final class Workspace extends Model
         // chaperone() gives every loaded client its parent workspace, so
         // building client URLs never queries the workspace again per row.
         return $this->hasMany(Client::class)->chaperone();
+    }
+
+    public function invoicingProfile(): HasOne
+    {
+        return $this->hasOne(InvoicingProfile::class);
     }
 
     public function invoices(): HasMany

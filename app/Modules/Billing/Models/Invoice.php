@@ -47,6 +47,8 @@ use LogicException;
  * @property Carbon $planned_send_on
  * @property int $due_in_days
  * @property array{name: string, billing_email: string, cc_emails: list<string>, address: string|null, tax_id: string|null} $bill_to
+ * @property array<string, string|null>|null $bill_from sender snapshot (see SenderSnapshot); null on invoices prepared before invoicing details existed
+ * @property string|null $pdf_path the official PDF, written once after issue
  * @property int $subtotal_minor
  * @property int $adjustments_minor
  * @property int $total_minor
@@ -84,6 +86,7 @@ final class Invoice extends Model
             'send_after' => 'datetime',
             'issued_at' => 'datetime',
             'bill_to' => 'array',
+            'bill_from' => 'array',
             'version' => 'integer',
             'due_in_days' => 'integer',
             'subtotal_minor' => 'integer',

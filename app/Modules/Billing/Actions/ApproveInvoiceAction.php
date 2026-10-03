@@ -12,11 +12,14 @@ use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Exceptions\InvoiceException;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\InvoiceRecalculator;
+use App\Modules\Billing\Support\SenderSnapshot;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Approves an invoice and schedules it: Ready to review → Approved, with
  * send_after = now + the cancel window (config finance.approval_send_delay_minutes).
+ * The sender (bill_from) must be complete; an invoice prepared before the
+ * workspace had invoicing details takes the current ones here.
  * It is locked from editing but has no number yet and nothing is sent; the
  * owner can still cancel sending. Issuing, and the number, come later
  * (IssueInvoiceAction).
@@ -51,7 +54,7 @@ final class ApproveInvoiceAction
 
     private function approve(Invoice $invoice, int $reviewedVersion, User $actor): Invoice
     {
-        $invoice = Invoice::query()->with(['lines', 'adjustments', 'workspace'])->findOrFail($invoice->getKey());
+        $invoice = Invoice::query()->with(['lines', 'adjustments', 'workspace.invoicingProfile'])->findOrFail($invoice->getKey());
 
         if ($invoice->status->locksFinancials()) {
             return $invoice;
@@ -67,6 +70,15 @@ final class ApproveInvoiceAction
 
         if (! $this->recalculator->recalculate($invoice)) {
             throw InvoiceException::invalidTransition(InvoiceStatus::NeedsHours, InvoiceStatus::Approved);
+        }
+
+        /* Invoices prepared before invoicing details existed take them now, while the owner reviews it. */
+        if ($invoice->bill_from === null) {
+            $invoice->bill_from = SenderSnapshot::from($invoice->workspace->invoicingProfile);
+        }
+
+        if (! SenderSnapshot::isComplete($invoice->bill_from)) {
+            throw InvoiceException::senderIncomplete('approving');
         }
 
         $invoice->save();
