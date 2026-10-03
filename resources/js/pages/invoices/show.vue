@@ -27,6 +27,10 @@ const props = defineProps<{
     canManageInvoicing: boolean;
     /** Whether Settings → Invoicing currently has everything an invoice needs. */
     hasCompleteInvoicingDetails: boolean;
+    canRecordPayments: boolean;
+    paymentMethods: { value: string; label: string }[];
+    /** Today in the workspace's timezone (Y-m-d). */
+    today: string;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -330,6 +334,15 @@ onBeforeUnmount(() => {
                     </template>
                 </div>
             </div>
+
+            <!-- Payments live beside the document: the issued PDF never changes -->
+            <InvoicePayments
+                v-if="summary.status === 'issued'"
+                :invoice="invoice"
+                :can-record="canRecordPayments"
+                :methods="paymentMethods"
+                :today="today"
+            />
 
             <!-- Sender details missing or out of date -->
             <div

@@ -156,3 +156,26 @@ export const INVOICE_STATUS_STYLES: Record<InvoiceStatus, string> = {
     approved: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
     issued: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
+
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid';
+
+export const PAYMENT_STATUS_STYLES: Record<PaymentStatus, string> = {
+    unpaid: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    partially_paid: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+};
+
+/** The one status a list row should show: payment state once issued, otherwise the invoice state. */
+export function rowStatus(invoice: {
+    status: InvoiceStatus;
+    status_label: string;
+    payment_status?: PaymentStatus | null;
+    payment_status_label?: string;
+}): {
+    label: string;
+    style: string;
+} {
+    return invoice.status === 'issued' && invoice.payment_status
+        ? { label: invoice.payment_status_label ?? '', style: PAYMENT_STATUS_STYLES[invoice.payment_status] }
+        : { label: invoice.status_label, style: INVOICE_STATUS_STYLES[invoice.status] };
+}

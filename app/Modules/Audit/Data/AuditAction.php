@@ -62,6 +62,8 @@ enum AuditAction: string
     case INVOICE_SEND_CANCELLED = 'invoice.send_cancelled';
     case INVOICE_ISSUED = 'invoice.issued';
     case INVOICING_UPDATED = 'invoicing.updated';
+    case PAYMENT_RECORDED = 'payment.recorded';
+    case PAYMENT_VOIDED = 'payment.voided';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -103,7 +105,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
-            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
@@ -176,6 +178,8 @@ enum AuditAction: string
             self::INVOICE_SEND_CANCELLED => 'Invoice sending cancelled',
             self::INVOICE_ISSUED => 'Invoice issued',
             self::INVOICING_UPDATED => 'Invoicing details updated',
+            self::PAYMENT_RECORDED => 'Payment recorded',
+            self::PAYMENT_VOIDED => 'Payment voided',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',

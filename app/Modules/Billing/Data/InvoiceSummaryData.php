@@ -33,6 +33,12 @@ final class InvoiceSummaryData extends Data
         public string $planned_send_on,
         public int $total_minor,
         public int $lines_missing_hours,
+        /** Only once issued: unpaid / partially_paid / paid. */
+        #[LiteralTypeScriptType("'unpaid' | 'partially_paid' | 'paid' | null")]
+        public ?string $payment_status,
+        public ?string $payment_status_label,
+        public int $paid_minor,
+        public int $balance_due_minor,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -52,6 +58,10 @@ final class InvoiceSummaryData extends Data
             planned_send_on: $invoice->planned_send_on->toDateString(),
             total_minor: $invoice->total_minor,
             lines_missing_hours: (int) ($invoice->lines_missing_hours ?? $invoice->lines->whereNull('quantity_centi')->count()),
+            payment_status: $invoice->paymentStatus()?->value,
+            payment_status_label: $invoice->paymentStatus()?->label(),
+            paid_minor: $invoice->paidMinor(),
+            balance_due_minor: $invoice->balanceDueMinor(),
         );
     }
 }

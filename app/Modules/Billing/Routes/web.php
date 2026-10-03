@@ -7,6 +7,7 @@ use App\Modules\Billing\Http\Controllers\ClientController;
 use App\Modules\Billing\Http\Controllers\ClientLogoController;
 use App\Modules\Billing\Http\Controllers\InvoiceController;
 use App\Modules\Billing\Http\Controllers\InvoicingSettingsController;
+use App\Modules\Billing\Http\Controllers\PaymentController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,8 @@ TenantRoute::prefixed('invoices', 'workspace.invoices.', function () {
     Route::post('{invoice}/sender', [InvoiceController::class, 'refreshSender'])->name('sender.refresh');
     Route::get('{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('pdf');
     Route::get('{invoice}/logo', [InvoiceController::class, 'logo'])->name('logo');
+    Route::post('{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('{invoice}/payments/{payment}/void', [PaymentController::class, 'void'])->name('payments.void');
 });
 
 TenantRoute::prefixed('settings/invoicing', 'workspace.invoicing.', function () {

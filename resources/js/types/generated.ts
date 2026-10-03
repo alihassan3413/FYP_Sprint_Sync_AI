@@ -103,6 +103,8 @@ export enum AuditAction {
     INVOICE_SEND_CANCELLED = 'invoice.send_cancelled',
     INVOICE_ISSUED = 'invoice.issued',
     INVOICING_UPDATED = 'invoicing.updated',
+    PAYMENT_RECORDED = 'payment.recorded',
+    PAYMENT_VOIDED = 'payment.voided',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -283,6 +285,7 @@ export type InvoiceData = {
     logo_url?: string;
     pdf_url: string;
     pdf_filename: string;
+    payments: PaymentData[];
 };
 export enum InvoiceStatus {
     NeedsHours = 'needs_hours',
@@ -305,6 +308,10 @@ export type InvoiceSummaryData = {
     planned_send_on: string;
     total_minor: number;
     lines_missing_hours: number;
+    payment_status?: 'unpaid' | 'partially_paid' | 'paid' | null;
+    payment_status_label?: string;
+    paid_minor: number;
+    balance_due_minor: number;
 };
 export type LinkedUserData = {
     id: number;
@@ -347,6 +354,31 @@ export enum NotificationType {
     TASK_ASSIGNED = 'task_assigned',
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
+}
+export type PaymentData = {
+    public_id: string;
+    amount_minor: number;
+    received_on: string;
+    method: string;
+    method_label: string;
+    reference?: string;
+    note?: string;
+    recorded_by?: string;
+    voided_at?: string;
+    voided_by?: string;
+    void_reason?: string;
+};
+export enum PaymentMethod {
+    BankTransfer = 'bank_transfer',
+    Cash = 'cash',
+    Card = 'card',
+    Check = 'check',
+    Other = 'other',
+}
+export enum PaymentStatus {
+    Unpaid = 'unpaid',
+    PartiallyPaid = 'partially_paid',
+    Paid = 'paid',
 }
 export type PersonData = {
     public_id: string;

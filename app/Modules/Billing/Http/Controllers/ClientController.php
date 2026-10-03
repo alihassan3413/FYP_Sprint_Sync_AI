@@ -11,12 +11,14 @@ use App\Modules\Billing\Actions\UpdateClientAction;
 use App\Modules\Billing\Data\BillingPlanData;
 use App\Modules\Billing\Data\ClientData;
 use App\Modules\Billing\Data\Currency;
+use App\Modules\Billing\Data\InvoiceSummaryData;
 use App\Modules\Billing\Http\Requests\StoreClientRequest;
 use App\Modules\Billing\Http\Requests\UpdateClientRequest;
 use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\BillingSchedule;
+use App\Modules\Billing\Support\PaymentTotals;
 use App\Modules\People\Models\Person;
 use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -55,6 +57,12 @@ final class ClientController
             'currencies' => Currency::options(),
             'canManageClients' => $canManage,
             'plans' => $this->plans($client, $today),
+            'invoices' => PaymentTotals::withPaid($client->invoices()->getQuery())
+                ->orderByDesc('period_start')
+                ->orderByDesc('id')
+                ->get()
+                ->map(InvoiceSummaryData::fromModel(...))
+                ->values(),
             'today' => $today->toDateString(),
             ...($canManage ? ['teamMembers' => $this->teamMembers($workspace)] : []),
         ]);

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Billing\Data\Currency;
 use App\Modules\Billing\Data\DeliveryMode;
 use App\Modules\Billing\Data\InvoiceStatus;
+use App\Modules\Billing\Data\PaymentStatus;
 use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Database\Factories\InvoiceFactory;
 use App\Modules\Workspace\Models\Workspace;
@@ -154,6 +155,35 @@ final class Invoice extends Model
     public function isIssued(): bool
     {
         return $this->status === InvoiceStatus::Issued;
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * What has been paid: the sum of active (not voided) payments. Uses a
+     * loaded `paid_minor` (withSum) when present, otherwise asks the database.
+     */
+    public function paidMinor(): int
+    {
+        if (array_key_exists('paid_minor', $this->attributes)) {
+            return (int) $this->attributes['paid_minor'];
+        }
+
+        return (int) $this->payments()->active()->sum('amount_minor');
+    }
+
+    public function balanceDueMinor(): int
+    {
+        return $this->total_minor - $this->paidMinor();
+    }
+
+    /** Only meaningful once issued; drafts are not payable yet. */
+    public function paymentStatus(): ?PaymentStatus
+    {
+        return $this->isIssued() ? PaymentStatus::for($this->total_minor, $this->paidMinor()) : null;
     }
 
     protected static function newFactory(): InvoiceFactory

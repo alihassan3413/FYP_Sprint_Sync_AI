@@ -36,6 +36,16 @@ final class InvoicePolicy
         return $invoice->workspace->allowsFinance($user, FinancePermission::Approve);
     }
 
+    public function recordPayment(User $user, Invoice $invoice): bool
+    {
+        return $invoice->workspace->allowsFinance($user, FinancePermission::Payments);
+    }
+
+    public function voidPayment(User $user, Invoice $invoice): bool
+    {
+        return $invoice->workspace->allowsFinance($user, FinancePermission::Payments);
+    }
+
     /** Undoing an approval is part of approving. */
     public function cancelSending(User $user, Invoice $invoice): bool
     {

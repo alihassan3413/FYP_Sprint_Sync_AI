@@ -131,6 +131,7 @@ declare module 'vue' {
     Icon: typeof import('./../components/Icon.vue')['default']
     Input: typeof import('./../components/ui/input/Input.vue')['default']
     InputError: typeof import('./../components/InputError.vue')['default']
+    InvoicePayments: typeof import('./../components/billing/InvoicePayments.vue')['default']
     KanbanBoard: typeof import('./../components/tasks/KanbanBoard.vue')['default']
     Label: typeof import('./../components/ui/label/Label.vue')['default']
     Layout: typeof import('./../layouts/settings/Layout.vue')['default']

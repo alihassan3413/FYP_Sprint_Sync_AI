@@ -51,6 +51,9 @@ final class InvoiceData extends Data
         public ?string $logo_url,
         public string $pdf_url,
         public string $pdf_filename,
+        /** Newest first; voided ones included so the history is complete. */
+        #[LiteralTypeScriptType('PaymentData[]')]
+        public array $payments,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -87,6 +90,13 @@ final class InvoiceData extends Data
             ]),
             pdf_url: route('workspace.invoices.pdf', ['workspace' => $invoice->workspace->slug, 'invoice' => $invoice->public_id]),
             pdf_filename: app(InvoicePdfRenderer::class)->filename($invoice),
+            payments: $invoice->payments()
+                ->with(['recorder:id,name', 'voider:id,name'])
+                ->orderByDesc('received_on')
+                ->orderByDesc('id')
+                ->get()
+                ->map(PaymentData::fromModel(...))
+                ->all(),
         );
     }
 }

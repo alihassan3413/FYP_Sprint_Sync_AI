@@ -10,14 +10,17 @@ use App\Modules\Billing\Actions\RefreshInvoiceSenderAction;
 use App\Modules\Billing\Actions\UpdateInvoiceLinesAction;
 use App\Modules\Billing\Data\InvoiceData;
 use App\Modules\Billing\Data\InvoiceSummaryData;
+use App\Modules\Billing\Data\PaymentMethod;
 use App\Modules\Billing\Http\Requests\ApproveInvoiceRequest;
 use App\Modules\Billing\Http\Requests\UpdateInvoiceLinesRequest;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Models\InvoicingProfile;
 use App\Modules\Billing\Support\InvoicePdfRenderer;
 use App\Modules\Billing\Support\OfficialInvoicePdf;
+use App\Modules\Billing\Support\PaymentTotals;
 use App\Modules\Billing\Support\SenderSnapshot;
 use App\Modules\Workspace\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -29,11 +32,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class InvoiceController
 {
-    public function index(Request $request, Workspace $workspace): Response
+    public function index(Request $request, Workspace $workspace, PaymentTotals $totals): Response
     {
         abort_unless($request->user()->can('viewAny', [Invoice::class, $workspace]), 403);
 
-        $invoices = $workspace->invoices()
+        $invoices = PaymentTotals::withPaid($workspace->invoices()->getQuery())
             ->withCount(['lines as lines_missing_hours' => fn ($query) => $query->whereNull('quantity_centi')])
             ->orderByDesc('period_start')
             ->orderByDesc('id')
@@ -44,6 +47,8 @@ final class InvoiceController
         return Inertia::render('invoices/index', [
             'needsYou' => $needsYou->map(InvoiceSummaryData::fromModel(...))->values(),
             'invoices' => $invoices->map(InvoiceSummaryData::fromModel(...))->values(),
+            'waitingToBePaid' => $totals->waiting($workspace),
+            'receivedThisMonth' => $totals->receivedThisMonth($workspace),
         ]);
     }
 
@@ -58,6 +63,9 @@ final class InvoiceController
             'canEdit' => $request->user()->can('update', $invoice),
             'canApprove' => $request->user()->can('approve', $invoice),
             'sendDelayMinutes' => (int) config('finance.approval_send_delay_minutes'),
+            'canRecordPayments' => $request->user()->can('recordPayment', $invoice),
+            'paymentMethods' => PaymentMethod::options(),
+            'today' => CarbonImmutable::now($workspace->timezone)->toDateString(),
             'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
             'hasCompleteInvoicingDetails' => SenderSnapshot::isComplete(SenderSnapshot::from($workspace->invoicingProfile)),
         ]);

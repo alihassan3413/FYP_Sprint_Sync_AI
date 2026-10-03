@@ -11,13 +11,19 @@ if (typeof window !== 'undefined') {
 import { ChevronRight, Clock, ReceiptText, Repeat } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
-import { formatMoney, INVOICE_STATUS_STYLES, periodLabel } from '@/lib/billing';
+import { formatMoney, INVOICE_STATUS_STYLES, periodLabel, rowStatus } from '@/lib/billing';
 import { type BreadcrumbItem } from '@/types';
 import type { InvoiceSummaryData } from '@/types/generated';
+
+type CurrencyAmount = { currency: string; amount_minor: number };
 
 defineProps<{
     needsYou: InvoiceSummaryData[];
     invoices: InvoiceSummaryData[];
+    /** What issued invoices still owe, per currency (amounts in different currencies are never added together). */
+    waitingToBePaid: CurrencyAmount[];
+    /** Active payments received in the workspace's current month, per currency. */
+    receivedThisMonth: CurrencyAmount[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -47,6 +53,24 @@ onMounted(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-8 p-4 md:p-6 lg:p-8">
             <AppPageHeader eyebrow="Money" title="Invoices" description="What has been prepared, and what is waiting for you." />
+
+            <div class="grid gap-3 sm:grid-cols-2" data-testid="kpis">
+                <div
+                    v-for="kpi in [
+                        { key: 'waiting', label: 'Waiting to be paid', amounts: waitingToBePaid },
+                        { key: 'received', label: 'Received this month', amounts: receivedThisMonth },
+                    ]"
+                    :key="kpi.key"
+                    class="bg-card rounded-2xl border p-5"
+                    :data-testid="`kpi-${kpi.key}`"
+                >
+                    <p class="text-muted-foreground text-sm">{{ kpi.label }}</p>
+                    <p v-if="!kpi.amounts.length" class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{{ formatMoney(0, 'USD') }}</p>
+                    <p v-for="amount in kpi.amounts" :key="amount.currency" class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                        {{ formatMoney(amount.amount_minor, amount.currency) }}
+                    </p>
+                </div>
+            </div>
 
             <section v-if="needsYou.length" data-testid="needs-you">
                 <h2 class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.12em] uppercase">Needs you</h2>
@@ -109,14 +133,17 @@ onMounted(() => {
                                         <span class="tabular-nums">{{
                                             invoice.number ?? (invoice.status === 'approved' ? 'Scheduled to send' : 'Draft')
                                         }}</span>
+                                        <template v-if="invoice.payment_status === 'partially_paid'">
+                                            · {{ formatMoney(invoice.balance_due_minor, invoice.currency) }} remaining</template
+                                        >
                                     </p>
                                 </div>
                                 <div class="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                                     <span class="text-sm font-medium tabular-nums">{{
                                         invoice.status === 'needs_hours' ? '—' : formatMoney(invoice.total_minor, invoice.currency)
                                     }}</span>
-                                    <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="INVOICE_STATUS_STYLES[invoice.status]">
-                                        {{ invoice.status_label }}
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="rowStatus(invoice).style">
+                                        {{ rowStatus(invoice).label }}
                                     </span>
                                 </div>
                                 <ChevronRight

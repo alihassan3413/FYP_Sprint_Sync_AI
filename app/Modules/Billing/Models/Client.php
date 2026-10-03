@@ -84,6 +84,11 @@ final class Client extends Model
         return $this->hasMany(BillingPlan::class);
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
     public function isArchived(): bool
     {
         return $this->archived_at !== null;

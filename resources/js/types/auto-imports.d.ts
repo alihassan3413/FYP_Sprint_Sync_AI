@@ -11,6 +11,7 @@ declare global {
   const Head: typeof import('@inertiajs/vue3').Head
   const INVOICE_STATUS_STYLES: typeof import('../lib/billing').INVOICE_STATUS_STYLES
   const Link: typeof import('@inertiajs/vue3').Link
+  const PAYMENT_STATUS_STYLES: typeof import('../lib/billing').PAYMENT_STATUS_STYLES
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const REMINDER_OPTIONS: typeof import('../lib/billing').REMINDER_OPTIONS
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
@@ -98,6 +99,7 @@ declare global {
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
   const router: typeof import('@inertiajs/vue3').router
+  const rowStatus: typeof import('../lib/billing').rowStatus
   const scoreCommand: typeof import('../lib/command-search').scoreCommand
   const searchCommands: typeof import('../lib/command-search').searchCommands
   const severityDot: typeof import('../lib/health').severityDot
@@ -200,7 +202,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus } from '../lib/billing'
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus } from '../lib/billing'
   import('../lib/billing')
   // @ts-ignore
   export type { Client, CurrencyOption } from '../lib/clients'
@@ -244,6 +246,7 @@ declare module 'vue' {
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly INVOICE_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['INVOICE_STATUS_STYLES']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
+    readonly PAYMENT_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['PAYMENT_STATUS_STYLES']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly REMINDER_OPTIONS: UnwrapRef<typeof import('../lib/billing')['REMINDER_OPTIONS']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
@@ -331,6 +334,7 @@ declare module 'vue' {
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly router: UnwrapRef<typeof import('@inertiajs/vue3')['router']>
+    readonly rowStatus: UnwrapRef<typeof import('../lib/billing')['rowStatus']>
     readonly scoreCommand: UnwrapRef<typeof import('../lib/command-search')['scoreCommand']>
     readonly searchCommands: UnwrapRef<typeof import('../lib/command-search')['searchCommands']>
     readonly severityDot: UnwrapRef<typeof import('../lib/health')['severityDot']>

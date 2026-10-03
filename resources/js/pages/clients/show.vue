@@ -3,16 +3,18 @@ import { Archive, ArchiveRestore, ChevronLeft, ChevronRight, Coins, ImageMinus, 
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { TeamMemberOption } from '@/lib/billing';
+import { formatMoney, periodLabel, rowStatus, type TeamMemberOption } from '@/lib/billing';
 import { type Client, type CurrencyOption } from '@/lib/clients';
 import { type BreadcrumbItem } from '@/types';
-import type { BillingPlanData } from '@/types/generated';
+import type { BillingPlanData, InvoiceSummaryData } from '@/types/generated';
 
 const props = defineProps<{
     client: Client;
     currencies: CurrencyOption[];
     canManageClients: boolean;
     plans: BillingPlanData[];
+    /** This client's invoices with what has been paid. */
+    invoices: InvoiceSummaryData[];
     /** Today in the workspace's timezone (Y-m-d). */
     today: string;
     /** Team profiles that can go on a recurring invoice; only sent to people who can manage it. */
@@ -228,6 +230,34 @@ const actions = computed<DropdownEntry[]>(() =>
                         </template>
                     </AppEmptyState>
                 </div>
+            </section>
+
+            <section v-if="invoices.length" data-testid="client-invoices">
+                <h2 class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.12em] uppercase">Invoices</h2>
+                <ul class="bg-card divide-y overflow-hidden rounded-2xl border">
+                    <li v-for="invoice in invoices" :key="invoice.public_id">
+                        <Link
+                            :href="workspaceRoute('workspace.invoices.show', { invoice: invoice.public_id })"
+                            class="hover:bg-muted/40 focus-visible:ring-ring flex items-center gap-4 px-4 py-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+                        >
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate font-medium tabular-nums">{{ invoice.number ?? 'Draft' }} · {{ invoice.title }}</p>
+                                <p class="text-muted-foreground truncate text-sm">
+                                    {{ periodLabel(invoice.period_start) }}
+                                    <template v-if="invoice.payment_status && invoice.payment_status !== 'paid'">
+                                        · {{ formatMoney(invoice.balance_due_minor, invoice.currency) }} remaining</template
+                                    >
+                                </p>
+                            </div>
+                            <span class="text-sm font-medium tabular-nums">{{
+                                invoice.status === 'needs_hours' ? '—' : formatMoney(invoice.total_minor, invoice.currency)
+                            }}</span>
+                            <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="rowStatus(invoice).style">{{
+                                rowStatus(invoice).label
+                            }}</span>
+                        </Link>
+                    </li>
+                </ul>
             </section>
 
             <section class="bg-card rounded-xl border">
