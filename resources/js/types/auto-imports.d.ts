@@ -9,6 +9,7 @@ declare global {
   const DEFAULT_ATTACHMENT_LIMITS: typeof import('../lib/attachments').DEFAULT_ATTACHMENT_LIMITS
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
+  const INVOICE_STATUS_STYLES: typeof import('../lib/billing').INVOICE_STATUS_STYLES
   const Link: typeof import('@inertiajs/vue3').Link
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const REMINDER_OPTIONS: typeof import('../lib/billing').REMINDER_OPTIONS
@@ -51,6 +52,7 @@ declare global {
   const greeting: typeof import('../lib/activity').greeting
   const h: typeof import('vue').h
   const handleError: typeof import('../lib/errors/handleError').handleError
+  const hoursToInput: typeof import('../lib/billing').hoursToInput
   const initializeTheme: typeof import('../composables/useAppearance').initializeTheme
   const inject: typeof import('vue').inject
   const isOverdue: typeof import('../lib/tasks').isOverdue
@@ -62,6 +64,7 @@ declare global {
   const isShallow: typeof import('vue').isShallow
   const isSupportedTimezone: typeof import('../lib/timezones').isSupportedTimezone
   const isValidMeetingLink: typeof import('../lib/meetings').isValidMeetingLink
+  const lineAmount: typeof import('../lib/billing').lineAmount
   const markRaw: typeof import('vue').markRaw
   const meaningfulTokens: typeof import('../lib/command-search').meaningfulTokens
   const memberPresence: typeof import('../lib/members').memberPresence
@@ -87,6 +90,7 @@ declare global {
   const ordinal: typeof import('../lib/billing').ordinal
   const parseError: typeof import('../lib/errors/handleError').parseError
   const parseScaled: typeof import('../lib/billing').parseScaled
+  const periodLabel: typeof import('../lib/billing').periodLabel
   const provide: typeof import('vue').provide
   const rankFindings: typeof import('../lib/health').rankFindings
   const reactive: typeof import('vue').reactive
@@ -196,7 +200,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals } from '../lib/billing'
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus } from '../lib/billing'
   import('../lib/billing')
   // @ts-ignore
   export type { Client, CurrencyOption } from '../lib/clients'
@@ -238,6 +242,7 @@ declare module 'vue' {
     readonly DEFAULT_ATTACHMENT_LIMITS: UnwrapRef<typeof import('../lib/attachments')['DEFAULT_ATTACHMENT_LIMITS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
+    readonly INVOICE_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['INVOICE_STATUS_STYLES']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly REMINDER_OPTIONS: UnwrapRef<typeof import('../lib/billing')['REMINDER_OPTIONS']>
@@ -280,6 +285,7 @@ declare module 'vue' {
     readonly greeting: UnwrapRef<typeof import('../lib/activity')['greeting']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly handleError: UnwrapRef<typeof import('../lib/errors/handleError')['handleError']>
+    readonly hoursToInput: UnwrapRef<typeof import('../lib/billing')['hoursToInput']>
     readonly initializeTheme: UnwrapRef<typeof import('../composables/useAppearance')['initializeTheme']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isOverdue: UnwrapRef<typeof import('../lib/tasks')['isOverdue']>
@@ -291,6 +297,7 @@ declare module 'vue' {
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly isSupportedTimezone: UnwrapRef<typeof import('../lib/timezones')['isSupportedTimezone']>
     readonly isValidMeetingLink: UnwrapRef<typeof import('../lib/meetings')['isValidMeetingLink']>
+    readonly lineAmount: UnwrapRef<typeof import('../lib/billing')['lineAmount']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly meaningfulTokens: UnwrapRef<typeof import('../lib/command-search')['meaningfulTokens']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
@@ -316,6 +323,7 @@ declare module 'vue' {
     readonly ordinal: UnwrapRef<typeof import('../lib/billing')['ordinal']>
     readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
     readonly parseScaled: UnwrapRef<typeof import('../lib/billing')['parseScaled']>
+    readonly periodLabel: UnwrapRef<typeof import('../lib/billing')['periodLabel']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly rankFindings: UnwrapRef<typeof import('../lib/health')['rankFindings']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>

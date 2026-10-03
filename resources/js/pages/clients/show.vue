@@ -42,6 +42,20 @@ function openPlan(plan: BillingPlanData | null) {
     isPlanSheetOpen.value = true;
 }
 
+/* Idempotent on the server: a second click opens the same invoice. */
+const preparing = ref(false);
+
+function prepareInvoice(plan: BillingPlanData) {
+    if (preparing.value) return;
+
+    preparing.value = true;
+    router.post(
+        workspaceRoute('workspace.clients.plans.invoices.store', { client: props.client.public_id, billingPlan: plan.public_id }),
+        {},
+        { onFinish: () => (preparing.value = false) },
+    );
+}
+
 function setPaused(plan: BillingPlanData, paused: boolean) {
     router.post(
         workspaceRoute(paused ? 'workspace.clients.plans.pause' : 'workspace.clients.plans.resume', {
@@ -190,6 +204,7 @@ const actions = computed<DropdownEntry[]>(() =>
                         @edit="openPlan(plan)"
                         @pause="setPaused(plan, true)"
                         @resume="setPaused(plan, false)"
+                        @prepare="prepareInvoice(plan)"
                     />
                 </div>
                 <div v-else class="bg-card rounded-2xl border border-dashed">

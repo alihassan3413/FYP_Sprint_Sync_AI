@@ -54,6 +54,13 @@ enum AuditAction: string
     case BILLING_PLAN_UPDATED = 'billing_plan.updated';
     case BILLING_PLAN_PAUSED = 'billing_plan.paused';
     case BILLING_PLAN_RESUMED = 'billing_plan.resumed';
+    case INVOICE_GENERATED = 'invoice.generated';
+    case INVOICE_UPDATED = 'invoice.updated';
+    case INVOICE_READY = 'invoice.ready';
+    case INVOICE_APPROVED = 'invoice.approved';
+    case INVOICE_REAPPROVED = 'invoice.reapproved';
+    case INVOICE_SEND_CANCELLED = 'invoice.send_cancelled';
+    case INVOICE_ISSUED = 'invoice.issued';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -95,7 +102,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
-            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
@@ -160,6 +167,13 @@ enum AuditAction: string
             self::BILLING_PLAN_UPDATED => 'Recurring invoice updated',
             self::BILLING_PLAN_PAUSED => 'Recurring invoice paused',
             self::BILLING_PLAN_RESUMED => 'Recurring invoice resumed',
+            self::INVOICE_GENERATED => 'Invoice prepared',
+            self::INVOICE_UPDATED => 'Invoice edited',
+            self::INVOICE_READY => 'Invoice ready to review',
+            self::INVOICE_APPROVED => 'Invoice approved',
+            self::INVOICE_REAPPROVED => 'Invoice approved again',
+            self::INVOICE_SEND_CANCELLED => 'Invoice sending cancelled',
+            self::INVOICE_ISSUED => 'Invoice issued',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',

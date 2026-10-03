@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CalendarDays, Clock, Eye, Pause, Pencil, Play, Repeat, Zap } from 'lucide-vue-next';
+import { Link } from '@inertiajs/vue3';
+import { CalendarDays, Clock, Eye, FileText, Pause, Pencil, Play, Repeat, Zap } from 'lucide-vue-next';
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import { basisPointsToInput, formatMoney, formatShortDate, monthName } from '@/lib/billing';
@@ -10,7 +11,12 @@ const props = defineProps<{
     canManage: boolean;
 }>();
 
-const emit = defineEmits<{ edit: []; pause: []; resume: [] }>();
+const emit = defineEmits<{ edit: []; pause: []; resume: []; prepare: [] }>();
+
+const { workspaceRoute } = useCurrentWorkspace();
+
+/* The invoice for the latest month that is due: open it if it exists, otherwise offer to prepare it. */
+const dueMonth = computed(() => monthName(props.plan.due_period_start));
 
 const isHourly = computed(() => props.plan.pricing_mode === 'hourly');
 const money = (minor: number) => formatMoney(minor, props.plan.currency);
@@ -104,6 +110,19 @@ const actions = computed<DropdownEntry[]>(() => [
                 <component :is="delivery.icon" class="size-3.5" />
                 {{ delivery.text }}
             </p>
+        </div>
+
+        <div v-if="canManage" class="relative z-10 mt-4">
+            <Button v-if="plan.due_invoice_public_id" variant="outline" size="sm" class="gap-1.5" as-child>
+                <Link :href="workspaceRoute('workspace.invoices.show', { invoice: plan.due_invoice_public_id })" data-testid="open-due-invoice">
+                    <FileText class="size-3.5" />
+                    Open {{ dueMonth }} invoice
+                </Link>
+            </Button>
+            <Button v-else-if="!plan.paused" variant="outline" size="sm" class="gap-1.5" data-testid="prepare-invoice" @click="emit('prepare')">
+                <FileText class="size-3.5" />
+                Prepare {{ dueMonth }} invoice
+            </Button>
         </div>
     </article>
 </template>

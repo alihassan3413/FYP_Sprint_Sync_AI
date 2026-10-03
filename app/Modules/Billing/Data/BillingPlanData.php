@@ -51,11 +51,18 @@ final class BillingPlanData extends Data
         public string $next_send_on,
         public string $next_period_start,
         public string $next_period_end,
+        public string $due_period_start,
+        public ?string $due_invoice_public_id,
     ) {}
 
-    public static function fromModel(BillingPlan $plan, CarbonImmutable $today): self
+    /**
+     * @param  string|null  $dueInvoicePublicId  the invoice already generated for the latest due month, if any
+     */
+    public static function fromModel(BillingPlan $plan, CarbonImmutable $today, ?string $dueInvoicePublicId = null): self
     {
-        $cycle = app(BillingSchedule::class)->nextCycleForPlan($plan, $today);
+        $schedule = app(BillingSchedule::class);
+        $cycle = $schedule->nextCycleForPlan($plan, $today);
+        $due = $schedule->latestDueCycle($plan, $today);
         $totals = app(BillingPlanTotals::class)->forPlan($plan);
 
         return new self(
@@ -89,6 +96,8 @@ final class BillingPlanData extends Data
             next_send_on: $cycle->sendDate->toDateString(),
             next_period_start: $cycle->periodStart->toDateString(),
             next_period_end: $cycle->periodEnd->toDateString(),
+            due_period_start: $due->periodStart->toDateString(),
+            due_invoice_public_id: $dueInvoicePublicId,
         );
     }
 }

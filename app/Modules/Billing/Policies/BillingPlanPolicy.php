@@ -24,4 +24,9 @@ final class BillingPlanPolicy
     {
         return $plan->workspace->allowsFinance($user, FinancePermission::Manage);
     }
+
+    public function generateInvoice(User $user, BillingPlan $plan): bool
+    {
+        return $plan->workspace->allowsFinance($user, FinancePermission::Manage);
+    }
 }

@@ -26,8 +26,10 @@ final class InvoiceCalculator
     /**
      * @param  list<array{quantity: int, unit_price: int}>  $lines  quantity in hundredths, unit_price in minor units
      * @param  list<array{kind: AdjustmentKind, type: AdjustmentType, value: int}>  $adjustments  value in basis points or minor units
+     * @param  bool  $partial  the lines are not all known yet (an hourly invoice still waiting for hours), so a
+     *                         temporarily negative total is reported instead of rejected
      */
-    public function calculate(Currency $currency, array $lines, array $adjustments = []): InvoiceTotals
+    public function calculate(Currency $currency, array $lines, array $adjustments = [], bool $partial = false): InvoiceTotals
     {
         $lineAmounts = array_map(fn (array $line) => $this->lineAmount($currency, $line), $lines);
 
@@ -37,7 +39,7 @@ final class InvoiceCalculator
 
         $total = array_reduce($adjustmentAmounts, fn (Money $carry, Money $amount) => $carry->plus($amount), $subtotal);
 
-        if ($total->isNegative()) {
+        if ($total->isNegative() && ! $partial) {
             throw new InvalidArgumentException('Discounts cannot be larger than the subtotal.');
         }
 

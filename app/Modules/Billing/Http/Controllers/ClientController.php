@@ -15,11 +15,14 @@ use App\Modules\Billing\Http\Requests\StoreClientRequest;
 use App\Modules\Billing\Http\Requests\UpdateClientRequest;
 use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
+use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Support\BillingSchedule;
 use App\Modules\People\Models\Person;
 use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,15 +54,33 @@ final class ClientController
             'client' => ClientData::fromModel($client),
             'currencies' => Currency::options(),
             'canManageClients' => $canManage,
-            'plans' => $client->billingPlans()
-                ->with(['lines.person:id,public_id', 'adjustments'])
-                ->orderBy('name')
-                ->get()
-                ->map(fn (BillingPlan $plan) => BillingPlanData::fromModel($plan, $today))
-                ->values(),
+            'plans' => $this->plans($client, $today),
             'today' => $today->toDateString(),
             ...($canManage ? ['teamMembers' => $this->teamMembers($workspace)] : []),
         ]);
+    }
+
+    /**
+     * Each recurring invoice with the invoice already prepared for its latest
+     * due month, so the card can offer "Open" instead of "Prepare".
+     *
+     * @return Collection<int, BillingPlanData>
+     */
+    private function plans(Client $client, CarbonImmutable $today): Collection
+    {
+        $plans = $client->billingPlans()->with(['lines.person:id,public_id', 'adjustments'])->orderBy('name')->get();
+        $schedule = app(BillingSchedule::class);
+
+        $invoices = Invoice::query()
+            ->whereIn('billing_plan_id', $plans->modelKeys())
+            ->get(['public_id', 'billing_plan_id', 'period_start'])
+            ->keyBy(fn (Invoice $invoice) => $invoice->billing_plan_id.'|'.$invoice->period_start->toDateString());
+
+        return $plans->map(function (BillingPlan $plan) use ($today, $schedule, $invoices) {
+            $due = $schedule->latestDueCycle($plan, $today)->periodStart->toDateString();
+
+            return BillingPlanData::fromModel($plan, $today, $invoices->get("{$plan->id}|{$due}")?->public_id);
+        })->values();
     }
 
     /**

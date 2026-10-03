@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Billing\Http\Controllers\BillingPlanController;
 use App\Modules\Billing\Http\Controllers\ClientController;
 use App\Modules\Billing\Http\Controllers\ClientLogoController;
+use App\Modules\Billing\Http\Controllers\InvoiceController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
 
@@ -25,4 +26,13 @@ TenantRoute::prefixed('clients', 'workspace.clients.', function () {
     Route::put('{client}/recurring-invoices/{billingPlan}', [BillingPlanController::class, 'update'])->name('plans.update');
     Route::post('{client}/recurring-invoices/{billingPlan}/pause', [BillingPlanController::class, 'pause'])->name('plans.pause');
     Route::post('{client}/recurring-invoices/{billingPlan}/resume', [BillingPlanController::class, 'resume'])->name('plans.resume');
+    Route::post('{client}/recurring-invoices/{billingPlan}/invoices', [BillingPlanController::class, 'generateInvoice'])->name('plans.invoices.store');
+});
+
+TenantRoute::prefixed('invoices', 'workspace.invoices.', function () {
+    Route::get('/', [InvoiceController::class, 'index'])->name('index');
+    Route::get('{invoice}', [InvoiceController::class, 'show'])->name('show');
+    Route::put('{invoice}/lines', [InvoiceController::class, 'updateLines'])->name('lines.update');
+    Route::post('{invoice}/approve', [InvoiceController::class, 'approve'])->name('approve');
+    Route::post('{invoice}/cancel-sending', [InvoiceController::class, 'cancelSending'])->name('cancel-sending');
 });

@@ -4,7 +4,7 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Archive, BarChart3, BookOpen, Building2, Folder, FolderKanban, LayoutGrid, ShieldCheck, Users2 } from 'lucide-vue-next';
+import { Archive, BarChart3, BookOpen, Building2, Folder, FolderKanban, LayoutGrid, ReceiptText, ShieldCheck, Users2 } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
@@ -67,12 +67,16 @@ const mainNavItems = computed<NavItem[]>(() => {
 
 /**
  * Money is its own group so finance never blends into project work. It only
- * appears for people with finance access (the workspace owner in v1); Invoices
- * joins Clients here once invoices exist.
+ * appears for people with finance access (the workspace owner in v1).
  */
 const moneyNavItems = computed<NavItem[]>(() =>
     navigation.value?.finance
         ? [
+              {
+                  title: 'Invoices',
+                  href: workspaceRoute('workspace.invoices.index'),
+                  icon: ReceiptText,
+              },
               {
                   title: 'Clients',
                   href: workspaceRoute('workspace.clients.index'),

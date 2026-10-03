@@ -95,6 +95,13 @@ export enum AuditAction {
     BILLING_PLAN_UPDATED = 'billing_plan.updated',
     BILLING_PLAN_PAUSED = 'billing_plan.paused',
     BILLING_PLAN_RESUMED = 'billing_plan.resumed',
+    INVOICE_GENERATED = 'invoice.generated',
+    INVOICE_UPDATED = 'invoice.updated',
+    INVOICE_READY = 'invoice.ready',
+    INVOICE_APPROVED = 'invoice.approved',
+    INVOICE_REAPPROVED = 'invoice.reapproved',
+    INVOICE_SEND_CANCELLED = 'invoice.send_cancelled',
+    INVOICE_ISSUED = 'invoice.issued',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -147,6 +154,8 @@ export type BillingPlanData = {
     next_send_on: string;
     next_period_start: string;
     next_period_end: string;
+    due_period_start: string;
+    due_invoice_public_id?: string;
 };
 export type BillingPlanLineData = {
     person_public_id?: string;
@@ -232,6 +241,53 @@ export enum HealthVerdict {
     AtRisk = 'at_risk',
     Critical = 'critical',
 }
+export type InvoiceData = {
+    summary: InvoiceSummaryData;
+    version: number;
+    is_editable: boolean;
+    bill_to: { name: string; billing_email: string; cc_emails: string[]; address: string | null; tax_id: string | null };
+    lines: {
+        position: number;
+        description: string;
+        role_label: string | null;
+        quantity_centi: number | null;
+        unit_price_minor: number;
+        amount_minor: number | null;
+    }[];
+    adjustments: { kind: 'fee' | 'tax' | 'discount'; type: 'percentage' | 'fixed'; label: string; value: number; amount_minor: number }[];
+    subtotal_minor: number;
+    generated_on: string;
+    due_in_days: number;
+    issue_date?: string;
+    due_date?: string;
+    approved_at?: string;
+    approved_by?: string;
+    send_after?: string;
+    issued_at?: string;
+    client_public_id?: string;
+};
+export enum InvoiceStatus {
+    NeedsHours = 'needs_hours',
+    ReadyToReview = 'ready_to_review',
+    Approved = 'approved',
+    Issued = 'issued',
+}
+export type InvoiceSummaryData = {
+    public_id: string;
+    number?: string;
+    title: string;
+    client_name: string;
+    status: 'needs_hours' | 'ready_to_review' | 'approved' | 'issued';
+    status_label: string;
+    pricing_mode: 'fixed' | 'hourly';
+    delivery_mode: 'review_before_sending' | 'auto_send';
+    currency: string;
+    period_start: string;
+    period_end: string;
+    planned_send_on: string;
+    total_minor: number;
+    lines_missing_hours: number;
+};
 export type LinkedUserData = {
     id: number;
     name: string;

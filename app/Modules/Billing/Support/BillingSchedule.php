@@ -67,6 +67,21 @@ final class BillingSchedule
         return $this->cycleFor($generationDay, $sendDay, $period, $month);
     }
 
+    /**
+     * The most recent cycle whose draft is due by $today: what "generate this
+     * month's invoice now" means for an owner, and what a late run catches up.
+     */
+    public function latestDueCycle(BillingPlan $plan, CarbonImmutable $today): BillingCycle
+    {
+        $month = $today->startOfMonth();
+
+        if ($month->setDay($plan->generation_day)->greaterThan($today->startOfDay())) {
+            $month = $month->subMonthNoOverflow();
+        }
+
+        return $this->cycleFor($plan->generation_day, $plan->send_day, $plan->billing_period, $month);
+    }
+
     public function nextCycleForPlan(BillingPlan $plan, CarbonImmutable $today): BillingCycle
     {
         return $this->nextCycle($plan->generation_day, $plan->send_day, $plan->billing_period, $today);

@@ -132,3 +132,27 @@ export const REMINDER_OPTIONS = [
     { value: 3, label: '3 days before' },
     { value: 7, label: '7 days before' },
 ] as const;
+
+/** quantity (hundredths) × unit price, rounded half up once, as InvoiceCalculator. */
+export function lineAmount(unitPriceMinor: number, quantityCenti: number): number {
+    return divideHalfUp(BigInt(unitPriceMinor) * BigInt(quantityCenti), 100n);
+}
+
+/** 16050 → "160.5", 16000 → "160" */
+export function hoursToInput(quantityCenti: number | null): string {
+    return quantityCenti === null ? '' : basisPointsToInput(quantityCenti) || '0';
+}
+
+/** "2026-09-01" → "September 2026" */
+export function periodLabel(periodStart: string): string {
+    return calendarDate(periodStart).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+export type InvoiceStatus = 'needs_hours' | 'ready_to_review' | 'approved' | 'issued';
+
+export const INVOICE_STATUS_STYLES: Record<InvoiceStatus, string> = {
+    needs_hours: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    ready_to_review: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    approved: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
+    issued: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+};
