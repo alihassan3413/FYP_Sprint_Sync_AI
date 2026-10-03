@@ -91,6 +91,11 @@ export enum AuditAction {
     CLIENT_UPDATED = 'client.updated',
     CLIENT_ARCHIVED = 'client.archived',
     CLIENT_RESTORED = 'client.restored',
+    PERSON_CREATED = 'person.created',
+    PERSON_UPDATED = 'person.updated',
+    PERSON_USER_LINKED = 'person.user_linked',
+    PERSON_USER_UNLINKED = 'person.user_unlinked',
+    DEPARTMENT_CREATED = 'department.created',
     ACCOUNT_PROFILE_UPDATED = 'account.profile_updated',
     ACCOUNT_PASSWORD_CHANGED = 'account.password_changed',
     ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated',
@@ -154,11 +159,17 @@ export type DashboardMeetingData = {
     is_past: boolean;
     url: string;
 };
+export type DepartmentData = {
+    public_id: string;
+    name: string;
+};
 export enum FinancePermission {
     View = 'billing.view',
     Manage = 'billing.manage',
     Approve = 'billing.approve',
     Payments = 'billing.payments',
+    PeopleView = 'people.view',
+    PeopleManage = 'people.manage',
     Compensation = 'people.compensation',
 }
 export type HealthSignalData = {
@@ -175,6 +186,11 @@ export enum HealthVerdict {
     AtRisk = 'at_risk',
     Critical = 'critical',
 }
+export type LinkedUserData = {
+    id: number;
+    name: string;
+    email: string;
+};
 export type MeetingData = {
     id: number;
     title: string;
@@ -212,6 +228,15 @@ export enum NotificationType {
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
 }
+export type PersonData = {
+    public_id: string;
+    name: string;
+    email?: string;
+    title?: string;
+    department?: DepartmentData;
+    linked_user?: LinkedUserData;
+    created_at: string;
+};
 export type PlatformMetricsData = {
     users_total: number;
     users_verified: number;

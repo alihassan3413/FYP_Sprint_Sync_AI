@@ -188,8 +188,8 @@ final class AccountAuditTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('entries.data', 1)
                 ->where('entries.data.0.action_label', 'Workspace renamed')
-                // The owner has finance access, so Billing is offered; Account never is.
-                ->where('categories', ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', 'Billing']))
+                // The owner has finance and people access, so Billing and People are offered; Account never is.
+                ->where('categories', ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', 'Billing', 'Team profiles']))
             ->assertDontSee('Profile updated')
             ->assertDontSee('Password changed');
     }

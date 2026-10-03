@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Actions;
 
 use App\Models\User;
+use App\Modules\People\Actions\LinkJoiningMemberAction;
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 use Illuminate\Support\Facades\DB;
 
 final class AcceptWorkspaceInvitationAction
 {
+    public function __construct(private readonly LinkJoiningMemberAction $linkPerson) {}
+
     public function handle(WorkspaceInvitation $invitation, User $user): WorkspaceInvitation
     {
         if ($invitation->isAccepted()) {
@@ -40,6 +43,8 @@ final class AcceptWorkspaceInvitationAction
             $user->forceFill(['current_workspace_id' => $invitation->workspace_id])->save();
 
             $invitation->update(['accepted_at' => now()]);
+
+            $this->linkPerson->handle($invitation->workspace, $user);
 
             return $invitation;
         });

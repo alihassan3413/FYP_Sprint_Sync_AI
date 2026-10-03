@@ -36,6 +36,7 @@ final class WorkspaceController
             'canDeleteWorkspace' => $request->user()->can('delete', $workspace),
             'canManageMembers' => $request->user()->can('manageMembers', $workspace),
             'canInviteMembers' => $request->user()->can('invite', $workspace),
+            'canViewTeam' => $request->user()->can('viewTeam', $workspace),
         ]);
     }
 

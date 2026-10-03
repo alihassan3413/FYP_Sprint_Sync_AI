@@ -2,19 +2,23 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Teams\Services;
+namespace App\Modules\Teams\Actions;
 
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceInvitation;
 use Illuminate\Support\Collection;
 
-final class TeamRoster
+/**
+ * Workspace members followed by pending invitations: who can sign in to
+ * SprintSync, or has been asked to. Everyone who can see the team may see it.
+ */
+final class BuildTeamRosterAction
 {
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    public function forWorkspace(Workspace $workspace, User $viewer): Collection
+    public function handle(Workspace $workspace, User $viewer): Collection
     {
         $customRoleNames = $workspace->roles()->pluck('name', 'id');
         $canSeeInviteLinks = $viewer->can('invite', $workspace);

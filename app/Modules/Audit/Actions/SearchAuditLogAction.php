@@ -57,11 +57,26 @@ final class SearchAuditLogAction
      */
     public function visibleCategories(Workspace $workspace, User $viewer): array
     {
-        if ($workspace->allowsFinance($viewer, FinancePermission::View)) {
-            return AuditAction::categories();
-        }
+        return array_values(array_diff(AuditAction::categories(), $this->hiddenCategories($workspace, $viewer)));
+    }
 
-        return array_values(array_diff(AuditAction::categories(), [AuditAction::BILLING_CATEGORY]));
+    /**
+     * Categories whose entries carry finance or people data, minus the ones
+     * this viewer is allowed to see.
+     *
+     * @return array<int, string>
+     */
+    private function hiddenCategories(Workspace $workspace, User $viewer): array
+    {
+        $restricted = [
+            AuditAction::BILLING_CATEGORY => FinancePermission::View,
+            AuditAction::PEOPLE_CATEGORY => FinancePermission::PeopleView,
+        ];
+
+        return array_keys(array_filter(
+            $restricted,
+            fn (FinancePermission $permission) => ! $workspace->allowsFinance($viewer, $permission),
+        ));
     }
 
     /**
@@ -95,8 +110,8 @@ final class SearchAuditLogAction
             $query->whereIn('project_id', $managedProjectIds);
         }
 
-        if (! $workspace->allowsFinance($viewer, FinancePermission::View)) {
-            $query->whereNotIn('action', AuditAction::valuesForCategory(AuditAction::BILLING_CATEGORY));
+        foreach ($this->hiddenCategories($workspace, $viewer) as $category) {
+            $query->whereNotIn('action', AuditAction::valuesForCategory($category));
         }
 
         return $query;

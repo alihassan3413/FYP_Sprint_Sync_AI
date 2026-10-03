@@ -34,13 +34,20 @@ final class TeamMemberTest extends TestCase
         $this->workspace->users()->attach($this->member->id, ['role' => UserRole::MEMBER->value]);
     }
 
+    public function test_the_old_team_url_redirects_to_people(): void
+    {
+        $this->actingAs($this->member)
+            ->get(route('workspace.teams.index', $this->workspace))
+            ->assertRedirect(route('workspace.people.index', $this->workspace));
+    }
+
     public function test_the_roster_lists_members_and_pending_invitations(): void
     {
         $this->actingAs($this->owner)
-            ->get(route('workspace.teams.index', $this->workspace))
+            ->get(route('workspace.people.index', $this->workspace))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('teams/index')
+                ->component('people/index')
                 ->has('members', 2)
                 ->where('canManageMembers', true));
     }
@@ -53,7 +60,7 @@ final class TeamMemberTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->get(route('workspace.teams.index', $this->workspace))
+            ->get(route('workspace.people.index', $this->workspace))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('canInviteMembers', true)
@@ -61,7 +68,7 @@ final class TeamMemberTest extends TestCase
                 ->where('members.2.invite_url', route('workspace.invitations.accept', ['token' => $invitation->token])));
 
         $this->actingAs($this->member)
-            ->get(route('workspace.teams.index', $this->workspace))
+            ->get(route('workspace.people.index', $this->workspace))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('canInviteMembers', false)
@@ -76,7 +83,7 @@ final class TeamMemberTest extends TestCase
         ]);
 
         $this->actingAs($this->member)
-            ->get(route('workspace.teams.index', $this->workspace))
+            ->get(route('workspace.people.index', $this->workspace))
             ->assertOk()
             ->assertDontSee($invitation->token);
     }
@@ -175,7 +182,7 @@ final class TeamMemberTest extends TestCase
         $this->workspace->users()->updateExistingPivot($this->member->id, ['workspace_role_id' => $role->id]);
 
         $this->actingAs($this->owner)
-            ->get(route('workspace.teams.index', $this->workspace))
+            ->get(route('workspace.people.index', $this->workspace))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('workspaceRoles', 1)

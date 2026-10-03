@@ -7,6 +7,7 @@ namespace App\Modules\Teams\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\People\Actions\UnlinkDepartedMemberAction;
 use App\Modules\Teams\Exceptions\TeamException;
 use App\Modules\Workspace\Models\Workspace;
 use App\UserRole;
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 final class RemoveWorkspaceMemberAction
 {
-    public function __construct(private readonly RecordAuditLogAction $auditLogger) {}
+    public function __construct(
+        private readonly RecordAuditLogAction $auditLogger,
+        private readonly UnlinkDepartedMemberAction $unlinkFromPeople,
+    ) {}
 
     public function handle(Workspace $workspace, User $member, User $actor): void
     {
@@ -26,8 +30,10 @@ final class RemoveWorkspaceMemberAction
             throw TeamException::cannotRemoveOwner();
         }
 
-        DB::transaction(function () use ($workspace, $member) {
+        DB::transaction(function () use ($workspace, $member, $actor) {
             $workspace->users()->detach($member->id);
+
+            $this->unlinkFromPeople->handle($workspace, $member, $actor);
 
             if ($member->current_workspace_id === $workspace->id) {
                 $member->forceFill([

@@ -51,6 +51,12 @@ enum AuditAction: string
     case CLIENT_ARCHIVED = 'client.archived';
     case CLIENT_RESTORED = 'client.restored';
 
+    case PERSON_CREATED = 'person.created';
+    case PERSON_UPDATED = 'person.updated';
+    case PERSON_USER_LINKED = 'person.user_linked';
+    case PERSON_USER_UNLINKED = 'person.user_unlinked';
+    case DEPARTMENT_CREATED = 'department.created';
+
     case ACCOUNT_PROFILE_UPDATED = 'account.profile_updated';
     case ACCOUNT_PASSWORD_CHANGED = 'account.password_changed';
     case ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated';
@@ -64,11 +70,17 @@ enum AuditAction: string
     public const BILLING_CATEGORY = 'Billing';
 
     /**
+     * People entries name staff and their logins, so they are only shown to
+     * people with people access.
+     */
+    public const PEOPLE_CATEGORY = 'Team profiles';
+
+    /**
      * @return array<int, string>
      */
     public static function categories(): array
     {
-        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', self::BILLING_CATEGORY];
+        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', self::BILLING_CATEGORY, self::PEOPLE_CATEGORY];
     }
 
     public function category(): string
@@ -80,6 +92,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
             str_starts_with($this->value, 'client.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
     }
@@ -139,6 +152,11 @@ enum AuditAction: string
             self::CLIENT_UPDATED => 'Client updated',
             self::CLIENT_ARCHIVED => 'Client archived',
             self::CLIENT_RESTORED => 'Client restored',
+            self::PERSON_CREATED => 'Person added',
+            self::PERSON_UPDATED => 'Person updated',
+            self::PERSON_USER_LINKED => 'Person linked to user',
+            self::PERSON_USER_UNLINKED => 'Person unlinked from user',
+            self::DEPARTMENT_CREATED => 'Department created',
             self::ACCOUNT_PROFILE_UPDATED => 'Profile updated',
             self::ACCOUNT_PASSWORD_CHANGED => 'Password changed',
             self::ACCOUNT_AVATAR_UPDATED => 'Profile picture updated',

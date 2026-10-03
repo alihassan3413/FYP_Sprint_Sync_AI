@@ -226,7 +226,7 @@ final class FinanceAccessTest extends TestCase
         $admin = $this->memberWithRole(UserRole::ADMIN);
 
         foreach ([$this->owner, $admin] as $user) {
-            foreach (['dashboard', 'workspace.projects.index', 'workspace.settings', 'workspace.teams.index'] as $route) {
+            foreach (['dashboard', 'workspace.projects.index', 'workspace.settings', 'workspace.people.index'] as $route) {
                 $content = $this->actingAs($user)->get(route($route, $this->workspace))->assertOk()->getContent();
 
                 $this->assertStringNotContainsString('billing@rocketflood.com', $content, "{$route} leaked a client email");

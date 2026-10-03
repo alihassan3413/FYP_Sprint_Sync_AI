@@ -82,8 +82,8 @@ function handleClose(value: boolean) {
 <template>
     <AppModal
         :open="open"
-        title="Change role"
-        :description="member ? `Update ${member.name}'s role in this workspace.` : undefined"
+        title="Change access role"
+        :description="member ? `What ${member.name} can do in SprintSync. This is not their job title.` : undefined"
         size="sm"
         @update:open="handleClose"
     >

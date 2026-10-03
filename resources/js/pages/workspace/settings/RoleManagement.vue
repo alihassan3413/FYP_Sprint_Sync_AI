@@ -67,7 +67,7 @@ const isDeleteDialogOpen = ref(false);
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: workspaceRoute('dashboard') },
     { title: 'Settings', href: workspaceRoute('workspace.settings') },
-    { title: 'Role Management', href: '' },
+    { title: 'Access & permissions', href: '' },
 ];
 
 const allPermissionGroups: PermissionGroup[] = [
@@ -234,14 +234,14 @@ function saveRole() {
 </script>
 
 <template>
-    <Head title="Role Management" />
+    <Head title="Access & permissions" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
             <AppPageHeader
                 eyebrow="Workspace"
-                title="Role Management"
-                description="Create custom roles and fine-tune what each member can do in your workspace."
+                title="Access & permissions"
+                description="Who can do what inside SprintSync. Job titles and departments live in Team."
             >
                 <template #actions>
                     <Button v-if="canManageRoles" size="sm" class="gap-1.5" @click="isCreateWorkspaceRoleModalOpen = true">

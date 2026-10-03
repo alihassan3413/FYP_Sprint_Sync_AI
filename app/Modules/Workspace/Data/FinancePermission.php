@@ -10,7 +10,9 @@ namespace App\Modules\Workspace\Data;
  * what people earn must never come along for free with "can manage projects".
  *
  * Each permission is independent so a bookkeeper can record payments without
- * approving invoices, and anyone can be kept away from salaries.
+ * approving invoices, and anyone can be kept away from salaries. Knowing who
+ * works here (people.view/manage) is separate from what they earn
+ * (people.compensation).
  *
  * v1: only the workspace owner has finance access (see Workspace::allowsFinance).
  * The values are already storable on custom roles so delegating them later is a
@@ -24,6 +26,8 @@ enum FinancePermission: string
     case Manage = 'billing.manage';
     case Approve = 'billing.approve';
     case Payments = 'billing.payments';
+    case PeopleView = 'people.view';
+    case PeopleManage = 'people.manage';
     case Compensation = 'people.compensation';
 
     /**
@@ -41,6 +45,8 @@ enum FinancePermission: string
             self::Manage => 'Manage clients and recurring invoices',
             self::Approve => 'Approve and send invoices',
             self::Payments => 'Record payments',
+            self::PeopleView => 'See people and departments',
+            self::PeopleManage => 'Manage people and departments',
             self::Compensation => 'See pay and compensation',
         };
     }

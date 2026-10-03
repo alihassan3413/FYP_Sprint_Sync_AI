@@ -9,6 +9,7 @@ use App\Modules\Attachments\Providers\AttachmentsServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Billing\Providers\BillingServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
+use App\Modules\People\Providers\PeopleServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
 use App\Modules\Tasks\Providers\TasksServiceProvider;
 use App\Modules\Teams\Providers\TeamsServiceProvider;
@@ -28,5 +29,6 @@ return [
     AttachmentsServiceProvider::class,
     AuditServiceProvider::class,
     BillingServiceProvider::class,
+    PeopleServiceProvider::class,
     AdminServiceProvider::class,
 ];

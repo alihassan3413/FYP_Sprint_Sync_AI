@@ -2,7 +2,7 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
 
 const props = defineProps<{
     workspaceProfile: {
@@ -17,6 +17,7 @@ const props = defineProps<{
     canDeleteWorkspace: boolean;
     canManageMembers: boolean;
     canInviteMembers: boolean;
+    canViewTeam: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -57,16 +58,32 @@ const settings = computed<SettingsCard[]>(() => [
     {
         key: 'roles',
         icon: ShieldCheck,
-        title: 'Role Management',
-        description: 'Define custom workspace roles and assign fine-grained permissions to control what members can see and do.',
+        title: 'Access & permissions',
+        description: 'Who can do what inside SprintSync: Owner, Admin, Member, and custom access roles you define.',
         badge: 'available',
         badgeLabel: 'Available',
         action: {
-            label: 'Manage roles',
+            label: 'Manage access roles',
             href: workspaceRoute('workspace.roles.index'),
         },
         highlighted: true,
     },
+    ...(props.canViewTeam
+        ? [
+              {
+                  key: 'people',
+                  icon: Users,
+                  title: 'Team',
+                  description: 'Everyone who works with your business, their job and department, and who can sign in to SprintSync.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Open Team',
+                      href: workspaceRoute('workspace.people.index'),
+                  },
+              },
+          ]
+        : []),
     ...(props.canViewAuditLog
         ? [
               {
@@ -95,36 +112,6 @@ const settings = computed<SettingsCard[]>(() => [
                   action: {
                       label: 'Edit workspace',
                       onClick: () => (isRenameModalOpen.value = true),
-                  },
-              },
-          ]
-        : []),
-    {
-        key: 'members',
-        icon: Users,
-        title: 'Members',
-        description: props.canManageMembers
-            ? 'View every member of this workspace, change their roles, and remove access.'
-            : 'See who belongs to this workspace.',
-        badge: 'available',
-        badgeLabel: 'Available',
-        action: {
-            label: props.canManageMembers ? 'Manage members' : 'View members',
-            href: workspaceRoute('workspace.teams.index'),
-        },
-    },
-    ...(props.canInviteMembers
-        ? [
-              {
-                  key: 'invitations',
-                  icon: Mail,
-                  title: 'Invitations',
-                  description: 'Invite new teammates by email and manage invitations that are still pending.',
-                  badge: 'available' as const,
-                  badgeLabel: 'Available',
-                  action: {
-                      label: 'Invite a teammate',
-                      href: workspaceRoute('workspace.invitations.create'),
                   },
               },
           ]

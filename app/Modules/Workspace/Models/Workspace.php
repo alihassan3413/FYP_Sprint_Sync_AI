@@ -6,6 +6,8 @@ namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
 use App\Modules\Billing\Models\Client;
+use App\Modules\People\Models\Department;
+use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\FinancePermission;
@@ -114,6 +116,16 @@ final class Workspace extends Model
         // chaperone() gives every loaded client its parent workspace, so
         // building client URLs never queries the workspace again per row.
         return $this->hasMany(Client::class)->chaperone();
+    }
+
+    public function people(): HasMany
+    {
+        return $this->hasMany(Person::class)->chaperone();
+    }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class)->chaperone();
     }
 
     /**

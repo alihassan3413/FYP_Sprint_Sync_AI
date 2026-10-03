@@ -87,8 +87,8 @@ async function copyInviteLink() {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Team', href: workspaceRoute('workspace.teams.index', { workspace: props.workspace.slug }) },
-    { title: 'Invite member', href: workspaceRoute('workspace.invitations.create', { workspace: props.workspace.slug }) },
+    { title: 'Team', href: workspaceRoute('workspace.people.index', { workspace: props.workspace.slug }) },
+    { title: 'Invite', href: workspaceRoute('workspace.invitations.create', { workspace: props.workspace.slug }) },
 ];
 
 const roleOptions = [
@@ -204,7 +204,7 @@ const roleOptions = [
 
                     <div class="flex items-center justify-end gap-2">
                         <Button as-child variant="ghost" size="sm" type="button" tabindex="3">
-                            <Link :href="workspaceRoute('workspace.teams.index', { workspace: props.workspace.slug })"> Cancel </Link>
+                            <Link :href="workspaceRoute('workspace.people.index', { workspace: props.workspace.slug })"> Cancel </Link>
                         </Button>
 
                         <Button type="submit" size="sm" tabindex="2" :disabled="form.processing" class="gap-1.5">

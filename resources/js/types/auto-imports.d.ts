@@ -198,8 +198,11 @@ declare global {
   export type { MeetingParticipant, MeetingTranscript, Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
-  export type { MemberStatus, MemberRole, WorkspaceRoleOption, Member } from '../lib/members'
+  export type { MemberStatus, MemberRole, WorkspaceRoleOption, MemberProfile, Member } from '../lib/members'
   import('../lib/members')
+  // @ts-ignore
+  export type { Department, LinkedUser, Person, LinkableUser } from '../lib/people'
+  import('../lib/people')
   // @ts-ignore
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')

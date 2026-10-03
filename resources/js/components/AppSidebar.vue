@@ -30,8 +30,8 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     if (navigation.value?.team) {
         items.push({
-            title: 'Teams',
-            href: workspaceRoute('workspace.teams.index'),
+            title: 'Team',
+            href: workspaceRoute('workspace.people.index'),
             icon: Users2,
         });
     }

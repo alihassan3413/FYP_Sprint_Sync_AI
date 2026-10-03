@@ -7,13 +7,12 @@ namespace App\Modules\Billing\Models;
 use App\Modules\Billing\Data\Currency;
 use App\Modules\Billing\Database\Factories\ClientFactory;
 use App\Modules\Workspace\Models\Workspace;
+use App\Support\Models\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use LogicException;
 
 /**
  * A business the workspace sends invoices to.
@@ -43,7 +42,7 @@ use LogicException;
 final class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasPublicId;
 
     /**
      * Logos are client data, so they live on the private disk and are only
@@ -67,30 +66,6 @@ final class Client extends Model
             'currency' => Currency::class,
             'archived_at' => 'datetime',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        self::updating(function (Client $client) {
-            if ($client->isDirty('public_id')) {
-                throw new LogicException('A client\'s public id cannot be changed.');
-            }
-        });
-    }
-
-    /**
-     * HasUlids fills these on create. The integer primary key stays as is.
-     *
-     * @return array<int, string>
-     */
-    public function uniqueIds(): array
-    {
-        return ['public_id'];
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'public_id';
     }
 
     public function hasLogo(): bool
