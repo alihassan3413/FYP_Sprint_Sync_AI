@@ -12,8 +12,6 @@ enum WorkspacePermission: string
     case MembersInvite = 'members.invite';
     case MembersRemove = 'members.remove';
     case MembersRoles = 'members.roles';
-    case BillingView = 'billing.view';
-    case BillingManage = 'billing.manage';
     case IntegrationsView = 'integrations.view';
     case IntegrationsManage = 'integrations.manage';
     case IntegrationsDeploy = 'integrations.deploy';

@@ -28,6 +28,7 @@ final class WorkspaceController
                 'id' => $workspace->id,
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
+                'timezone' => $workspace->timezone,
                 'created_at' => $workspace->created_at->toIso8601String(),
             ],
             'canViewAuditLog' => $request->user()->can('viewAny', [AuditLog::class, $workspace]),

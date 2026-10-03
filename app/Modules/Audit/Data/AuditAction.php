@@ -9,6 +9,7 @@ enum AuditAction: string
     case WORKSPACE_CREATED = 'workspace.created';
     case WORKSPACE_RENAMED = 'workspace.renamed';
     case WORKSPACE_DELETED = 'workspace.deleted';
+    case WORKSPACE_TIMEZONE_CHANGED = 'workspace.timezone_changed';
 
     case MEMBER_INVITED = 'member.invited';
     case MEMBER_REMOVED = 'member.removed';
@@ -45,6 +46,11 @@ enum AuditAction: string
     case MEETING_UPDATED = 'meeting.updated';
     case MEETING_CANCELLED = 'meeting.cancelled';
 
+    case CLIENT_CREATED = 'client.created';
+    case CLIENT_UPDATED = 'client.updated';
+    case CLIENT_ARCHIVED = 'client.archived';
+    case CLIENT_RESTORED = 'client.restored';
+
     case ACCOUNT_PROFILE_UPDATED = 'account.profile_updated';
     case ACCOUNT_PASSWORD_CHANGED = 'account.password_changed';
     case ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated';
@@ -52,11 +58,17 @@ enum AuditAction: string
     case ACCOUNT_DELETED = 'account.deleted';
 
     /**
+     * Billing entries name clients and amounts, so they are only shown to
+     * people with finance access (see SearchAuditLogAction).
+     */
+    public const BILLING_CATEGORY = 'Billing';
+
+    /**
      * @return array<int, string>
      */
     public static function categories(): array
     {
-        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings'];
+        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', self::BILLING_CATEGORY];
     }
 
     public function category(): string
@@ -67,6 +79,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
+            str_starts_with($this->value, 'client.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
     }
@@ -93,6 +106,7 @@ enum AuditAction: string
             self::WORKSPACE_CREATED => 'Workspace created',
             self::WORKSPACE_RENAMED => 'Workspace renamed',
             self::WORKSPACE_DELETED => 'Workspace deleted',
+            self::WORKSPACE_TIMEZONE_CHANGED => 'Workspace timezone changed',
             self::MEMBER_INVITED => 'Member invited',
             self::MEMBER_REMOVED => 'Member removed',
             self::MEMBER_ROLE_CHANGED => 'Workspace role changed',
@@ -121,6 +135,10 @@ enum AuditAction: string
             self::MEETING_SCHEDULED => 'Meeting scheduled',
             self::MEETING_UPDATED => 'Meeting updated',
             self::MEETING_CANCELLED => 'Meeting cancelled',
+            self::CLIENT_CREATED => 'Client added',
+            self::CLIENT_UPDATED => 'Client updated',
+            self::CLIENT_ARCHIVED => 'Client archived',
+            self::CLIENT_RESTORED => 'Client restored',
             self::ACCOUNT_PROFILE_UPDATED => 'Profile updated',
             self::ACCOUNT_PASSWORD_CHANGED => 'Password changed',
             self::ACCOUNT_AVATAR_UPDATED => 'Profile picture updated',

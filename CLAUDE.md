@@ -21,7 +21,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/sail (SAIL) - v1
 - phpunit/phpunit (PHPUNIT) - v11
 - @inertiajs/vue3 (INERTIA_VUE) - v2
-- tailwindcss (TAILWINDCSS) - v3
+- tailwindcss (TAILWINDCSS) - v4 (CSS-first config in `resources/css/app.css`; there is no `tailwind.config.js`)
 - vue (VUE) - v3
 - eslint (ESLINT) - v9
 - prettier (PRETTIER) - v3
@@ -227,3 +227,7 @@ Vue components must have a single root element.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+
+## Finance
+
+Before writing or changing any Finance code (clients, invoices, numbering, approval, email delivery, payments, time aggregation, scheduled automation), read and follow `app/Modules/Billing/FINANCE_RULES.md`. Idempotency, integer money, immutable invoice history and owner-only access are non-negotiable.

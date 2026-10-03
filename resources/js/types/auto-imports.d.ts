@@ -13,6 +13,7 @@ declare global {
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
   const categoryBadgeVariant: typeof import('../lib/audit').categoryBadgeVariant
+  const clientInitials: typeof import('../lib/clients').clientInitials
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -32,6 +33,7 @@ declare global {
   const formatLastActive: typeof import('../lib/members').formatLastActive
   const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
+  const formatMoney: typeof import('../lib/money').formatMoney
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
   const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
@@ -58,6 +60,7 @@ declare global {
   const markRaw: typeof import('vue').markRaw
   const meaningfulTokens: typeof import('../lib/command-search').meaningfulTokens
   const memberPresence: typeof import('../lib/members').memberPresence
+  const minorUnits: typeof import('../lib/money').minorUnits
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -183,6 +186,9 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
+  export type { Client, CurrencyOption } from '../lib/clients'
+  import('../lib/clients')
+  // @ts-ignore
   export type { SearchableCommand } from '../lib/command-search'
   import('../lib/command-search')
   // @ts-ignore
@@ -220,6 +226,7 @@ declare module 'vue' {
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
     readonly categoryBadgeVariant: UnwrapRef<typeof import('../lib/audit')['categoryBadgeVariant']>
+    readonly clientInitials: UnwrapRef<typeof import('../lib/clients')['clientInitials']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -239,6 +246,7 @@ declare module 'vue' {
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
     readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
+    readonly formatMoney: UnwrapRef<typeof import('../lib/money')['formatMoney']>
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
     readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
@@ -265,6 +273,7 @@ declare module 'vue' {
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly meaningfulTokens: UnwrapRef<typeof import('../lib/command-search')['meaningfulTokens']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
+    readonly minorUnits: UnwrapRef<typeof import('../lib/money')['minorUnits']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>

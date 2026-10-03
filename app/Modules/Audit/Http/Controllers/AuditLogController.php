@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Audit\Http\Controllers;
 
 use App\Modules\Audit\Actions\SearchAuditLogAction;
-use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Audit\Data\AuditLogEntryData;
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Workspace\Models\Workspace;
@@ -25,7 +24,7 @@ final class AuditLogController
 
         $filters = $request->validate([
             'user_id' => ['nullable', 'integer'],
-            'category' => ['nullable', Rule::in(AuditAction::categories())],
+            'category' => ['nullable', Rule::in($action->visibleCategories($workspace, $user))],
             'project_id' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
@@ -51,7 +50,7 @@ final class AuditLogController
                 'id' => $actor->id,
                 'name' => $actor->name,
             ])->values(),
-            'categories' => AuditAction::categories(),
+            'categories' => $action->visibleCategories($workspace, $user),
             'isAdmin' => $workspace->userHasAtLeast($user, UserRole::ADMIN),
         ]);
     }

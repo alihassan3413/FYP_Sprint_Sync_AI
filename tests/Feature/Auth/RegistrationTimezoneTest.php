@@ -224,12 +224,22 @@ final class RegistrationTimezoneTest extends TestCase
         $this->assertSame('Asia/Karachi', $user->timezone);
     }
 
-    public function test_timezone_never_becomes_workspace_context(): void
+    /**
+     * The workspace keeps its own timezone for finance scheduling. It is only
+     * seeded from the owner at creation; later changes to the person's
+     * timezone never move the workspace's business dates.
+     */
+    public function test_the_first_workspace_starts_in_the_registered_timezone(): void
     {
         $this->post(route('register'), $this->payload(['timezone' => 'Asia/Karachi']));
 
-        $workspace = User::query()->firstOrFail()->activeWorkspaceOrFail();
+        $user = User::query()->firstOrFail();
+        $workspace = $user->activeWorkspaceOrFail();
 
-        $this->assertArrayNotHasKey('timezone', $workspace->getAttributes());
+        $this->assertSame('Asia/Karachi', $workspace->timezone);
+
+        $user->update(['timezone' => 'Europe/London']);
+
+        $this->assertSame('Asia/Karachi', $workspace->fresh()->timezone);
     }
 }

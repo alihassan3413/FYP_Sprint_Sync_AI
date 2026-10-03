@@ -7,6 +7,7 @@ namespace App\Modules\Workspace\Actions;
 use App\Models\User;
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Workspace\Data\FinancePermission;
 use App\Modules\Workspace\Data\WorkspaceCapabilities;
 use App\Modules\Workspace\Models\Workspace;
 
@@ -40,6 +41,7 @@ final class ResolveWorkspaceCapabilities
                 || $canManageMembers
                 || $canManageRoles
                 || $canInviteMembers,
+            viewFinance: $workspace->allowsFinance($user, FinancePermission::View),
             createProjects: $canCreateProjects,
             manageWorkspace: $canManageWorkspace,
             manageMembers: $canManageMembers,
@@ -51,7 +53,7 @@ final class ResolveWorkspaceCapabilities
 
     /**
      * Clients live inside their projects only: no team roster, analytics, archive,
-     * audit log or workspace settings, and nothing they can create.
+     * audit log, workspace settings or finance, and nothing they can create.
      */
     private function forClient(Workspace $workspace, User $user, bool $hasAccessibleProjects): WorkspaceCapabilities
     {
@@ -62,6 +64,7 @@ final class ResolveWorkspaceCapabilities
             viewArchive: false,
             viewAudit: false,
             viewWorkspaceSettings: false,
+            viewFinance: false,
             createProjects: false,
             manageWorkspace: false,
             manageMembers: false,

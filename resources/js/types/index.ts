@@ -60,6 +60,8 @@ export interface NavigationContext {
     archive: boolean;
     audit: boolean;
     workspaceSettings: boolean;
+    /** Money section (clients, invoices). Owner-only in v1. */
+    finance: boolean;
 }
 
 export interface SharedData extends PageProps {

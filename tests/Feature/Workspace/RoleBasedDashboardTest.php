@@ -187,7 +187,7 @@ final class RoleBasedDashboardTest extends TestCase
 
     public function test_the_same_custom_role_without_project_visibility_sees_nothing(): void
     {
-        $viewer = $this->customRoleMember([WorkspacePermission::BillingView]);
+        $viewer = $this->customRoleMember([WorkspacePermission::IntegrationsView]);
 
         $this->tasksIn($this->alpha, 3);
 
@@ -221,7 +221,7 @@ final class RoleBasedDashboardTest extends TestCase
     public function test_a_custom_role_granting_project_creation_is_enforced_by_the_policy(): void
     {
         $creator = $this->customRoleMember([WorkspacePermission::ProjectsCreate]);
-        $plain = $this->customRoleMember([WorkspacePermission::BillingView]);
+        $plain = $this->customRoleMember([WorkspacePermission::IntegrationsView]);
 
         $this->assertTrue($creator->can('create', [Project::class, $this->workspace]));
         $this->assertFalse($plain->can('create', [Project::class, $this->workspace]));
@@ -230,7 +230,7 @@ final class RoleBasedDashboardTest extends TestCase
     public function test_a_custom_role_granting_role_management_is_enforced_by_the_policy(): void
     {
         $manager = $this->customRoleMember([WorkspacePermission::MembersRoles]);
-        $plain = $this->customRoleMember([WorkspacePermission::BillingView]);
+        $plain = $this->customRoleMember([WorkspacePermission::IntegrationsView]);
 
         $this->assertTrue($manager->can('manageRoles', $this->workspace));
         $this->assertFalse($plain->can('manageRoles', $this->workspace));
@@ -238,7 +238,7 @@ final class RoleBasedDashboardTest extends TestCase
 
     public function test_a_permission_change_applies_immediately_without_logging_out(): void
     {
-        $user = $this->customRoleMember([WorkspacePermission::BillingView]);
+        $user = $this->customRoleMember([WorkspacePermission::IntegrationsView]);
 
         $this->dashboard($user)
             ->assertInertia(fn ($page) => $page->where('capabilities.canInviteMembers', false));

@@ -9,6 +9,7 @@ const props = defineProps<{
         id: number;
         name: string;
         slug: string;
+        timezone: string;
         created_at: string;
     };
     canViewAuditLog: boolean;
@@ -88,11 +89,11 @@ const settings = computed<SettingsCard[]>(() => [
                   key: 'profile',
                   icon: Building2,
                   title: 'Workspace Profile',
-                  description: 'Update your workspace name and URL identifier.',
+                  description: 'Update your workspace name, URL identifier and timezone.',
                   badge: 'available' as const,
                   badgeLabel: 'Available',
                   action: {
-                      label: 'Rename workspace',
+                      label: 'Edit workspace',
                       onClick: () => (isRenameModalOpen.value = true),
                   },
               },

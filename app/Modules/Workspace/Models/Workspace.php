@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Models;
 
 use App\Models\User;
+use App\Modules\Billing\Models\Client;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Data\ClientPermission;
+use App\Modules\Workspace\Data\FinancePermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Database\Factories\WorkspaceFactory;
 use App\UserRole;
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $name
  * @property string $slug
+ * @property string $timezone
  * @property array<string, mixed>|null $settings
  * @property bool $is_active
  * @property int $owner_id
@@ -33,9 +36,20 @@ final class Workspace extends Model
     protected $fillable = [
         'name',
         'slug',
+        'timezone',
         'settings',
         'is_active',
         'owner_id',
+    ];
+
+    /**
+     * Mirrors the column default so a freshly created model can answer
+     * timezone questions without re-reading the row.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'timezone' => 'UTC',
     ];
 
     protected function casts(): array
@@ -95,6 +109,13 @@ final class Workspace extends Model
         return $this->hasMany(Project::class);
     }
 
+    public function clients(): HasMany
+    {
+        // chaperone() gives every loaded client its parent workspace, so
+        // building client URLs never queries the workspace again per row.
+        return $this->hasMany(Client::class)->chaperone();
+    }
+
     /**
      * @var array<int, User|null>
      */
@@ -135,6 +156,17 @@ final class Workspace extends Model
         }
 
         return $this->customRoleFor($user)?->grants($permission->value) ?? false;
+    }
+
+    /**
+     * The single place finance access is decided.
+     *
+     * Unlike allows(), admin rank grants nothing here. v1 is owner-only: custom
+     * role grants are stored but not honoured yet (see FinancePermission).
+     */
+    public function allowsFinance(User $user, FinancePermission $permission): bool
+    {
+        return $this->roleFor($user) === UserRole::OWNER;
     }
 
     public function isClient(User $user): bool

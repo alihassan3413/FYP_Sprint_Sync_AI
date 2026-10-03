@@ -31,6 +31,7 @@ final class UpdateWorkspaceRequest extends FormRequest
                 Rule::unique('workspaces', 'slug')->ignore($this->workspace()->id),
                 new WorkspaceSlug,
             ],
+            'timezone' => ['sometimes', 'required', 'string', 'timezone:all'],
         ];
     }
 

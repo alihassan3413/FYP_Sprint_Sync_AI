@@ -12,25 +12,53 @@ Every module lives in `app/Modules/` and looks like this:
 
 ```
 app/Modules/Projects/
-├── Actions/          # Business logic
-├── Data/             # DTOs / data classes
+├── Actions/              # Business logic, one job per class
+├── Contracts/            # Interfaces other modules may depend on
+├── Data/                 # DTOs, enums, value objects
+├── Database/
+│   ├── Factories/        # Model factories
+│   └── Migrations/       # This module's migrations (loaded automatically)
+├── Exceptions/
 ├── Http/
-│   ├── Controllers/  # Handle request & return response
-│   └── Requests/     # Validation
-├── Models/           # Eloquent models
-├── Services/         # External APIs & reusable logic
-└── routes.php        # Module routes
+│   ├── Controllers/      # Handle request & return response
+│   └── Requests/         # Validation + authorization
+├── Models/               # Eloquent models
+├── Policies/             # Registered via the provider's $policies
+├── Providers/
+│   └── ProjectsServiceProvider.php   # extends App\Support\Modules\ModuleServiceProvider
+├── Routes/
+│   └── web.php           # Module routes (loaded automatically)
+└── Services/             # External APIs & reusable logic (private to the module)
 ```
+
+The provider boots the module's policies, migrations and routes. It must be
+listed in `bootstrap/providers.php`.
+
+### Module boundaries
+
+`tests/Unit/ModuleBoundaryTest.php` enforces that a module only imports another
+module's `Contracts`, `Data`, `Models`, `Actions`, `Policies` and `Exceptions`.
+`Http`, `Services` and `Support` are private to their module.
 
 ---
 
 ## Create a Module
 
 ```bash
-php artisan make:module Projects
+php artisan make:module Projects --tenant
 ```
 
-That's it. Folders are created automatically.
+This creates the folders, the service provider, a `Routes/web.php` stub and
+`tests/Feature/Projects/`. `--tenant` scopes the routes to a workspace
+(`/{workspace:slug}/...`) through `App\Support\Routing\TenantRoute`.
+
+Then register the provider in `bootstrap/providers.php`.
+
+Create migrations inside the module:
+
+```bash
+php artisan make:migration create_projects_table --path=app/Modules/Projects/Database/Migrations
+```
 
 ---
 
@@ -105,7 +133,7 @@ namespace App\Modules\Projects\Models;
 
 | Thing | Location |
 |---|---|
-| Migrations | `database/migrations/` |
+| Framework/core migrations (users, jobs, cache…) | `database/migrations/` |
 | Vue pages | `resources/js/pages/` |
 | User model | `app/Models/User.php` |
 
@@ -123,18 +151,21 @@ composer dump-autoload
 php artisan optimize:clear
 ```
 
-Also make sure `routes/web.php` has `load_module_routes();` at the bottom.
+Also make sure the module's provider is listed in `bootstrap/providers.php`:
+module routes and migrations are only loaded through it.
 
 ---
 
 ## New Feature Checklist
 
 ```
-☐ Migration
-☐ Model
+☐ Migration (in Database/Migrations)
+☐ Model + factory
+☐ Policy (registered in the provider)
 ☐ Request
 ☐ Action
 ☐ Controller
-☐ routes.php
+☐ Routes/web.php
 ☐ Vue page
+☐ Feature tests (tests/Feature/<Module>)
 ```

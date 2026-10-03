@@ -10,7 +10,7 @@ metadata:
 
 ## Documentation
 
-Use `search-docs` for detailed Tailwind CSS v3 patterns and documentation.
+Use `search-docs` for detailed Tailwind CSS v4 patterns and documentation.
 
 ## Basic Usage
 
@@ -18,17 +18,16 @@ Use `search-docs` for detailed Tailwind CSS v3 patterns and documentation.
 - Offer to extract repeated patterns into components that match the project's conventions (e.g., Blade, JSX, Vue).
 - Consider class placement, order, priority, and defaults. Remove redundant classes, add classes to parent or child elements carefully to reduce repetition, and group elements logically.
 
-## Tailwind CSS v3 Specifics
+## Tailwind CSS v4 Specifics
 
-- Always use Tailwind CSS v3 and verify you're using only classes it supports.
-- Configuration is done in the `tailwind.config.js` file.
-- Import using `@tailwind` directives:
+- This project runs Tailwind CSS v4 (`@tailwindcss/vite`). Verify you're using only classes v4 supports.
+- Configuration is CSS-first in `resources/css/app.css`: design tokens live in `@theme inline`, content sources in `@source`, and custom utilities are declared with `@utility` (a class must be declared that way before it can be used in `@apply`).
+- There is no `tailwind.config.js`; do not create one. Tailwind v4 also scans project files for class names, so stray config-like files can add unused utilities.
+- Import with a single CSS import:
 
-<!-- v3 Import Syntax -->
+<!-- v4 Import Syntax -->
 ```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 ```
 
 ## Spacing

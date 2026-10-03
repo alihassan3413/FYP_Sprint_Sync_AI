@@ -1,3 +1,12 @@
+export enum AdjustmentKind {
+    Fee = 'fee',
+    Tax = 'tax',
+    Discount = 'discount',
+}
+export enum AdjustmentType {
+    Percentage = 'percentage',
+    Fixed = 'fixed',
+}
 export type AnalyticsData = {
     total_tasks: number;
     completed_tasks: number;
@@ -49,6 +58,7 @@ export enum AuditAction {
     WORKSPACE_CREATED = 'workspace.created',
     WORKSPACE_RENAMED = 'workspace.renamed',
     WORKSPACE_DELETED = 'workspace.deleted',
+    WORKSPACE_TIMEZONE_CHANGED = 'workspace.timezone_changed',
     MEMBER_INVITED = 'member.invited',
     MEMBER_REMOVED = 'member.removed',
     MEMBER_ROLE_CHANGED = 'member.role_changed',
@@ -77,6 +87,10 @@ export enum AuditAction {
     MEETING_SCHEDULED = 'meeting.scheduled',
     MEETING_UPDATED = 'meeting.updated',
     MEETING_CANCELLED = 'meeting.cancelled',
+    CLIENT_CREATED = 'client.created',
+    CLIENT_UPDATED = 'client.updated',
+    CLIENT_ARCHIVED = 'client.archived',
+    CLIENT_RESTORED = 'client.restored',
     ACCOUNT_PROFILE_UPDATED = 'account.profile_updated',
     ACCOUNT_PASSWORD_CHANGED = 'account.password_changed',
     ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated',
@@ -101,12 +115,33 @@ export type BoardColumnData = {
     is_done: boolean;
     project_id: number;
 };
+export type ClientData = {
+    public_id: string;
+    name: string;
+    billing_email: string;
+    cc_emails: Array<string>;
+    currency: string;
+    address?: string;
+    tax_id?: string;
+    logo_url?: string;
+    archived_at?: string;
+    created_at: string;
+};
 export enum ClientPermission {
     BoardView = 'client.board.view',
     TasksComment = 'client.tasks.comment',
     TasksRequest = 'client.tasks.request',
     TasksClose = 'client.tasks.close',
     MeetingsView = 'client.meetings.view',
+}
+export enum Currency {
+    USD = 'USD',
+    PKR = 'PKR',
+    EUR = 'EUR',
+    GBP = 'GBP',
+    AED = 'AED',
+    CAD = 'CAD',
+    AUD = 'AUD',
 }
 export type DashboardMeetingData = {
     id: number;
@@ -119,6 +154,27 @@ export type DashboardMeetingData = {
     is_past: boolean;
     url: string;
 };
+export enum FinancePermission {
+    View = 'billing.view',
+    Manage = 'billing.manage',
+    Approve = 'billing.approve',
+    Payments = 'billing.payments',
+    Compensation = 'people.compensation',
+}
+export type HealthSignalData = {
+    code: string;
+    severity: string;
+    headline: string;
+    detail: string;
+    suggestion?: string;
+};
+export enum HealthVerdict {
+    NoData = 'no_data',
+    Healthy = 'healthy',
+    Watch = 'watch',
+    AtRisk = 'at_risk',
+    Critical = 'critical',
+}
 export type MeetingData = {
     id: number;
     title: string;
@@ -176,6 +232,25 @@ export type ProjectData = {
     workspace_id: number;
     created_at: string;
     updated_at: string;
+};
+export type ProjectHealthData = {
+    project_id: number;
+    project_name: string;
+    verdict: string;
+    verdict_label: string;
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    completion_percentage: number;
+    overdue_tasks: number;
+    unassigned_open_tasks: number;
+    stale_open_tasks: number;
+    people_with_open_work: number;
+    busiest_share_percentage: number;
+    active_sprint_name?: string;
+    active_sprint_health?: string;
+    signals: Array<HealthSignalData>;
+    workload: Array<WorkloadEntryData>;
 };
 export enum ProjectRole {
     MANAGER = 'manager',
@@ -308,6 +383,8 @@ export type StoreTaskData = {
     assigned_to?: number;
     due_date?: string;
     sprint_id?: number;
+    board_column_id?: number;
+    attachment_ids: { [key: number]: number };
 };
 export type StoreWorkspaceRoleData = {
     name: string;
@@ -331,6 +408,16 @@ export type TaskCommentData = {
     user_id: number;
     user_name: string;
     created_at: string;
+    attachments: Array<{
+        id: number;
+        name: string;
+        mime: string;
+        size: number;
+        width: number | null;
+        height: number | null;
+        url: string;
+        is_image: boolean;
+    }>;
 };
 export type TaskData = {
     id: number;
@@ -346,6 +433,16 @@ export type TaskData = {
     comments: Array<TaskCommentData>;
     created_at: string;
     updated_at: string;
+    attachments: Array<{
+        id: number;
+        name: string;
+        mime: string;
+        size: number;
+        width: number | null;
+        height: number | null;
+        url: string;
+        is_image: boolean;
+    }>;
 };
 export type TopAssistantUserData = {
     id: number;
@@ -376,11 +473,20 @@ export enum UserRole {
     MEMBER = 'member',
     CLIENT = 'client',
 }
+export type WorkloadEntryData = {
+    user_id?: number;
+    name: string;
+    open_tasks: number;
+    overdue_tasks: number;
+    completed_tasks: number;
+    share_percentage: number;
+};
 export type WorkspaceData = {
     name: string;
     slug: string;
     settings: { [key: string]: any } | null;
     is_active: boolean;
+    timezone?: string | null;
 };
 export type WorkspaceInvitationData = {
     email: string;
@@ -394,8 +500,6 @@ export enum WorkspacePermission {
     MembersInvite = 'members.invite',
     MembersRemove = 'members.remove',
     MembersRoles = 'members.roles',
-    BillingView = 'billing.view',
-    BillingManage = 'billing.manage',
     IntegrationsView = 'integrations.view',
     IntegrationsManage = 'integrations.manage',
     IntegrationsDeploy = 'integrations.deploy',

@@ -7,6 +7,7 @@ namespace App\Modules\Audit\Actions;
 use App\Models\User;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Workspace\Data\FinancePermission;
 use App\Modules\Workspace\Models\Workspace;
 use App\UserRole;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -52,6 +53,18 @@ final class SearchAuditLogAction
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function visibleCategories(Workspace $workspace, User $viewer): array
+    {
+        if ($workspace->allowsFinance($viewer, FinancePermission::View)) {
+            return AuditAction::categories();
+        }
+
+        return array_values(array_diff(AuditAction::categories(), [AuditAction::BILLING_CATEGORY]));
+    }
+
+    /**
      * @return Collection<int, object{id: int, name: string}>
      */
     public function visibleProjects(Workspace $workspace, User $viewer): Collection
@@ -80,6 +93,10 @@ final class SearchAuditLogAction
         if (! $workspace->userHasAtLeast($viewer, UserRole::ADMIN)) {
             $managedProjectIds = $workspace->managedProjectsFor($viewer)->pluck('id');
             $query->whereIn('project_id', $managedProjectIds);
+        }
+
+        if (! $workspace->allowsFinance($viewer, FinancePermission::View)) {
+            $query->whereNotIn('action', AuditAction::valuesForCategory(AuditAction::BILLING_CATEGORY));
         }
 
         return $query;

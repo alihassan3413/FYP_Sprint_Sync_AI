@@ -21,5 +21,8 @@ class WorkspaceData extends Data
 
         #[TypeScriptType('boolean')]
         public bool $is_active = true,
+
+        #[TypeScriptType('string|null')]
+        public ?string $timezone = null,
     ) {}
 }

@@ -6,7 +6,6 @@ import {
     ChevronDown,
     ChevronUp,
     Code,
-    CreditCard,
     Crown,
     Handshake,
     Info,
@@ -90,15 +89,6 @@ const allPermissionGroups: PermissionGroup[] = [
             { key: 'members.invite', label: 'Invite members', hint: 'Send invitations to new teammates' },
             { key: 'members.remove', label: 'Remove members', hint: 'Remove members from the workspace' },
             { key: 'members.roles', label: 'Manage roles', hint: 'Assign or change member roles' },
-        ],
-    },
-    {
-        key: 'billing',
-        label: 'Billing',
-        icon: CreditCard,
-        permissions: [
-            { key: 'billing.view', label: 'View invoices', hint: 'Read billing history' },
-            { key: 'billing.manage', label: 'Manage billing', hint: 'Update payment methods and plan' },
         ],
     },
     {
