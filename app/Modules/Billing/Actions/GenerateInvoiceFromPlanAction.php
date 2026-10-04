@@ -7,6 +7,7 @@ namespace App\Modules\Billing\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\Billing\Data\BillingCycle;
 use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Data\PricingMode;
@@ -138,7 +139,7 @@ final class GenerateInvoiceFromPlanAction
         $this->auditLogger->handle(
             $plan->workspace,
             null,
-            $actor,
+            $actor ?? new SystemActor,
             AuditAction::INVOICE_GENERATED,
             ($actor?->name ?? 'SprintSync')." prepared the {$month} invoice \"{$plan->name}\" for {$client->name}.",
             $invoice,

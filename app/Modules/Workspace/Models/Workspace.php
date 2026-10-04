@@ -12,6 +12,7 @@ use App\Modules\Billing\Models\WorkspaceMailSettings;
 use App\Modules\People\Models\Department;
 use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
+use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\FinancePermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
@@ -135,6 +136,11 @@ final class Workspace extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class)->chaperone();
+    }
+
+    public function timeEntries(): HasMany
+    {
+        return $this->hasMany(TimeEntry::class);
     }
 
     public function people(): HasMany

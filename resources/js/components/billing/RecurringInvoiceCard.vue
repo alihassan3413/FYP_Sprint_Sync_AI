@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { CalendarDays, Clock, Eye, FileText, Pause, Pencil, Play, Repeat, Zap } from 'lucide-vue-next';
+import { CalendarDays, Clock, Eye, FileText, Pause, Pencil, Play, Repeat, ShieldCheck, Zap } from 'lucide-vue-next';
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import { basisPointsToInput, formatMoney, formatShortDate, monthName } from '@/lib/billing';
@@ -44,7 +44,7 @@ const headline = computed(() => {
 });
 
 const delivery = computed(() => {
-    if (props.plan.delivery_mode === 'auto_send') return { icon: Zap, text: 'Sends automatically when everything looks right' };
+    if (props.plan.delivery_mode === 'auto_send') return { icon: Zap, text: 'Automatic sending · Safety checks on' };
 
     if (isHourly.value) return { icon: Eye, text: "You review first · we'll ask on the 1st" };
 
@@ -110,7 +110,23 @@ const actions = computed<DropdownEntry[]>(() => [
                 <component :is="delivery.icon" class="size-3.5" />
                 {{ delivery.text }}
             </p>
+            <p
+                v-if="plan.delivery_mode === 'auto_send' && plan.first_invoice_needs_review && !plan.paused"
+                class="inline-flex items-center gap-1.5"
+                data-testid="first-invoice-note"
+            >
+                <ShieldCheck class="size-3.5" />
+                First invoice will need your review.
+            </p>
         </div>
+
+        <p
+            v-if="plan.due_missed_while_paused && canManage"
+            class="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+            data-testid="missed-while-paused"
+        >
+            {{ dueMonth }} invoice wasn't created while this recurring invoice was paused.
+        </p>
 
         <div v-if="canManage" class="relative z-10 mt-4">
             <Button v-if="plan.due_invoice_public_id" variant="outline" size="sm" class="gap-1.5" as-child>
@@ -121,7 +137,7 @@ const actions = computed<DropdownEntry[]>(() => [
             </Button>
             <Button v-else-if="!plan.paused" variant="outline" size="sm" class="gap-1.5" data-testid="prepare-invoice" @click="emit('prepare')">
                 <FileText class="size-3.5" />
-                Prepare {{ dueMonth }} invoice
+                {{ plan.due_missed_while_paused ? 'Prepare now' : `Prepare ${dueMonth} invoice` }}
             </Button>
         </div>
     </article>

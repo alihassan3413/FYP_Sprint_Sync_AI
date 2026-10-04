@@ -36,6 +36,7 @@ final class CancelInvoiceSendingAction
                 'version' => DB::raw('version + 1'),
                 'approved_at' => null,
                 'approved_by' => null,
+                'approved_automatically' => false,
                 'send_after' => null,
                 'updated_at' => now(),
             ]);

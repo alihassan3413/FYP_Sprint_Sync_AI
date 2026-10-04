@@ -53,12 +53,17 @@ final class BillingPlanData extends Data
         public string $next_period_end,
         public string $due_period_start,
         public ?string $due_invoice_public_id,
+        /** Automatic sending: nothing has been issued yet, so the first invoice waits for the owner. */
+        public bool $first_invoice_needs_review,
+        /** The due month was skipped while the plan was paused (it is never backfilled automatically). */
+        public bool $due_missed_while_paused,
     ) {}
 
     /**
      * @param  string|null  $dueInvoicePublicId  the invoice already generated for the latest due month, if any
+     * @param  bool  $hasIssuedInvoice  whether any invoice from this plan has been issued
      */
-    public static function fromModel(BillingPlan $plan, CarbonImmutable $today, ?string $dueInvoicePublicId = null): self
+    public static function fromModel(BillingPlan $plan, CarbonImmutable $today, ?string $dueInvoicePublicId = null, bool $hasIssuedInvoice = false): self
     {
         $schedule = app(BillingSchedule::class);
         $cycle = $schedule->nextCycleForPlan($plan, $today);
@@ -98,6 +103,9 @@ final class BillingPlanData extends Data
             next_period_end: $cycle->periodEnd->toDateString(),
             due_period_start: $due->periodStart->toDateString(),
             due_invoice_public_id: $dueInvoicePublicId,
+            first_invoice_needs_review: $plan->delivery_mode === DeliveryMode::AutoSend && ! $hasIssuedInvoice,
+            due_missed_while_paused: $dueInvoicePublicId === null && ! $plan->isPaused() && $plan->resumed_at !== null
+                && $plan->resumed_at->copy()->setTimezone($today->timezone)->toDateString() >= $due->generationDate->toDateString(),
         );
     }
 }

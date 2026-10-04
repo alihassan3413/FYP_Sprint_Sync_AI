@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing\Data;
 
 use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Support\InvoiceAttention;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -43,6 +44,9 @@ final class InvoiceSummaryData extends Data
         #[LiteralTypeScriptType("'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null")]
         public ?string $delivery_status,
         public ?string $sent_at,
+        /** What the owner needs to do with it and why (Needs you); null when nothing. */
+        #[LiteralTypeScriptType("{ kind: 'needs_hours' | 'safety_review' | 'ready_to_send' | 'ready_to_review' | 'email_failed'; priority: number; label: string; reason: string; action: string } | null")]
+        public ?array $attention,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -68,6 +72,7 @@ final class InvoiceSummaryData extends Data
             balance_due_minor: $invoice->balanceDueMinor(),
             delivery_status: $invoice->delivery?->status->value,
             sent_at: $invoice->delivery?->sent_at?->toIso8601String(),
+            attention: InvoiceAttention::for($invoice),
         );
     }
 }

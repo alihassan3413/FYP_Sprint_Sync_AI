@@ -10,7 +10,10 @@ use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Billing\Models\BillingPlan;
 
 /**
- * Pauses or resumes a recurring invoice. The change is a conditional update
+ * Pauses or resumes a recurring invoice. Resuming moves the automation
+ * boundary to now: months skipped while it was paused are never backfilled;
+ * the plan offers to prepare the current one instead.
+ * The change is a conditional update
  * (only from the opposite state), so a double click or retry changes nothing
  * the second time and is not audited twice.
  */
@@ -23,7 +26,9 @@ final class SetBillingPlanPausedAction
         $changed = BillingPlan::query()
             ->whereKey($plan->getKey())
             ->when($paused, fn ($query) => $query->whereNull('paused_at'), fn ($query) => $query->whereNotNull('paused_at'))
-            ->update(['paused_at' => $paused ? now() : null]);
+            ->update($paused
+                ? ['paused_at' => now()]
+                : ['paused_at' => null, 'resumed_at' => now(), 'automation_enabled_at' => now()]);
 
         $plan->refresh();
 

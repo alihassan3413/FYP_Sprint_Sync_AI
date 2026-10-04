@@ -42,6 +42,7 @@ final class ResolveWorkspaceCapabilities
                 || $canManageRoles
                 || $canInviteMembers,
             viewFinance: $workspace->allowsFinance($user, FinancePermission::View),
+            viewTime: true,
             createProjects: $canCreateProjects,
             manageWorkspace: $canManageWorkspace,
             manageMembers: $canManageMembers,
@@ -65,6 +66,7 @@ final class ResolveWorkspaceCapabilities
             viewAudit: false,
             viewWorkspaceSettings: false,
             viewFinance: false,
+            viewTime: false,
             createProjects: false,
             manageWorkspace: false,
             manageMembers: false,

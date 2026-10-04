@@ -20,6 +20,7 @@ use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Models\InvoiceDelivery;
 use App\Modules\Billing\Support\BillingSchedule;
 use App\Modules\Workspace\Models\Workspace;
+use App\Notifications\BillingAttentionNotification;
 use App\Notifications\InvoiceSentNotification;
 use App\UserRole;
 use Carbon\CarbonImmutable;
@@ -393,7 +394,14 @@ final class InvoiceDeliveryTest extends TestCase
         $this->assertStringNotContainsString('hunter2', (string) $delivery->error);
         $this->assertSame(1, $this->auditCount(AuditAction::INVOICE_DELIVERY_FAILED));
         $this->assertStringNotContainsString('hunter2', AuditLog::query()->get()->toJson());
-        Notification::assertNothingSent();
+        Notification::assertNotSentTo($this->owner, InvoiceSentNotification::class);
+        Notification::assertSentTo($this->owner, BillingAttentionNotification::class, function (BillingAttentionNotification $notification) {
+            $data = $notification->toArray($this->owner);
+
+            return $data['type'] === 'invoice_email_problem'
+                && $data['message'] === "INV-2026-0001 to RocketFlood wasn't sent. Could not connect to the email server. Check the host and port."
+                && ! str_contains(json_encode($data), 'hunter2');
+        });
     }
 
     public function test_retry_reuses_the_same_invoice_number_pdf_and_recipients(): void

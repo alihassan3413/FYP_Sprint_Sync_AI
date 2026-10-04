@@ -6,11 +6,13 @@ namespace App\Modules\Billing\Actions;
 
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\Billing\Data\DeliveryStatus;
 use App\Modules\Billing\Mail\InvoiceEmail;
 use App\Modules\Billing\Models\InvoiceDelivery;
 use App\Modules\Billing\Support\MailDeliveryFailure;
 use App\Modules\Billing\Support\OfficialInvoicePdf;
+use App\Modules\Billing\Support\OwnerReminders;
 use App\Modules\Billing\Support\WorkspaceMailer;
 use App\Notifications\InvoiceSentNotification;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +39,7 @@ final class SendInvoiceDeliveryAction
         private readonly WorkspaceMailer $mailer,
         private readonly OfficialInvoicePdf $pdf,
         private readonly RecordAuditLogAction $auditLogger,
+        private readonly OwnerReminders $reminders,
     ) {}
 
     public function handle(InvoiceDelivery $delivery): InvoiceDelivery
@@ -98,7 +101,7 @@ final class SendInvoiceDeliveryAction
         $this->auditLogger->handle(
             $invoice->workspace,
             null,
-            null,
+            new SystemActor,
             match ($outcome) {
                 DeliveryStatus::Sent => AuditAction::INVOICE_DELIVERY_SENT,
                 DeliveryStatus::NeedsAttention => AuditAction::INVOICE_DELIVERY_UNCERTAIN,
@@ -112,6 +115,17 @@ final class SendInvoiceDeliveryAction
             $delivery,
             ['invoice' => $invoice->number, 'recipient' => $delivery->recipient, 'attempt' => $delivery->attempts, 'reason' => $reason],
         );
+
+        if ($outcome !== DeliveryStatus::Sent) {
+            $this->reminders->once(
+                $invoice->workspace,
+                "delivery:{$delivery->id}:attempt:{$delivery->attempts}",
+                'invoice_email_problem',
+                'Invoice email needs attention',
+                "{$invoice->number} to {$invoice->bill_to['name']} wasn't sent. {$reason}",
+                route('workspace.invoices.show', ['workspace' => $invoice->workspace->slug, 'invoice' => $invoice->public_id]),
+            );
+        }
 
         if ($outcome === DeliveryStatus::Sent && $invoice->workspace->owner) {
             $invoice->workspace->owner->notify(new InvoiceSentNotification(

@@ -32,17 +32,21 @@ declare global {
   const effectScope: typeof import('vue').effectScope
   const extensionOf: typeof import('../lib/attachments').extensionOf
   const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
+  const formatBusinessDate: typeof import('../lib/time').formatBusinessDate
   const formatBytes: typeof import('../lib/attachments').formatBytes
+  const formatClock: typeof import('../lib/time').formatClock
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
-  const formatDuration: typeof import('../lib/meetings').formatDuration
+  const formatDuration: typeof import('../lib/time').formatDuration
   const formatLastActive: typeof import('../lib/members').formatLastActive
   const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
   const formatMoney: typeof import('../lib/money').formatMoney
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
+  const formatPeriod: typeof import('../lib/time').formatPeriod
   const formatShortDate: typeof import('../lib/billing').formatShortDate
   const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
+  const formatTimeOfDay: typeof import('../lib/time').formatTimeOfDay
   const generationDayFor: typeof import('../lib/billing').generationDayFor
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCsrfToken: typeof import('../lib/csrf').getCsrfToken
@@ -98,6 +102,7 @@ declare global {
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const requestKey: typeof import('../lib/time').requestKey
   const resolveComponent: typeof import('vue').resolveComponent
   const router: typeof import('@inertiajs/vue3').router
   const rowStatus: typeof import('../lib/billing').rowStatus
@@ -268,17 +273,21 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extensionOf: UnwrapRef<typeof import('../lib/attachments')['extensionOf']>
     readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
+    readonly formatBusinessDate: UnwrapRef<typeof import('../lib/time')['formatBusinessDate']>
     readonly formatBytes: UnwrapRef<typeof import('../lib/attachments')['formatBytes']>
+    readonly formatClock: UnwrapRef<typeof import('../lib/time')['formatClock']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
-    readonly formatDuration: UnwrapRef<typeof import('../lib/meetings')['formatDuration']>
+    readonly formatDuration: UnwrapRef<typeof import('../lib/time')['formatDuration']>
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
     readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
     readonly formatMoney: UnwrapRef<typeof import('../lib/money')['formatMoney']>
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
+    readonly formatPeriod: UnwrapRef<typeof import('../lib/time')['formatPeriod']>
     readonly formatShortDate: UnwrapRef<typeof import('../lib/billing')['formatShortDate']>
     readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
+    readonly formatTimeOfDay: UnwrapRef<typeof import('../lib/time')['formatTimeOfDay']>
     readonly generationDayFor: UnwrapRef<typeof import('../lib/billing')['generationDayFor']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCsrfToken: UnwrapRef<typeof import('../lib/csrf')['getCsrfToken']>
@@ -334,6 +343,7 @@ declare module 'vue' {
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
+    readonly requestKey: UnwrapRef<typeof import('../lib/time')['requestKey']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly router: UnwrapRef<typeof import('@inertiajs/vue3')['router']>
     readonly rowStatus: UnwrapRef<typeof import('../lib/billing')['rowStatus']>

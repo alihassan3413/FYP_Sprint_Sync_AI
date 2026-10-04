@@ -471,7 +471,8 @@ function close(value: boolean) {
                                     class="text-muted-foreground flex items-center gap-1.5 pr-4 pb-3 pl-11 text-xs"
                                 >
                                     <ShieldCheck class="size-3.5" />
-                                    We'll pause and ask you if something looks unusual.
+                                    Automatic invoices pause and ask you when totals or hours look unusual. The first invoice always waits for your
+                                    review.
                                 </p>
                             </div>
                         </div>

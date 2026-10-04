@@ -8,10 +8,10 @@ if (typeof window !== 'undefined') {
 </script>
 
 <script setup lang="ts">
-import { ChevronRight, Clock, ReceiptText, Repeat } from 'lucide-vue-next';
+import { AlertTriangle, ChevronRight, Clock, MailWarning, ReceiptText, Repeat, Send } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
-import { deliveryNote, formatMoney, INVOICE_STATUS_STYLES, periodLabel, rowStatus } from '@/lib/billing';
+import { deliveryNote, formatMoney, periodLabel, rowStatus } from '@/lib/billing';
 import { type BreadcrumbItem } from '@/types';
 import type { InvoiceSummaryData } from '@/types/generated';
 
@@ -30,14 +30,16 @@ const { workspaceRoute } = useCurrentWorkspace();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Invoices', href: workspaceRoute('workspace.invoices.index') }];
 
-/** What the owner has to do next, in a few words. */
-function nextStep(invoice: InvoiceSummaryData): string {
-    if (invoice.status === 'needs_hours') {
-        return `${invoice.lines_missing_hours} ${invoice.lines_missing_hours === 1 ? 'person needs' : 'people need'} hours`;
-    }
+type AttentionKind = NonNullable<InvoiceSummaryData['attention']>['kind'];
 
-    return `${formatMoney(invoice.total_minor, invoice.currency)} · ready for you to approve`;
-}
+/** Icon and colour for each kind of "needs you" item. */
+const ATTENTION: Record<AttentionKind, { icon: typeof Clock; tone: string; badge: string }> = {
+    needs_hours: { icon: Clock, tone: 'bg-amber-500/10 text-amber-600', badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+    safety_review: { icon: AlertTriangle, tone: 'bg-orange-500/10 text-orange-600', badge: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+    ready_to_send: { icon: Send, tone: 'bg-violet-500/10 text-violet-600', badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300' },
+    ready_to_review: { icon: ReceiptText, tone: 'bg-sky-500/10 text-sky-600', badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+    email_failed: { icon: MailWarning, tone: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-700 dark:text-red-400' },
+};
 
 onMounted(() => {
     if (restoredFromHistory) {
@@ -79,22 +81,26 @@ onMounted(() => {
                         v-for="invoice in needsYou"
                         :key="invoice.public_id"
                         :href="workspaceRoute('workspace.invoices.show', { invoice: invoice.public_id })"
-                        class="group bg-card hover:border-foreground/20 focus-visible:ring-ring flex items-center gap-4 rounded-2xl border p-4 transition outline-none hover:shadow-sm focus-visible:ring-2"
+                        class="group bg-card hover:border-foreground/20 focus-visible:ring-ring flex items-start gap-4 rounded-2xl border p-4 transition outline-none hover:shadow-sm focus-visible:ring-2"
+                        :data-testid="`needs-you-${invoice.attention!.kind}`"
                     >
-                        <span
-                            class="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                            :class="invoice.status === 'needs_hours' ? 'bg-amber-500/10 text-amber-600' : 'bg-sky-500/10 text-sky-600'"
-                        >
-                            <Clock v-if="invoice.status === 'needs_hours'" class="size-5" />
-                            <ReceiptText v-else class="size-5" />
+                        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl" :class="ATTENTION[invoice.attention!.kind].tone">
+                            <component :is="ATTENTION[invoice.attention!.kind].icon" class="size-5" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="truncate font-semibold">{{ invoice.title }} · {{ periodLabel(invoice.period_start) }}</p>
-                            <p class="text-muted-foreground truncate text-sm">{{ invoice.client_name }} · {{ nextStep(invoice) }}</p>
+                            <div class="flex items-start justify-between gap-2">
+                                <p class="truncate font-semibold">{{ invoice.title }} · {{ periodLabel(invoice.period_start) }}</p>
+                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium" :class="ATTENTION[invoice.attention!.kind].badge">
+                                    {{ invoice.attention!.label }}
+                                </span>
+                            </div>
+                            <p class="text-muted-foreground truncate text-sm">{{ invoice.client_name }}</p>
+                            <p class="mt-1 text-sm">{{ invoice.attention!.reason }}</p>
+                            <p class="text-foreground mt-2 inline-flex items-center gap-1 text-sm font-medium group-hover:underline">
+                                {{ invoice.attention!.action }}
+                                <ChevronRight class="size-3.5" />
+                            </p>
                         </div>
-                        <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium" :class="INVOICE_STATUS_STYLES[invoice.status]">
-                            {{ invoice.status_label }}
-                        </span>
                     </Link>
                 </div>
             </section>

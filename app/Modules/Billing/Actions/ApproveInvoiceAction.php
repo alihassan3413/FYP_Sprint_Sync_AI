@@ -7,6 +7,7 @@ namespace App\Modules\Billing\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Exceptions\InvoiceException;
@@ -24,6 +25,10 @@ use Illuminate\Support\Facades\DB;
  * owner can still cancel sending. Issuing, and the number, come later
  * (IssueInvoiceAction).
  *
+ * The same path approves for a person and for SprintSync's automatic sending
+ * (SystemActor): the automatic one records approved_automatically instead of
+ * borrowing a user id, and its audit entry says SprintSync did it.
+ *
  * Safe to repeat and to race: the change is a conditional UPDATE on the status
  * and the version the reviewer saw, so a double click approves once (one
  * send_after, one audit entry) and a review of an out-of-date invoice is
@@ -37,7 +42,7 @@ final class ApproveInvoiceAction
         private readonly InvoiceRecalculator $recalculator,
     ) {}
 
-    public function handle(Invoice $invoice, int $reviewedVersion, User $actor): Invoice
+    public function handle(Invoice $invoice, int $reviewedVersion, User|SystemActor $actor): Invoice
     {
         try {
             return DB::transaction(fn () => $this->approve($invoice, $reviewedVersion, $actor));
@@ -52,7 +57,7 @@ final class ApproveInvoiceAction
         }
     }
 
-    private function approve(Invoice $invoice, int $reviewedVersion, User $actor): Invoice
+    private function approve(Invoice $invoice, int $reviewedVersion, User|SystemActor $actor): Invoice
     {
         $invoice = Invoice::query()->with(['lines', 'adjustments', 'workspace.invoicingProfile'])->findOrFail($invoice->getKey());
 
@@ -93,7 +98,8 @@ final class ApproveInvoiceAction
                 'status' => InvoiceStatus::Approved->value,
                 'version' => $reviewedVersion + 1,
                 'approved_at' => now(),
-                'approved_by' => $actor->id,
+                'approved_by' => $actor instanceof User ? $actor->id : null,
+                'approved_automatically' => $actor instanceof SystemActor,
                 'send_after' => $sendAfter,
                 'updated_at' => now(),
             ]);
@@ -116,12 +122,17 @@ final class ApproveInvoiceAction
             null,
             $actor,
             $approvedBefore ? AuditAction::INVOICE_REAPPROVED : AuditAction::INVOICE_APPROVED,
-            $approvedBefore ? "{$actor->name} approved {$label} again." : "{$actor->name} approved {$label}.",
+            match (true) {
+                $actor instanceof SystemActor => "{$actor->name} automatically approved {$label}. It sends after the cancel window unless someone cancels it.",
+                $approvedBefore => "{$actor->name} approved {$label} again.",
+                default => "{$actor->name} approved {$label}.",
+            },
             $invoice,
             [
                 'total_minor' => $invoice->total_minor,
                 'currency' => $invoice->currency->value,
                 'send_after' => $sendAfter->toIso8601String(),
+                'automatic' => $actor instanceof SystemActor,
             ],
         );
 

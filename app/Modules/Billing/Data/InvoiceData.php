@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Data;
 
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Support\InvoiceAttention;
 use App\Modules\Billing\Support\InvoicePdfRenderer;
 use App\Modules\Billing\Support\SenderSnapshot;
 use Illuminate\Support\Arr;
@@ -57,6 +59,12 @@ final class InvoiceData extends Data
         /** The email delivery. The error is already a short, safe sentence. */
         #[LiteralTypeScriptType("{ status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention'; status_label: string; recipient: string; cc: string[]; attempts: number; last_attempted_at: string | null; sent_at: string | null; error: string | null } | null")]
         public ?array $delivery,
+        public bool $approved_automatically,
+        /** Will be checked and sent automatically on its planned send date. */
+        public bool $sends_automatically,
+        /** Why automatic sending is waiting for the owner, while it is. */
+        #[LiteralTypeScriptType('{ code: AutomationReason; message: string }[]')]
+        public array $automation_reasons,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -80,7 +88,7 @@ final class InvoiceData extends Data
             issue_date: $invoice->issue_date?->toDateString(),
             due_date: $invoice->due_date?->toDateString(),
             approved_at: $invoice->approved_at?->toIso8601String(),
-            approved_by: $invoice->approver?->name,
+            approved_by: $invoice->approved_automatically ? SystemActor::NAME : $invoice->approver?->name,
             send_after: $invoice->send_after?->toIso8601String(),
             issued_at: $invoice->issued_at?->toIso8601String(),
             client_public_id: $invoice->client?->public_id,
@@ -110,6 +118,9 @@ final class InvoiceData extends Data
                 'sent_at' => $invoice->delivery->sent_at?->toIso8601String(),
                 'error' => $invoice->delivery->error,
             ],
+            approved_automatically: $invoice->approved_automatically,
+            sends_automatically: InvoiceAttention::sendsAutomatically($invoice),
+            automation_reasons: InvoiceAttention::reasons($invoice),
         );
     }
 }

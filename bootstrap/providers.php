@@ -13,6 +13,7 @@ use App\Modules\People\Providers\PeopleServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
 use App\Modules\Tasks\Providers\TasksServiceProvider;
 use App\Modules\Teams\Providers\TeamsServiceProvider;
+use App\Modules\TimeTracking\Providers\TimeTrackingServiceProvider;
 use App\Modules\Workspace\Providers\WorkspaceServiceProvider;
 use App\Providers\AppServiceProvider;
 
@@ -30,5 +31,6 @@ return [
     AuditServiceProvider::class,
     BillingServiceProvider::class,
     PeopleServiceProvider::class,
+    TimeTrackingServiceProvider::class,
     AdminServiceProvider::class,
 ];

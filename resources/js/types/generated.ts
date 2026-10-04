@@ -1,3 +1,7 @@
+export enum ActorType {
+    User = 'user',
+    System = 'system',
+}
 export enum AdjustmentKind {
     Fee = 'fee',
     Tax = 'tax',
@@ -112,6 +116,13 @@ export enum AuditAction {
     INVOICE_DELIVERY_FAILED = 'invoice.delivery_failed',
     INVOICE_DELIVERY_UNCERTAIN = 'invoice.delivery_uncertain',
     INVOICE_DELIVERY_RETRIED = 'invoice.delivery_retried',
+    INVOICE_AUTOMATION_HELD = 'invoice.automation_held',
+    TIME_TIMER_STARTED = 'time.timer_started',
+    TIME_TIMER_STOPPED = 'time.timer_stopped',
+    TIME_MANUAL_ADDED = 'time.manual_added',
+    TIME_ADJUSTMENT_ADDED = 'time.adjustment_added',
+    TIME_HISTORICAL_ADDED = 'time.historical_added',
+    TIME_ENTRY_VOIDED = 'time.entry_voided',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -133,6 +144,17 @@ export type AuditLogEntryData = {
     project_name?: string;
     created_at: string;
 };
+export enum AutomationReason {
+    FirstInvoice = 'first_invoice',
+    TotalVariance = 'total_variance',
+    HoursVariance = 'hours_variance',
+    MissingHours = 'missing_hours',
+    SendDateMissed = 'send_date_missed',
+    MailNotConnected = 'mail_not_connected',
+    SenderIncomplete = 'sender_incomplete',
+    RecipientInvalid = 'recipient_invalid',
+    LateHours = 'late_hours',
+}
 export enum BillingPeriod {
     PreviousMonth = 'previous_month',
     CurrentMonth = 'current_month',
@@ -166,6 +188,8 @@ export type BillingPlanData = {
     next_period_end: string;
     due_period_start: string;
     due_invoice_public_id?: string;
+    first_invoice_needs_review: boolean;
+    due_missed_while_paused: boolean;
 };
 export type BillingPlanLineData = {
     person_public_id?: string;
@@ -310,6 +334,9 @@ export type InvoiceData = {
         sent_at: string | null;
         error: string | null;
     } | null;
+    approved_automatically: boolean;
+    sends_automatically: boolean;
+    automation_reasons: { code: AutomationReason; message: string }[];
 };
 export enum InvoiceStatus {
     NeedsHours = 'needs_hours',
@@ -338,6 +365,13 @@ export type InvoiceSummaryData = {
     balance_due_minor: number;
     delivery_status?: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null;
     sent_at?: string;
+    attention?: {
+        kind: 'needs_hours' | 'safety_review' | 'ready_to_send' | 'ready_to_review' | 'email_failed';
+        priority: number;
+        label: string;
+        reason: string;
+        action: string;
+    } | null;
 };
 export type LinkedUserData = {
     id: number;
@@ -656,6 +690,50 @@ export type TaskData = {
         is_image: boolean;
     }>;
 };
+export type TimeEntryData = {
+    public_id: string;
+    source: 'tracked' | 'manual' | 'adjustment';
+    source_label: string;
+    person_name: string;
+    project_name: string;
+    task_title?: string;
+    started_at?: string;
+    ended_at?: string;
+    period_start: string;
+    period_end: string;
+    duration_seconds: number;
+    billable: boolean;
+    note?: string;
+    created_by?: string;
+    adjusts_entry_public_id?: string;
+    voided: boolean;
+    void_reason?: string;
+};
+export enum TimeEntrySource {
+    Tracked = 'tracked',
+    Manual = 'manual',
+    Adjustment = 'adjustment',
+}
+export type TimerData = {
+    public_id: string;
+    state: 'running' | 'paused' | 'stopped';
+    project: { public_id: string | null; name: string };
+    task?: { public_id: string | null; title: string } | null;
+    started_at: string;
+    running_since?: string;
+    accumulated_seconds: number;
+    elapsed_seconds: number;
+    longest_segment_seconds: number;
+    billable: boolean;
+    note?: string;
+    server_time: string;
+    entry_public_id?: string;
+};
+export enum TimerState {
+    Running = 'running',
+    Paused = 'paused',
+    Stopped = 'stopped',
+}
 export type TopAssistantUserData = {
     id: number;
     name: string;

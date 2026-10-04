@@ -62,6 +62,8 @@ export interface NavigationContext {
     workspaceSettings: boolean;
     /** Money section (clients, invoices). Owner-only in v1. */
     finance: boolean;
+    /** Time tracking: everyone except client guests. */
+    time: boolean;
 }
 
 export interface SharedData extends PageProps {

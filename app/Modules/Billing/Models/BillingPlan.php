@@ -11,6 +11,7 @@ use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Database\Factories\BillingPlanFactory;
 use App\Modules\Workspace\Models\Workspace;
 use App\Support\Models\HasPublicId;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +37,8 @@ use Illuminate\Support\Carbon;
  * @property DeliveryMode $delivery_mode
  * @property int|null $reminder_days_before
  * @property Carbon|null $paused_at
+ * @property Carbon|null $automation_enabled_at automation only handles months generated strictly after this (workspace calendar)
+ * @property Carbon|null $resumed_at
  */
 final class BillingPlan extends Model
 {
@@ -66,6 +69,8 @@ final class BillingPlan extends Model
             'due_in_days' => 'integer',
             'reminder_days_before' => 'integer',
             'paused_at' => 'datetime',
+            'automation_enabled_at' => 'datetime',
+            'resumed_at' => 'datetime',
         ];
     }
 
@@ -92,6 +97,30 @@ final class BillingPlan extends Model
     public function isPaused(): bool
     {
         return $this->paused_at !== null;
+    }
+
+    /**
+     * Does recurring automation handle the month generated on this date? Only
+     * months generated strictly after the activation boundary (plan creation,
+     * the Phase 8 rollout, or the last resume) in the workspace's calendar, so
+     * nothing from before is ever backfilled, approved or sent automatically.
+     */
+    public function automates(CarbonInterface $generationDate): bool
+    {
+        if ($this->automation_enabled_at === null) {
+            return false;
+        }
+
+        $boundary = $this->automation_enabled_at->copy()->setTimezone($this->workspace->timezone)->toDateString();
+
+        return $generationDate->toDateString() > $boundary;
+    }
+
+    protected static function booted(): void
+    {
+        self::creating(function (self $plan) {
+            $plan->automation_enabled_at ??= now();
+        });
     }
 
     protected static function newFactory(): BillingPlanFactory

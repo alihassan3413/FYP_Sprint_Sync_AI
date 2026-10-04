@@ -11,6 +11,7 @@ use App\Modules\Billing\Actions\UpdateClientAction;
 use App\Modules\Billing\Data\BillingPlanData;
 use App\Modules\Billing\Data\ClientData;
 use App\Modules\Billing\Data\Currency;
+use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Data\InvoiceSummaryData;
 use App\Modules\Billing\Http\Requests\StoreClientRequest;
 use App\Modules\Billing\Http\Requests\UpdateClientRequest;
@@ -59,6 +60,7 @@ final class ClientController
             'plans' => $this->plans($client, $today),
             'invoices' => PaymentTotals::withPaid($client->invoices()->getQuery())
                 ->with('delivery')
+                ->withCount(['lines as lines_missing_hours' => fn ($query) => $query->whereNull('quantity_centi')])
                 ->orderByDesc('period_start')
                 ->orderByDesc('id')
                 ->get()
@@ -85,10 +87,17 @@ final class ClientController
             ->get(['public_id', 'billing_plan_id', 'period_start'])
             ->keyBy(fn (Invoice $invoice) => $invoice->billing_plan_id.'|'.$invoice->period_start->toDateString());
 
-        return $plans->map(function (BillingPlan $plan) use ($today, $schedule, $invoices) {
+        $issued = Invoice::query()
+            ->whereIn('billing_plan_id', $plans->modelKeys())
+            ->where('status', InvoiceStatus::Issued->value)
+            ->distinct()
+            ->pluck('billing_plan_id')
+            ->flip();
+
+        return $plans->map(function (BillingPlan $plan) use ($today, $schedule, $invoices, $issued) {
             $due = $schedule->latestDueCycle($plan, $today)->periodStart->toDateString();
 
-            return BillingPlanData::fromModel($plan, $today, $invoices->get("{$plan->id}|{$due}")?->public_id);
+            return BillingPlanData::fromModel($plan, $today, $invoices->get("{$plan->id}|{$due}")?->public_id, $issued->has($plan->id));
         })->values();
     }
 

@@ -71,6 +71,7 @@ final class SearchAuditLogAction
         $restricted = [
             AuditAction::BILLING_CATEGORY => FinancePermission::View,
             AuditAction::PEOPLE_CATEGORY => FinancePermission::PeopleView,
+            AuditAction::TIME_CATEGORY => FinancePermission::PeopleView,
         ];
 
         return array_keys(array_filter(

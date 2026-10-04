@@ -2,6 +2,7 @@
 import { usePoll } from '@inertiajs/vue3';
 import {
     AlertCircle,
+    AlertTriangle,
     CheckCircle2,
     ChevronLeft,
     Clock,
@@ -354,12 +355,19 @@ onBeforeUnmount(() => {
                                 :is="summary.delivery_mode === 'auto_send' ? Zap : ReceiptText"
                                 class="mr-1 inline size-3.5 align-[-2px] text-sky-600"
                             />
-                            Ready to review. After you approve, you have {{ delayLabel }} to cancel sending and make changes.
+                            <template v-if="invoice.sends_automatically">
+                                Sends automatically on {{ formatShortDate(summary.planned_send_on) }} if everything looks right. You can review and
+                                approve it sooner.
+                            </template>
+                            <template v-else
+                                >Ready to review. After you approve, you have {{ delayLabel }} to cancel sending and make changes.</template
+                            >
                         </template>
                         <template v-else-if="summary.status === 'approved'">
                             <CheckCircle2 class="mr-1 inline size-3.5 align-[-2px] text-violet-600" />
                             <span class="text-foreground font-medium" data-testid="scheduled-text"
-                                >Approved<template v-if="sendsIn"> · Scheduled to send {{ sendsIn }} ({{ sendAtTime }})</template
+                                >{{ invoice.approved_automatically ? 'Approved automatically by SprintSync' : 'Approved'
+                                }}<template v-if="sendsIn"> · Scheduled to send {{ sendsIn }} ({{ sendAtTime }})</template
                                 ><template v-else> · Ready to send</template></span
                             >. You can cancel sending if you notice something that needs changing.
                             <template v-if="!mailConnected"> Connect email delivery so it can be sent.</template>
@@ -408,6 +416,24 @@ onBeforeUnmount(() => {
                         </Button>
                     </template>
                 </div>
+            </div>
+
+            <!-- Automatic sending is waiting for the owner, and why -->
+            <div
+                v-if="invoice.automation_reasons.length"
+                class="flex flex-col gap-2 rounded-2xl border border-orange-500/30 bg-orange-500/5 p-4 text-sm"
+                data-testid="automation-reasons"
+            >
+                <p class="flex items-center gap-2 font-medium">
+                    <AlertTriangle class="size-4 shrink-0 text-orange-600" />
+                    {{ summary.attention?.label === 'Ready to send' ? 'Ready to send' : 'Automatic sending paused for your review' }}
+                </p>
+                <ul class="space-y-1 pl-6">
+                    <li v-for="reason in invoice.automation_reasons" :key="reason.code + reason.message" :data-reason="reason.code">
+                        {{ reason.message }}
+                    </li>
+                </ul>
+                <p class="text-muted-foreground pl-6">When it looks right, approve it below. It still waits {{ delayLabel }} before it is sent.</p>
             </div>
 
             <!-- Email not connected: nothing can be sent until it is -->

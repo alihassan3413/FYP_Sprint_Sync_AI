@@ -28,7 +28,7 @@ final class AuditLogEntryData extends Data
 
         return new self(
             id: $log->id,
-            actor_name: $log->user?->name,
+            actor_name: $log->actor_type === ActorType::System ? SystemActor::NAME : $log->user?->name,
             actor_avatar_url: $log->user?->avatar_url,
             action_label: $action?->label() ?? $log->action,
             category: $action?->category() ?? 'Other',

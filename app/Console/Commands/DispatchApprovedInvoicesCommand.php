@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\Billing\Actions\PrepareInvoiceDeliveryAction;
 use App\Modules\Billing\Data\DeliveryStatus;
 use App\Modules\Billing\Data\InvoiceStatus;
@@ -69,7 +70,7 @@ final class DispatchApprovedInvoicesCommand extends Command
                     ->update(['status' => DeliveryStatus::NeedsAttention->value, 'error' => 'Sending was interrupted, so it is not known whether the email went out.', 'failed_at' => now()]);
 
                 if ($moved === 1) {
-                    $audit->handle($delivery->invoice->workspace, null, null, AuditAction::INVOICE_DELIVERY_UNCERTAIN, "Sending invoice {$delivery->invoice->number} was interrupted.", $delivery, ['invoice' => $delivery->invoice->number]);
+                    $audit->handle($delivery->invoice->workspace, null, new SystemActor, AuditAction::INVOICE_DELIVERY_UNCERTAIN, "Sending invoice {$delivery->invoice->number} was interrupted.", $delivery, ['invoice' => $delivery->invoice->number]);
                 }
             });
 

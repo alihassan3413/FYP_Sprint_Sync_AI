@@ -57,9 +57,12 @@ use LogicException;
  * @property Carbon|null $issue_date
  * @property Carbon|null $due_date
  * @property Carbon|null $approved_at
- * @property int|null $approved_by
+ * @property int|null $approved_by null when SprintSync approved it (approved_automatically)
+ * @property bool $approved_automatically
  * @property Carbon|null $send_after approved invoices wait until then; cancelling sending is possible before issue
  * @property Carbon|null $issued_at
+ * @property Carbon|null $automation_checked_at when automatic sending made its one decision
+ * @property list<array{code: string, message: string}>|null $automation_hold why automatic sending held it for the owner
  */
 final class Invoice extends Model
 {
@@ -67,7 +70,7 @@ final class Invoice extends Model
     use HasFactory, HasPublicId;
 
     /** The only columns that may change while an invoice is approved and waiting to be issued. */
-    private const APPROVAL_COLUMNS = ['status', 'version', 'approved_at', 'approved_by', 'send_after', 'issued_at', 'number', 'issue_date', 'due_date', 'updated_at'];
+    private const APPROVAL_COLUMNS = ['status', 'version', 'approved_at', 'approved_by', 'approved_automatically', 'send_after', 'issued_at', 'number', 'issue_date', 'due_date', 'updated_at'];
 
     protected $guarded = ['id', 'public_id'];
 
@@ -87,6 +90,9 @@ final class Invoice extends Model
             'approved_at' => 'datetime',
             'send_after' => 'datetime',
             'issued_at' => 'datetime',
+            'approved_automatically' => 'boolean',
+            'automation_checked_at' => 'datetime',
+            'automation_hold' => 'array',
             'bill_to' => 'array',
             'bill_from' => 'array',
             'version' => 'integer',

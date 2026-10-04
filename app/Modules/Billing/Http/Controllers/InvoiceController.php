@@ -43,11 +43,13 @@ final class InvoiceController
             ->orderByDesc('id')
             ->get();
 
-        $needsYou = $invoices->filter(fn (Invoice $invoice) => $invoice->status->isEditable());
+        $summaries = $invoices->map(InvoiceSummaryData::fromModel(...));
 
         return Inertia::render('invoices/index', [
-            'needsYou' => $needsYou->map(InvoiceSummaryData::fromModel(...))->values(),
-            'invoices' => $invoices->map(InvoiceSummaryData::fromModel(...))->values(),
+            'needsYou' => $summaries->filter(fn (InvoiceSummaryData $invoice) => $invoice->attention !== null)
+                ->sortBy(fn (InvoiceSummaryData $invoice) => $invoice->attention['priority'], SORT_NUMERIC)
+                ->values(),
+            'invoices' => $summaries->values(),
             'waitingToBePaid' => $totals->waiting($workspace),
             'receivedThisMonth' => $totals->receivedThisMonth($workspace),
         ]);

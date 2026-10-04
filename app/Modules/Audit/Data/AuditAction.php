@@ -71,6 +71,13 @@ enum AuditAction: string
     case INVOICE_DELIVERY_FAILED = 'invoice.delivery_failed';
     case INVOICE_DELIVERY_UNCERTAIN = 'invoice.delivery_uncertain';
     case INVOICE_DELIVERY_RETRIED = 'invoice.delivery_retried';
+    case INVOICE_AUTOMATION_HELD = 'invoice.automation_held';
+    case TIME_TIMER_STARTED = 'time.timer_started';
+    case TIME_TIMER_STOPPED = 'time.timer_stopped';
+    case TIME_MANUAL_ADDED = 'time.manual_added';
+    case TIME_ADJUSTMENT_ADDED = 'time.adjustment_added';
+    case TIME_HISTORICAL_ADDED = 'time.historical_added';
+    case TIME_ENTRY_VOIDED = 'time.entry_voided';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -96,12 +103,15 @@ enum AuditAction: string
      */
     public const PEOPLE_CATEGORY = 'Team profiles';
 
+    /** Who worked how long: owner-only like Team profiles. */
+    public const TIME_CATEGORY = 'Time';
+
     /**
      * @return array<int, string>
      */
     public static function categories(): array
     {
-        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', self::BILLING_CATEGORY, self::PEOPLE_CATEGORY];
+        return ['Workspace', 'Team', 'Projects', 'Tasks', 'Meetings', self::BILLING_CATEGORY, self::PEOPLE_CATEGORY, self::TIME_CATEGORY];
     }
 
     public function category(): string
@@ -114,6 +124,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'meeting.') => 'Meetings',
             str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.'), str_starts_with($this->value, 'mail.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
+            str_starts_with($this->value, 'time.') => self::TIME_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
     }
@@ -194,6 +205,13 @@ enum AuditAction: string
             self::INVOICE_DELIVERY_FAILED => 'Invoice email failed',
             self::INVOICE_DELIVERY_UNCERTAIN => 'Invoice email needs checking',
             self::INVOICE_DELIVERY_RETRIED => 'Invoice email retried',
+            self::INVOICE_AUTOMATION_HELD => 'Automatic sending paused for review',
+            self::TIME_TIMER_STARTED => 'Timer started',
+            self::TIME_TIMER_STOPPED => 'Timer stopped',
+            self::TIME_MANUAL_ADDED => 'Time added',
+            self::TIME_ADJUSTMENT_ADDED => 'Time adjusted',
+            self::TIME_HISTORICAL_ADDED => 'Previous hours added',
+            self::TIME_ENTRY_VOIDED => 'Time entry voided',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',

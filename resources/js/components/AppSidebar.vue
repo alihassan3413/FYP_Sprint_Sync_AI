@@ -4,7 +4,7 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Archive, BarChart3, BookOpen, Building2, Folder, FolderKanban, LayoutGrid, ReceiptText, ShieldCheck, Users2 } from 'lucide-vue-next';
+import { Archive, BarChart3, BookOpen, Building2, Folder, FolderKanban, LayoutGrid, ReceiptText, ShieldCheck, Timer, Users2 } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
@@ -25,6 +25,14 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Projects',
             href: workspaceRoute('workspace.projects.index'),
             icon: FolderKanban,
+        });
+    }
+
+    if (navigation.value?.time) {
+        items.push({
+            title: 'Time',
+            href: workspaceRoute('workspace.time.index'),
+            icon: Timer,
         });
     }
 
