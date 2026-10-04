@@ -39,6 +39,7 @@ final class WorkspaceController
             'canInviteMembers' => $request->user()->can('invite', $workspace),
             'canViewTeam' => $request->user()->can('viewTeam', $workspace),
             'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
+            'emailDeliveryConnected' => $workspace->mailSettings()->whereNotNull('verified_at')->exists(),
         ]);
     }
 

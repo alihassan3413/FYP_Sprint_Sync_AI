@@ -1,5 +1,22 @@
 <script setup lang="ts">
-import { AlertCircle, CheckCircle2, ChevronLeft, Clock, Download, Loader2, Lock, ReceiptText, RefreshCw, Send, Undo2, Zap } from 'lucide-vue-next';
+import { usePoll } from '@inertiajs/vue3';
+import {
+    AlertCircle,
+    CheckCircle2,
+    ChevronLeft,
+    Clock,
+    Download,
+    Loader2,
+    Lock,
+    Mail,
+    ReceiptText,
+    RefreshCw,
+    Send,
+    Undo2,
+    Zap,
+} from 'lucide-vue-next';
+
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
@@ -31,6 +48,10 @@ const props = defineProps<{
     paymentMethods: { value: string; label: string }[];
     /** Today in the workspace's timezone (Y-m-d). */
     today: string;
+    /** Send now and retry sending. */
+    canSend: boolean;
+    /** Whether Settings → Email delivery has been set up; invoices are only ever sent through it. */
+    mailConnected: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -198,6 +219,57 @@ function cancelSending() {
     );
 }
 
+/* ---- Email delivery: separate from the invoice's own status ---------- */
+
+const delivery = computed(() => props.invoice.delivery);
+const sendNowOpen = ref(false);
+const sendingNow = ref(false);
+
+function sendNow() {
+    if (sendingNow.value) return;
+
+    sendingNow.value = true;
+    router.post(
+        workspaceRoute('workspace.invoices.send-now', { invoice: summary.value.public_id }),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                sendingNow.value = false;
+                sendNowOpen.value = false;
+            },
+        },
+    );
+}
+
+const retryOpen = ref(false);
+const retrying = ref(false);
+
+function retry() {
+    if (retrying.value) return;
+
+    retrying.value = true;
+    router.post(
+        workspaceRoute('workspace.invoices.delivery.retry', { invoice: summary.value.public_id }),
+        { confirmed: delivery.value?.status === 'needs_attention' },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retrying.value = false;
+                retryOpen.value = false;
+            },
+        },
+    );
+}
+
+/** While an email is on its way, check back until it settles. */
+const inFlight = computed(() => delivery.value?.status === 'pending' || delivery.value?.status === 'sending');
+const { start: startPolling, stop: stopPolling } = usePoll(4000, { only: ['invoice'] }, { autoStart: false });
+watch(inFlight, (busy) => (busy ? startPolling() : stopPolling()), { immediate: true });
+
+const formatDateTime = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 /* ---- Sender (who the invoice is from) --------------------------------- */
 
 const from = computed(() => props.invoice.bill_from);
@@ -289,7 +361,8 @@ onBeforeUnmount(() => {
                             <span class="text-foreground font-medium" data-testid="scheduled-text"
                                 >Approved<template v-if="sendsIn"> · Scheduled to send {{ sendsIn }} ({{ sendAtTime }})</template
                                 ><template v-else> · Ready to send</template></span
-                            >. You can cancel sending if you notice something that needs changing. Email sending arrives in a later phase.
+                            >. You can cancel sending if you notice something that needs changing.
+                            <template v-if="!mailConnected"> Connect email delivery so it can be sent.</template>
                         </template>
                         <template v-else>
                             <Lock class="mr-1 inline size-3.5 align-[-2px] text-emerald-600" />
@@ -321,12 +394,14 @@ onBeforeUnmount(() => {
                             Cancel sending
                         </Button>
                         <Button
+                            v-if="canSend"
                             variant="ghost"
                             size="sm"
                             class="gap-1.5"
-                            disabled
-                            title="Email sending arrives in a later phase"
+                            :disabled="!mailConnected || sendingNow"
+                            :title="mailConnected ? undefined : 'Connect email delivery before sending invoices.'"
                             data-testid="send-now"
+                            @click="sendNowOpen = true"
                         >
                             <Send class="size-3.5" />
                             Send now
@@ -334,6 +409,102 @@ onBeforeUnmount(() => {
                     </template>
                 </div>
             </div>
+
+            <!-- Email not connected: nothing can be sent until it is -->
+            <div
+                v-if="summary.status === 'approved' && !mailConnected"
+                class="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-center"
+                data-testid="mail-not-connected"
+            >
+                <AlertCircle class="hidden size-4 shrink-0 text-amber-600 sm:block" />
+                <p class="flex-1">Connect email delivery before sending invoices. This invoice stays approved and waits until you do.</p>
+                <Button v-if="canManageInvoicing" variant="outline" size="sm" as-child>
+                    <Link :href="workspaceRoute('workspace.mail-settings.edit')">Connect email</Link>
+                </Button>
+            </div>
+
+            <!-- Email delivery: its own state, the invoice stays issued whatever happens here -->
+            <div
+                v-if="delivery"
+                class="flex flex-col gap-3 rounded-2xl border p-4 text-sm sm:flex-row sm:items-center"
+                :class="delivery.status === 'failed' || delivery.status === 'needs_attention' ? 'border-destructive/30 bg-destructive/5' : 'bg-card'"
+                data-testid="delivery"
+                :data-status="delivery.status"
+            >
+                <Loader2 v-if="inFlight" class="hidden size-4 shrink-0 animate-spin text-sky-600 sm:block" />
+                <Mail v-else-if="delivery.status === 'sent'" class="hidden size-4 shrink-0 text-emerald-600 sm:block" />
+                <AlertCircle v-else class="text-destructive hidden size-4 shrink-0 sm:block" />
+                <div class="min-w-0 flex-1">
+                    <p v-if="inFlight" class="font-medium">Sending to {{ delivery.recipient }}…</p>
+                    <p v-else-if="delivery.status === 'sent'">
+                        <span class="font-medium">Sent to {{ delivery.recipient }}</span>
+                        <span class="text-muted-foreground"
+                            ><template v-if="delivery.cc.length"> · cc {{ delivery.cc.join(', ') }}</template
+                            ><template v-if="delivery.sent_at"> · {{ formatDateTime(delivery.sent_at) }}</template></span
+                        >
+                    </p>
+                    <template v-else>
+                        <p class="font-medium">
+                            {{ delivery.status === 'needs_attention' ? "We couldn't confirm the email was sent" : "The email wasn't sent" }}
+                        </p>
+                        <p class="text-muted-foreground" data-testid="delivery-error">
+                            {{ delivery.error }} {{ summary.number }} is still issued; nothing about the invoice has changed.
+                        </p>
+                    </template>
+                </div>
+                <Button
+                    v-if="canSend && (delivery.status === 'failed' || delivery.status === 'needs_attention')"
+                    variant="outline"
+                    size="sm"
+                    class="gap-1.5"
+                    :disabled="retrying"
+                    data-testid="retry-sending"
+                    @click="delivery.status === 'needs_attention' ? (retryOpen = true) : retry()"
+                >
+                    <Loader2 v-if="retrying" class="size-3.5 animate-spin" />
+                    <RefreshCw v-else class="size-3.5" />
+                    Retry sending
+                </Button>
+            </div>
+
+            <Dialog v-model:open="sendNowOpen">
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Send this invoice now?</DialogTitle>
+                        <DialogDescription>
+                            It will be issued with its invoice number and emailed to {{ invoice.bill_to.billing_email }} straight away. After this it
+                            can no longer be changed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter class="gap-2">
+                        <DialogClose as-child>
+                            <Button variant="outline">Not yet</Button>
+                        </DialogClose>
+                        <Button :disabled="sendingNow" data-testid="confirm-send-now" @click="sendNow">
+                            <Loader2 v-if="sendingNow" class="mr-2 size-4 animate-spin" />
+                            Send now
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog v-model:open="retryOpen">
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Send it again?</DialogTitle>
+                        <DialogDescription>
+                            Sending was interrupted after the email reached your mail server, so it may have arrived. Check your sent mail or ask the
+                            client first. If you send again, they may get it twice.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter class="gap-2">
+                        <DialogClose as-child>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button :disabled="retrying" data-testid="confirm-retry" @click="retry">Send again</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <!-- Payments live beside the document: the issued PDF never changes -->
             <InvoicePayments

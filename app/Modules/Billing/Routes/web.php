@@ -6,7 +6,9 @@ use App\Modules\Billing\Http\Controllers\BillingPlanController;
 use App\Modules\Billing\Http\Controllers\ClientController;
 use App\Modules\Billing\Http\Controllers\ClientLogoController;
 use App\Modules\Billing\Http\Controllers\InvoiceController;
+use App\Modules\Billing\Http\Controllers\InvoiceDeliveryController;
 use App\Modules\Billing\Http\Controllers\InvoicingSettingsController;
+use App\Modules\Billing\Http\Controllers\MailSettingsController;
 use App\Modules\Billing\Http\Controllers\PaymentController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +42,8 @@ TenantRoute::prefixed('invoices', 'workspace.invoices.', function () {
     Route::post('{invoice}/sender', [InvoiceController::class, 'refreshSender'])->name('sender.refresh');
     Route::get('{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('pdf');
     Route::get('{invoice}/logo', [InvoiceController::class, 'logo'])->name('logo');
+    Route::post('{invoice}/send-now', [InvoiceDeliveryController::class, 'sendNow'])->name('send-now');
+    Route::post('{invoice}/delivery/retry', [InvoiceDeliveryController::class, 'retry'])->name('delivery.retry');
     Route::post('{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::post('{invoice}/payments/{payment}/void', [PaymentController::class, 'void'])->name('payments.void');
 });
@@ -50,4 +54,10 @@ TenantRoute::prefixed('settings/invoicing', 'workspace.invoicing.', function () 
     Route::get('logo', [InvoicingSettingsController::class, 'showLogo'])->name('logo.show');
     Route::post('logo', [InvoicingSettingsController::class, 'storeLogo'])->name('logo.store');
     Route::delete('logo', [InvoicingSettingsController::class, 'destroyLogo'])->name('logo.destroy');
+});
+
+TenantRoute::prefixed('settings/email-delivery', 'workspace.mail-settings.', function () {
+    Route::get('/', [MailSettingsController::class, 'edit'])->name('edit');
+    Route::put('/', [MailSettingsController::class, 'update'])->name('update');
+    Route::post('test', [MailSettingsController::class, 'test'])->middleware('throttle:5,10')->name('test');
 });

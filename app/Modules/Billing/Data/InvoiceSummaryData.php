@@ -39,6 +39,10 @@ final class InvoiceSummaryData extends Data
         public ?string $payment_status_label,
         public int $paid_minor,
         public int $balance_due_minor,
+        /** The email's progress, separate from the invoice's own status; null until there is a delivery. */
+        #[LiteralTypeScriptType("'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null")]
+        public ?string $delivery_status,
+        public ?string $sent_at,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -62,6 +66,8 @@ final class InvoiceSummaryData extends Data
             payment_status_label: $invoice->paymentStatus()?->label(),
             paid_minor: $invoice->paidMinor(),
             balance_due_minor: $invoice->balanceDueMinor(),
+            delivery_status: $invoice->delivery?->status->value,
+            sent_at: $invoice->delivery?->sent_at?->toIso8601String(),
         );
     }
 }

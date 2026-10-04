@@ -179,3 +179,29 @@ export function rowStatus(invoice: {
         ? { label: invoice.payment_status_label ?? '', style: PAYMENT_STATUS_STYLES[invoice.payment_status] }
         : { label: invoice.status_label, style: INVOICE_STATUS_STYLES[invoice.status] };
 }
+
+export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention';
+
+/** A quiet note on an invoice row about its email: "Sent Oct 3", "Sending…", "Email failed". */
+export function deliveryNote(invoice: {
+    delivery_status?: DeliveryStatus | null;
+    sent_at?: string | null;
+}): { label: string; isProblem: boolean } | null {
+    switch (invoice.delivery_status) {
+        case 'sent':
+            return {
+                label: invoice.sent_at
+                    ? `Sent ${new Date(invoice.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                    : 'Sent',
+                isProblem: false,
+            };
+        case 'pending':
+        case 'sending':
+            return { label: 'Sending…', isProblem: false };
+        case 'failed':
+        case 'needs_attention':
+            return { label: 'Email failed', isProblem: true };
+        default:
+            return null;
+    }
+}

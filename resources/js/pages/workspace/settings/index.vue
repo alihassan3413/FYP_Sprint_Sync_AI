@@ -2,7 +2,20 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, ReceiptText, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
+import {
+    AlertTriangle,
+    ArrowRight,
+    Bell,
+    Building2,
+    CreditCard,
+    Info,
+    Lock,
+    Mail,
+    ReceiptText,
+    ScrollText,
+    ShieldCheck,
+    Users,
+} from 'lucide-vue-next';
 
 const props = defineProps<{
     workspaceProfile: {
@@ -19,6 +32,7 @@ const props = defineProps<{
     canInviteMembers: boolean;
     canViewTeam: boolean;
     canManageInvoicing: boolean;
+    emailDeliveryConnected: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -97,6 +111,18 @@ const settings = computed<SettingsCard[]>(() => [
                   action: {
                       label: 'Edit invoicing details',
                       href: workspaceRoute('workspace.invoicing.edit'),
+                  },
+              },
+              {
+                  key: 'email-delivery',
+                  icon: Mail,
+                  title: 'Email delivery',
+                  description: 'The email account your invoices are sent from, so clients receive them from your own address.',
+                  badge: (props.emailDeliveryConnected ? 'available' : 'later') as BadgeVariant,
+                  badgeLabel: props.emailDeliveryConnected ? 'Connected' : 'Not connected',
+                  action: {
+                      label: props.emailDeliveryConnected ? 'Manage email delivery' : 'Connect email',
+                      href: workspaceRoute('workspace.mail-settings.edit'),
                   },
               },
           ]

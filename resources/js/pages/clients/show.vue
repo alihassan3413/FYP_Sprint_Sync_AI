@@ -3,7 +3,7 @@ import { Archive, ArchiveRestore, ChevronLeft, ChevronRight, Coins, ImageMinus, 
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { formatMoney, periodLabel, rowStatus, type TeamMemberOption } from '@/lib/billing';
+import { deliveryNote, formatMoney, periodLabel, rowStatus, type TeamMemberOption } from '@/lib/billing';
 import { type Client, type CurrencyOption } from '@/lib/clients';
 import { type BreadcrumbItem } from '@/types';
 import type { BillingPlanData, InvoiceSummaryData } from '@/types/generated';
@@ -246,6 +246,12 @@ const actions = computed<DropdownEntry[]>(() =>
                                     {{ periodLabel(invoice.period_start) }}
                                     <template v-if="invoice.payment_status && invoice.payment_status !== 'paid'">
                                         · {{ formatMoney(invoice.balance_due_minor, invoice.currency) }} remaining</template
+                                    >
+                                    <template v-if="deliveryNote(invoice)">
+                                        ·
+                                        <span :class="{ 'text-destructive': deliveryNote(invoice)!.isProblem }">{{
+                                            deliveryNote(invoice)!.label
+                                        }}</span></template
                                     >
                                 </p>
                             </div>

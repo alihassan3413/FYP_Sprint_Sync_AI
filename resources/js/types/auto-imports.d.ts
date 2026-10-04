@@ -27,6 +27,7 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const deliveryNote: typeof import('../lib/billing').deliveryNote
   const detectTimezone: typeof import('../lib/timezones').detectTimezone
   const effectScope: typeof import('vue').effectScope
   const extensionOf: typeof import('../lib/attachments').extensionOf
@@ -202,7 +203,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus } from '../lib/billing'
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus, DeliveryStatus } from '../lib/billing'
   import('../lib/billing')
   // @ts-ignore
   export type { Client, CurrencyOption } from '../lib/clients'
@@ -262,6 +263,7 @@ declare module 'vue' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly deliveryNote: UnwrapRef<typeof import('../lib/billing')['deliveryNote']>
     readonly detectTimezone: UnwrapRef<typeof import('../lib/timezones')['detectTimezone']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extensionOf: UnwrapRef<typeof import('../lib/attachments')['extensionOf']>

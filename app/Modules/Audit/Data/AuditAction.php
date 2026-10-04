@@ -64,6 +64,13 @@ enum AuditAction: string
     case INVOICING_UPDATED = 'invoicing.updated';
     case PAYMENT_RECORDED = 'payment.recorded';
     case PAYMENT_VOIDED = 'payment.voided';
+    case MAIL_SETTINGS_SAVED = 'mail.settings_saved';
+    case MAIL_TEST_SUCCEEDED = 'mail.test_succeeded';
+    case MAIL_TEST_FAILED = 'mail.test_failed';
+    case INVOICE_DELIVERY_SENT = 'invoice.delivery_sent';
+    case INVOICE_DELIVERY_FAILED = 'invoice.delivery_failed';
+    case INVOICE_DELIVERY_UNCERTAIN = 'invoice.delivery_uncertain';
+    case INVOICE_DELIVERY_RETRIED = 'invoice.delivery_retried';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -105,7 +112,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
-            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.'), str_starts_with($this->value, 'mail.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
         };
@@ -180,6 +187,13 @@ enum AuditAction: string
             self::INVOICING_UPDATED => 'Invoicing details updated',
             self::PAYMENT_RECORDED => 'Payment recorded',
             self::PAYMENT_VOIDED => 'Payment voided',
+            self::MAIL_SETTINGS_SAVED => 'Email delivery settings saved',
+            self::MAIL_TEST_SUCCEEDED => 'Test email sent',
+            self::MAIL_TEST_FAILED => 'Test email failed',
+            self::INVOICE_DELIVERY_SENT => 'Invoice emailed',
+            self::INVOICE_DELIVERY_FAILED => 'Invoice email failed',
+            self::INVOICE_DELIVERY_UNCERTAIN => 'Invoice email needs checking',
+            self::INVOICE_DELIVERY_RETRIED => 'Invoice email retried',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',

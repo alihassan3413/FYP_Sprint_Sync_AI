@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use LogicException;
 
@@ -155,6 +156,11 @@ final class Invoice extends Model
     public function isIssued(): bool
     {
         return $this->status === InvoiceStatus::Issued;
+    }
+
+    public function delivery(): HasOne
+    {
+        return $this->hasOne(InvoiceDelivery::class)->where('channel', InvoiceDelivery::CHANNEL_EMAIL);
     }
 
     public function payments(): HasMany

@@ -46,6 +46,12 @@ final class InvoicePolicy
         return $invoice->workspace->allowsFinance($user, FinancePermission::Payments);
     }
 
+    /** Send now and retry sending: issuing and emailing is part of approving. */
+    public function send(User $user, Invoice $invoice): bool
+    {
+        return $invoice->workspace->allowsFinance($user, FinancePermission::Approve);
+    }
+
     /** Undoing an approval is part of approving. */
     public function cancelSending(User $user, Invoice $invoice): bool
     {

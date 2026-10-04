@@ -54,6 +54,9 @@ final class InvoiceData extends Data
         /** Newest first; voided ones included so the history is complete. */
         #[LiteralTypeScriptType('PaymentData[]')]
         public array $payments,
+        /** The email delivery. The error is already a short, safe sentence. */
+        #[LiteralTypeScriptType("{ status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention'; status_label: string; recipient: string; cc: string[]; attempts: number; last_attempted_at: string | null; sent_at: string | null; error: string | null } | null")]
+        public ?array $delivery,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -97,6 +100,16 @@ final class InvoiceData extends Data
                 ->get()
                 ->map(PaymentData::fromModel(...))
                 ->all(),
+            delivery: $invoice->delivery === null ? null : [
+                'status' => $invoice->delivery->status->value,
+                'status_label' => $invoice->delivery->status->label(),
+                'recipient' => $invoice->delivery->recipient,
+                'cc' => $invoice->delivery->cc ?? [],
+                'attempts' => $invoice->delivery->attempts,
+                'last_attempted_at' => $invoice->delivery->last_attempted_at?->toIso8601String(),
+                'sent_at' => $invoice->delivery->sent_at?->toIso8601String(),
+                'error' => $invoice->delivery->error,
+            ],
         );
     }
 }

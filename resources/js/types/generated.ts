@@ -105,6 +105,13 @@ export enum AuditAction {
     INVOICING_UPDATED = 'invoicing.updated',
     PAYMENT_RECORDED = 'payment.recorded',
     PAYMENT_VOIDED = 'payment.voided',
+    MAIL_SETTINGS_SAVED = 'mail.settings_saved',
+    MAIL_TEST_SUCCEEDED = 'mail.test_succeeded',
+    MAIL_TEST_FAILED = 'mail.test_failed',
+    INVOICE_DELIVERY_SENT = 'invoice.delivery_sent',
+    INVOICE_DELIVERY_FAILED = 'invoice.delivery_failed',
+    INVOICE_DELIVERY_UNCERTAIN = 'invoice.delivery_uncertain',
+    INVOICE_DELIVERY_RETRIED = 'invoice.delivery_retried',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -217,6 +224,13 @@ export enum DeliveryMode {
     ReviewBeforeSending = 'review_before_sending',
     AutoSend = 'auto_send',
 }
+export enum DeliveryStatus {
+    Pending = 'pending',
+    Sending = 'sending',
+    Sent = 'sent',
+    Failed = 'failed',
+    NeedsAttention = 'needs_attention',
+}
 export type DepartmentData = {
     public_id: string;
     name: string;
@@ -286,6 +300,16 @@ export type InvoiceData = {
     pdf_url: string;
     pdf_filename: string;
     payments: PaymentData[];
+    delivery?: {
+        status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention';
+        status_label: string;
+        recipient: string;
+        cc: string[];
+        attempts: number;
+        last_attempted_at: string | null;
+        sent_at: string | null;
+        error: string | null;
+    } | null;
 };
 export enum InvoiceStatus {
     NeedsHours = 'needs_hours',
@@ -312,12 +336,19 @@ export type InvoiceSummaryData = {
     payment_status_label?: string;
     paid_minor: number;
     balance_due_minor: number;
+    delivery_status?: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null;
+    sent_at?: string;
 };
 export type LinkedUserData = {
     id: number;
     name: string;
     email: string;
 };
+export enum MailEncryption {
+    Tls = 'tls',
+    Ssl = 'ssl',
+    None = 'none',
+}
 export type MeetingData = {
     id: number;
     title: string;

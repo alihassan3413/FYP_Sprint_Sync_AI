@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
 import { ChevronRight, Clock, ReceiptText, Repeat } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
-import { formatMoney, INVOICE_STATUS_STYLES, periodLabel, rowStatus } from '@/lib/billing';
+import { deliveryNote, formatMoney, INVOICE_STATUS_STYLES, periodLabel, rowStatus } from '@/lib/billing';
 import { type BreadcrumbItem } from '@/types';
 import type { InvoiceSummaryData } from '@/types/generated';
 
@@ -135,6 +135,12 @@ onMounted(() => {
                                         }}</span>
                                         <template v-if="invoice.payment_status === 'partially_paid'">
                                             · {{ formatMoney(invoice.balance_due_minor, invoice.currency) }} remaining</template
+                                        >
+                                        <template v-if="deliveryNote(invoice)">
+                                            ·
+                                            <span :class="{ 'text-destructive': deliveryNote(invoice)!.isProblem }">{{
+                                                deliveryNote(invoice)!.label
+                                            }}</span></template
                                         >
                                     </p>
                                 </div>

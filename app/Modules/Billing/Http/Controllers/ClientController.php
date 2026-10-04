@@ -58,6 +58,7 @@ final class ClientController
             'canManageClients' => $canManage,
             'plans' => $this->plans($client, $today),
             'invoices' => PaymentTotals::withPaid($client->invoices()->getQuery())
+                ->with('delivery')
                 ->orderByDesc('period_start')
                 ->orderByDesc('id')
                 ->get()

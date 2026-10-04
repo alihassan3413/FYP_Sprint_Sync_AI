@@ -37,6 +37,7 @@ final class InvoiceController
         abort_unless($request->user()->can('viewAny', [Invoice::class, $workspace]), 403);
 
         $invoices = PaymentTotals::withPaid($workspace->invoices()->getQuery())
+            ->with('delivery')
             ->withCount(['lines as lines_missing_hours' => fn ($query) => $query->whereNull('quantity_centi')])
             ->orderByDesc('period_start')
             ->orderByDesc('id')
@@ -56,7 +57,7 @@ final class InvoiceController
     {
         abort_unless($request->user()->can('view', $invoice), 403);
 
-        $invoice->load(['lines', 'adjustments', 'approver:id,name', 'client:id,public_id']);
+        $invoice->load(['lines', 'adjustments', 'approver:id,name', 'client:id,public_id', 'delivery']);
 
         return Inertia::render('invoices/show', [
             'invoice' => InvoiceData::fromModel($invoice),
@@ -68,6 +69,8 @@ final class InvoiceController
             'today' => CarbonImmutable::now($workspace->timezone)->toDateString(),
             'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
             'hasCompleteInvoicingDetails' => SenderSnapshot::isComplete(SenderSnapshot::from($workspace->invoicingProfile)),
+            'canSend' => $request->user()->can('send', $invoice),
+            'mailConnected' => $workspace->mailSettings()->exists(),
         ]);
     }
 

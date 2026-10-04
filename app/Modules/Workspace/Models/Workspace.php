@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Billing\Models\Client;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Models\InvoicingProfile;
+use App\Modules\Billing\Models\WorkspaceMailSettings;
 use App\Modules\People\Models\Department;
 use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
@@ -124,6 +125,11 @@ final class Workspace extends Model
     public function invoicingProfile(): HasOne
     {
         return $this->hasOne(InvoicingProfile::class);
+    }
+
+    public function mailSettings(): HasOne
+    {
+        return $this->hasOne(WorkspaceMailSettings::class);
     }
 
     public function invoices(): HasMany
