@@ -8,6 +8,8 @@ use App\Modules\Assistant\Providers\AssistantServiceProvider;
 use App\Modules\Attachments\Providers\AttachmentsServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Billing\Providers\BillingServiceProvider;
+use App\Modules\Desktop\Providers\DesktopServiceProvider;
+use App\Modules\Expenses\Providers\ExpensesServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
 use App\Modules\People\Providers\PeopleServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
@@ -32,5 +34,7 @@ return [
     BillingServiceProvider::class,
     PeopleServiceProvider::class,
     TimeTrackingServiceProvider::class,
+    DesktopServiceProvider::class,
+    ExpensesServiceProvider::class,
     AdminServiceProvider::class,
 ];

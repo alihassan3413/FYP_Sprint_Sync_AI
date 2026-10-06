@@ -18,6 +18,9 @@ use Illuminate\Validation\Validator;
  * 0 = nothing to bill). Fixed invoices accept amounts only. Nothing else on
  * the line (rates, names, totals) can be changed through this request: other
  * keys are simply never read.
+ *
+ * reasons (hourly): { "0": "Internal training" }. Required for a line whose
+ * billed hours differ from the hours time tracking recorded.
  */
 final class UpdateInvoiceLinesRequest extends FormRequest
 {
@@ -37,6 +40,8 @@ final class UpdateInvoiceLinesRequest extends FormRequest
         return [
             'lines' => ['required', 'array'],
             'lines.*' => [$this->isHourly() ? 'nullable' : 'required', 'string', $this->valueRule()],
+            'reasons' => ['sometimes', 'array'],
+            'reasons.*' => ['nullable', 'string', 'max:300'],
         ];
     }
 
@@ -51,6 +56,28 @@ final class UpdateInvoiceLinesRequest extends FormRequest
 
             if ($unknown !== []) {
                 $validator->errors()->add('lines', 'Some lines are not on this invoice.');
+
+                return;
+            }
+
+            if (! $this->isHourly() || $validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            /* Raw input here: validated() would run validation again from inside it. */
+            $values = [];
+            foreach ((array) $this->input('lines', []) as $position => $value) {
+                $values[(int) $position] = $value === null ? null : DecimalAmount::scaled((string) $value, 2);
+            }
+            $reasons = $this->reasons();
+
+            foreach ($this->invoice()->lines()->whereNotNull('tracked_quantity_centi')->get() as $line) {
+                $billed = array_key_exists($line->position, $values) ? $values[$line->position] : $line->quantity_centi;
+                $reason = array_key_exists($line->position, $reasons) ? $reasons[$line->position] : ($billed === $line->quantity_centi ? $line->quantity_reason : null);
+
+                if ($billed !== null && $billed !== $line->tracked_quantity_centi && blank($reason)) {
+                    $validator->errors()->add("reasons.{$line->position}", 'Add a reason for billing different hours than were recorded.');
+                }
             }
         }];
     }
@@ -72,6 +99,20 @@ final class UpdateInvoiceLinesRequest extends FormRequest
         }
 
         return $values;
+    }
+
+    /**
+     * @return array<int, string|null>
+     */
+    public function reasons(): array
+    {
+        $reasons = [];
+
+        foreach ((array) $this->input('reasons', []) as $position => $reason) {
+            $reasons[(int) $position] = is_string($reason) && trim($reason) !== '' ? trim($reason) : null;
+        }
+
+        return $reasons;
     }
 
     protected function prepareForValidation(): void

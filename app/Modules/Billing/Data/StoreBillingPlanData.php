@@ -26,6 +26,8 @@ final readonly class StoreBillingPlanData
         public ?int $reminder_days_before,
         public array $lines,
         public array $adjustments,
+        /** @var list<int> projects whose tracked time this recurring invoice bills (hourly) */
+        public array $project_ids = [],
     ) {}
 
     /**

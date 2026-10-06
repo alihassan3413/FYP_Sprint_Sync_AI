@@ -53,6 +53,8 @@ const props = defineProps<{
     canSend: boolean;
     /** Whether Settings → Email delivery has been set up; invoices are only ever sent through it. */
     mailConnected: boolean;
+    /** Time recorded for this period since the draft read it (drafts only). */
+    trackedUpdate: { delta_seconds: number; lines: number } | null;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -87,6 +89,41 @@ syncFromServer();
 watch(() => props.invoice, syncFromServer);
 
 const errors = ref<Record<string, string>>({});
+
+/* ---- Recorded (time tracking) vs billed hours: a reason when they differ ---- */
+
+const reasons = reactive<Record<number, string>>({});
+
+function syncReasons() {
+    for (const line of props.invoice.lines) {
+        if (!editedSinceSend.has(line.position)) reasons[line.position] = line.quantity_reason ?? '';
+    }
+}
+
+syncReasons();
+watch(() => props.invoice, syncReasons);
+
+/** Billed hours (typed) differ from the hours time tracking recorded. */
+function billedDiffers(line: InvoiceData['lines'][number]): boolean {
+    if (line.tracked_quantity_centi === null) return false;
+
+    const typed = parseScaled(values[line.position] ?? '');
+
+    return typed !== null && typed !== line.tracked_quantity_centi;
+}
+
+const refreshing = ref(false);
+
+function refreshHours() {
+    if (refreshing.value) return;
+
+    refreshing.value = true;
+    router.post(
+        workspaceRoute('workspace.invoices.refresh-hours', { invoice: summary.value.public_id }),
+        {},
+        { preserveScroll: true, onFinish: () => (refreshing.value = false) },
+    );
+}
 const saving = ref(false);
 let saveAgain = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -112,17 +149,26 @@ function save() {
 
     saving.value = true;
     unsent.value = false;
-    editedSinceSend.clear();
+    /* Typed values stay "being edited" until the server accepts them, so a refusal (a missing reason) never wipes them. */
+    const sent = new Set(editedSinceSend);
 
     router.put(
         workspaceRoute('workspace.invoices.lines.update', { invoice: summary.value.public_id }),
-        { lines: { ...values } },
+        { lines: { ...values }, reasons: isHourly.value ? { ...reasons } : {} },
         {
             preserveScroll: true,
             preserveState: true,
             only: ['invoice', 'flash', 'errors'],
-            onSuccess: () => (errors.value = {}),
-            onError: (bag) => (errors.value = bag),
+            onSuccess: () => {
+                errors.value = {};
+                sent.forEach((position) => editedSinceSend.delete(position));
+                syncFromServer();
+                syncReasons();
+            },
+            onError: (bag) => {
+                errors.value = bag;
+                unsent.value = true;
+            },
             onFinish: () => {
                 saving.value = false;
 
@@ -418,6 +464,26 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
+            <!-- Time recorded after this draft was prepared -->
+            <div
+                v-if="trackedUpdate && canEdit"
+                class="flex flex-col gap-3 rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4 text-sm sm:flex-row sm:items-center"
+                data-testid="tracked-update"
+            >
+                <Clock class="hidden size-4 shrink-0 text-sky-600 sm:block" />
+                <p class="flex-1">
+                    Recorded hours changed since this invoice was prepared:
+                    <strong class="tabular-nums"
+                        >{{ trackedUpdate.delta_seconds >= 0 ? '+' : '−' }}{{ (Math.abs(trackedUpdate.delta_seconds) / 3600).toFixed(2) }}h</strong
+                    >
+                    across {{ trackedUpdate.lines }} {{ trackedUpdate.lines === 1 ? 'person' : 'people' }}. Hours you changed yourself are kept.
+                </p>
+                <Button variant="outline" size="sm" class="gap-1.5" :disabled="refreshing" data-testid="refresh-hours" @click="refreshHours">
+                    <RefreshCw class="size-3.5" />
+                    Refresh recorded hours
+                </Button>
+            </div>
+
             <!-- Automatic sending is waiting for the owner, and why -->
             <div
                 v-if="invoice.automation_reasons.length"
@@ -660,6 +726,20 @@ onBeforeUnmount(() => {
                                 <div class="min-w-0">
                                     <p class="font-medium">{{ line.description }}</p>
                                     <p v-if="line.role_label" class="text-muted-foreground text-xs">{{ line.role_label }}</p>
+                                    <p
+                                        v-if="isHourly && line.tracked_quantity_centi !== null"
+                                        class="text-muted-foreground text-xs tabular-nums"
+                                        :data-testid="`recorded-${index}`"
+                                    >
+                                        {{
+                                            line.tracked_quantity_centi === 0
+                                                ? 'No tracked time'
+                                                : `Recorded ${(line.tracked_quantity_centi / 100).toFixed(2)}h`
+                                        }}
+                                        <template v-if="!editable && line.quantity_reason">
+                                            · Billed differently: {{ line.quantity_reason }}</template
+                                        >
+                                    </p>
                                 </div>
 
                                 <div class="flex items-center gap-3 sm:contents">
@@ -712,6 +792,22 @@ onBeforeUnmount(() => {
                                 <p v-if="errors[`lines.${line.position}`]" class="text-destructive col-span-full text-xs">
                                     {{ errors[`lines.${line.position}`] }}
                                 </p>
+                                <div v-if="isHourly && editable && billedDiffers(line)" class="col-span-full grid gap-1">
+                                    <input
+                                        v-model="reasons[line.position]"
+                                        class="h-9 rounded-md border px-2 text-sm"
+                                        :class="errors[`reasons.${line.position}`] && 'border-destructive'"
+                                        placeholder="Why bill different hours? e.g. Internal training"
+                                        :aria-label="`Reason for billing different hours for ${line.description}`"
+                                        :data-testid="`reason-${index}`"
+                                        @input="edited(line.position)"
+                                        @blur="save"
+                                        @keydown.enter.prevent="save"
+                                    />
+                                    <p v-if="errors[`reasons.${line.position}`]" class="text-destructive text-xs">
+                                        {{ errors[`reasons.${line.position}`] }}
+                                    </p>
+                                </div>
                             </li>
                         </ul>
 

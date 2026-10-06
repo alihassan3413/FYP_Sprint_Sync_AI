@@ -56,6 +56,7 @@ final class StartTimerAction
                     'state' => TimerState::Running,
                     'active_person_id' => $person->id,
                     'started_at' => $now,
+                    'state_changed_at' => $now,
                     'segment_started_at' => $now,
                     'accumulated_seconds' => 0,
                     'longest_segment_seconds' => 0,

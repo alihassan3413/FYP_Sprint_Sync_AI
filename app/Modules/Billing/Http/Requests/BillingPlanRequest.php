@@ -17,6 +17,7 @@ use App\Modules\Billing\Support\BillingSchedule;
 use App\Modules\Billing\Support\DecimalAmount;
 use App\Modules\Billing\Support\InvoiceCalculator;
 use App\Modules\People\Models\Person;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -68,6 +69,12 @@ abstract class BillingPlanRequest extends FormRequest
                 Rule::in(DeliveryMode::reminderOptions()),
             ],
 
+            'projects' => ['nullable', 'array', 'max:20'],
+            'projects.*' => ['string', 'distinct', function (string $attribute, mixed $value, Closure $fail) {
+                if (! is_string($value) || ! Project::query()->where('workspace_id', $this->workspace()->id)->where('public_id', $value)->exists()) {
+                    $fail('Choose projects from this workspace.');
+                }
+            }],
             'lines' => ['required', 'array', 'min:1', 'max:'.self::MAX_LINES],
             'lines.*.person' => [
                 Rule::requiredIf(fn () => $this->isHourly()),
@@ -171,6 +178,7 @@ abstract class BillingPlanRequest extends FormRequest
                 'label' => $adjustment['label'],
                 'value' => DecimalAmount::scaled($adjustment['value'], 2),
             ], $validated['adjustments'] ?? [])),
+            project_ids: Project::query()->where('workspace_id', $this->workspace()->id)->whereIn('public_id', $validated['projects'] ?? [])->pluck('id')->all(),
         );
     }
 

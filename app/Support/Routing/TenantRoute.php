@@ -25,6 +25,20 @@ final class TenantRoute
             ->group($routes);
     }
 
+    /**
+     * Workspace routes for SprintSync Desktop: /api/desktop/{workspace}/{prefix},
+     * authenticated by the desktop device token instead of a session, with
+     * the same membership check and scoped bindings as the web routes.
+     */
+    public static function desktop(string $prefix, string $namePrefix, Closure $routes): void
+    {
+        Route::middleware(['auth:desktop', EnsureWorkspaceMember::class])
+            ->prefix('api/desktop/'.self::PARAMETER.'/'.trim($prefix, '/'))
+            ->name($namePrefix)
+            ->scopeBindings()
+            ->group($routes);
+    }
+
     private static function registrar(string $prefix = self::PARAMETER): RouteRegistrar
     {
         return Route::middleware(['auth', 'verified', EnsureWorkspaceMember::class])

@@ -8,6 +8,7 @@ use App\Modules\Billing\Models\Concerns\BelongsToFrozenInvoice;
 use App\Modules\People\Models\Person;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A snapshot line. person_id is a reference only; description and role_label
@@ -20,7 +21,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $person_id
  * @property string $description
  * @property string|null $role_label
- * @property int|null $quantity_centi
+ * @property int|null $quantity_centi billed hours (hundredths): what the client pays for
+ * @property int|null $tracked_seconds recorded billable time for the period (time tracking), the reference
+ * @property int|null $tracked_quantity_centi tracked_seconds in hundredths of an hour
+ * @property string|null $quantity_reason why billed hours differ from recorded
+ * @property int|null $quantity_set_by
+ * @property Carbon|null $quantity_set_at
  * @property int $unit_price_minor
  * @property int|null $amount_minor
  */
@@ -37,6 +43,9 @@ final class InvoiceLine extends Model
         return [
             'position' => 'integer',
             'quantity_centi' => 'integer',
+            'tracked_seconds' => 'integer',
+            'tracked_quantity_centi' => 'integer',
+            'quantity_set_at' => 'datetime',
             'unit_price_minor' => 'integer',
             'amount_minor' => 'integer',
         ];

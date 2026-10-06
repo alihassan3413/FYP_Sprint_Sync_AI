@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Data;
 
+use App\Modules\Billing\Support\MoneyFormatter;
 use InvalidArgumentException;
 use OverflowException;
 
@@ -60,6 +61,12 @@ final readonly class Money
     public function percentage(int $basisPoints): self
     {
         return new self(self::divideHalfUp(self::checked($this->minor * $basisPoints), 10_000), $this->currency);
+    }
+
+    /** "$5,059.20", "PKR 1,200.00". */
+    public function formatted(): string
+    {
+        return MoneyFormatter::format($this->minor, $this->currency);
     }
 
     public function negated(): self

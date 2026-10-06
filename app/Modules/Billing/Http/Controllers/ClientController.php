@@ -67,7 +67,11 @@ final class ClientController
                 ->map(InvoiceSummaryData::fromModel(...))
                 ->values(),
             'today' => $today->toDateString(),
-            ...($canManage ? ['teamMembers' => $this->teamMembers($workspace)] : []),
+            ...($canManage ? [
+                'teamMembers' => $this->teamMembers($workspace),
+                /* Projects whose tracked time an hourly recurring invoice can bill. */
+                'projectOptions' => $workspace->projects()->orderBy('name')->get(['public_id', 'name'])->map->only(['public_id', 'name'])->values(),
+            ] : []),
         ]);
     }
 
@@ -79,7 +83,7 @@ final class ClientController
      */
     private function plans(Client $client, CarbonImmutable $today): Collection
     {
-        $plans = $client->billingPlans()->with(['lines.person:id,public_id', 'adjustments'])->orderBy('name')->get();
+        $plans = $client->billingPlans()->with(['lines.person:id,public_id', 'adjustments', 'projects:id,public_id'])->orderBy('name')->get();
         $schedule = app(BillingSchedule::class);
 
         $invoices = Invoice::query()

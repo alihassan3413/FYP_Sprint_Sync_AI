@@ -19,6 +19,7 @@ const props = defineProps<{
     today: string;
     /** Team profiles that can go on a recurring invoice; only sent to people who can manage it. */
     teamMembers?: TeamMemberOption[];
+    projectOptions?: { public_id: string; name: string }[];
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -308,6 +309,7 @@ const actions = computed<DropdownEntry[]>(() =>
         :client="client"
         :plan="editingPlan"
         :team-members="teamMembers ?? []"
+        :project-options="projectOptions ?? []"
         :currencies="currencies"
         :today="today"
     />

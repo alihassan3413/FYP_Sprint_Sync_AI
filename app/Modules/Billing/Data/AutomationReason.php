@@ -24,6 +24,7 @@ enum AutomationReason: string
     case MailNotConnected = 'mail_not_connected';
     case SenderIncomplete = 'sender_incomplete';
     case RecipientInvalid = 'recipient_invalid';
+    case TimeActivityReview = 'time_activity_review';
     /** Shown, not stored: missing hours that were entered after the send date. */
     case LateHours = 'late_hours';
 }

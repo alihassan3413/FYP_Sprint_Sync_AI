@@ -78,6 +78,23 @@ enum AuditAction: string
     case TIME_ADJUSTMENT_ADDED = 'time.adjustment_added';
     case TIME_HISTORICAL_ADDED = 'time.historical_added';
     case TIME_ENTRY_VOIDED = 'time.entry_voided';
+    case TIME_POLICY_CHANGED = 'time.policy_changed';
+    case TIME_SCHEDULE_CHANGED = 'time.schedule_changed';
+    case TIME_HOLIDAY_ADDED = 'time.holiday_added';
+    case TIME_HOLIDAY_REMOVED = 'time.holiday_removed';
+    case TIME_LEAVE_ADDED = 'time.leave_added';
+    case TIME_LEAVE_REMOVED = 'time.leave_removed';
+    case TIME_IDLE_KEPT = 'time.idle_kept';
+    case TIME_ACTIVITY_FLAGGED = 'time.activity_flagged';
+    case TIME_REVIEW_RESOLVED = 'time.review_resolved';
+    case INVOICE_HOURS_REFRESHED = 'invoice.hours_refreshed';
+    case INVOICE_HOURS_OVERRIDDEN = 'invoice.hours_overridden';
+    case EXPENSE_RECORDED = 'expense.recorded';
+    case EXPENSE_VOIDED = 'expense.voided';
+    case EXPENSE_RECURRING_SAVED = 'expense.recurring_saved';
+    case EXPENSE_RECURRING_STOPPED = 'expense.recurring_stopped';
+    case FX_RATE_ENTERED = 'fx.rate_entered';
+    case FINANCE_REPORTING_CURRENCY_CHANGED = 'finance.reporting_currency_changed';
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
@@ -90,6 +107,8 @@ enum AuditAction: string
     case ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated';
     case ACCOUNT_AVATAR_REMOVED = 'account.avatar_removed';
     case ACCOUNT_DELETED = 'account.deleted';
+    case ACCOUNT_DESKTOP_SIGNED_IN = 'account.desktop_signed_in';
+    case ACCOUNT_DESKTOP_SIGNED_OUT = 'account.desktop_signed_out';
 
     /**
      * Billing entries name clients and amounts, so they are only shown to
@@ -122,7 +141,7 @@ enum AuditAction: string
             str_starts_with($this->value, 'project.'), str_starts_with($this->value, 'sprint.') => 'Projects',
             str_starts_with($this->value, 'task.'), str_starts_with($this->value, 'board_column.') => 'Tasks',
             str_starts_with($this->value, 'meeting.') => 'Meetings',
-            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.'), str_starts_with($this->value, 'mail.') => self::BILLING_CATEGORY,
+            str_starts_with($this->value, 'client.'), str_starts_with($this->value, 'billing_plan.'), str_starts_with($this->value, 'invoice.'), str_starts_with($this->value, 'invoicing.'), str_starts_with($this->value, 'payment.'), str_starts_with($this->value, 'mail.'), str_starts_with($this->value, 'expense.'), str_starts_with($this->value, 'fx.'), str_starts_with($this->value, 'finance.') => self::BILLING_CATEGORY,
             str_starts_with($this->value, 'person.'), str_starts_with($this->value, 'department.') => self::PEOPLE_CATEGORY,
             str_starts_with($this->value, 'time.') => self::TIME_CATEGORY,
             str_starts_with($this->value, 'account.') => 'Account',
@@ -212,6 +231,23 @@ enum AuditAction: string
             self::TIME_ADJUSTMENT_ADDED => 'Time adjusted',
             self::TIME_HISTORICAL_ADDED => 'Previous hours added',
             self::TIME_ENTRY_VOIDED => 'Time entry voided',
+            self::TIME_POLICY_CHANGED => 'Time policy changed',
+            self::TIME_SCHEDULE_CHANGED => 'Work schedule changed',
+            self::TIME_HOLIDAY_ADDED => 'Holiday added',
+            self::TIME_HOLIDAY_REMOVED => 'Holiday removed',
+            self::TIME_LEAVE_ADDED => 'Leave added',
+            self::TIME_LEAVE_REMOVED => 'Leave removed',
+            self::TIME_IDLE_KEPT => 'Idle time kept as work',
+            self::TIME_ACTIVITY_FLAGGED => 'Activity flagged for review',
+            self::TIME_REVIEW_RESOLVED => 'Time review resolved',
+            self::INVOICE_HOURS_REFRESHED => 'Invoice recorded hours refreshed',
+            self::INVOICE_HOURS_OVERRIDDEN => 'Billed hours changed',
+            self::EXPENSE_RECORDED => 'Expense recorded',
+            self::EXPENSE_VOIDED => 'Expense voided',
+            self::EXPENSE_RECURRING_SAVED => 'Recurring expense saved',
+            self::EXPENSE_RECURRING_STOPPED => 'Recurring expense stopped',
+            self::FX_RATE_ENTERED => 'Exchange rate entered',
+            self::FINANCE_REPORTING_CURRENCY_CHANGED => 'Reporting currency changed',
             self::PERSON_CREATED => 'Person added',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',
@@ -219,6 +255,8 @@ enum AuditAction: string
             self::DEPARTMENT_CREATED => 'Department created',
             self::ACCOUNT_PROFILE_UPDATED => 'Profile updated',
             self::ACCOUNT_PASSWORD_CHANGED => 'Password changed',
+            self::ACCOUNT_DESKTOP_SIGNED_IN => 'Signed in to SprintSync Desktop',
+            self::ACCOUNT_DESKTOP_SIGNED_OUT => 'Signed out of SprintSync Desktop',
             self::ACCOUNT_AVATAR_UPDATED => 'Profile picture updated',
             self::ACCOUNT_AVATAR_REMOVED => 'Profile picture removed',
             self::ACCOUNT_DELETED => 'Account deleted',

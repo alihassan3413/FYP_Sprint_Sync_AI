@@ -50,6 +50,8 @@ use LogicException;
  * @property int $due_in_days
  * @property array{name: string, billing_email: string, cc_emails: list<string>, address: string|null, tax_id: string|null} $bill_to
  * @property array<string, string|null>|null $bill_from sender snapshot (see SenderSnapshot); null on invoices prepared before invoicing details existed
+ * @property list<int>|null $time_project_ids projects whose tracked time this invoice bills (hourly; null = hours entered by hand)
+ * @property Carbon|null $tracked_at when recorded hours were last read from time tracking
  * @property string|null $pdf_path the official PDF, written once after issue
  * @property int $subtotal_minor
  * @property int $adjustments_minor
@@ -95,6 +97,8 @@ final class Invoice extends Model
             'automation_hold' => 'array',
             'bill_to' => 'array',
             'bill_from' => 'array',
+            'time_project_ids' => 'array',
+            'tracked_at' => 'datetime',
             'version' => 'integer',
             'due_in_days' => 'integer',
             'subtotal_minor' => 'integer',

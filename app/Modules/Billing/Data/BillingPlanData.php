@@ -57,6 +57,8 @@ final class BillingPlanData extends Data
         public bool $first_invoice_needs_review,
         /** The due month was skipped while the plan was paused (it is never backfilled automatically). */
         public bool $due_missed_while_paused,
+        /** Projects whose tracked time is billed (hourly), by public id. */
+        public array $project_public_ids = [],
     ) {}
 
     /**
@@ -103,6 +105,7 @@ final class BillingPlanData extends Data
             next_period_end: $cycle->periodEnd->toDateString(),
             due_period_start: $due->periodStart->toDateString(),
             due_invoice_public_id: $dueInvoicePublicId,
+            project_public_ids: $plan->projects->pluck('public_id')->values()->all(),
             first_invoice_needs_review: $plan->delivery_mode === DeliveryMode::AutoSend && ! $hasIssuedInvoice,
             due_missed_while_paused: $dueInvoicePublicId === null && ! $plan->isPaused() && $plan->resumed_at !== null
                 && $plan->resumed_at->copy()->setTimezone($today->timezone)->toDateString() >= $due->generationDate->toDateString(),

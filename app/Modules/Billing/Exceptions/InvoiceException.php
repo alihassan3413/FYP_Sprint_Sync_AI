@@ -31,6 +31,15 @@ final class InvoiceException extends AppException
         );
     }
 
+    public static function billedHoursNeedReason(string $line): self
+    {
+        return new self(
+            code: ErrorCode::INVOICE_INVALID_TRANSITION,
+            status: 422,
+            message: "{$line}: add a reason for billing different hours than were recorded.",
+        );
+    }
+
     public static function alreadyIssued(): self
     {
         return new self(

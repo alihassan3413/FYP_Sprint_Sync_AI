@@ -20,7 +20,7 @@ final class TimerData extends Data
 {
     public function __construct(
         public string $public_id,
-        #[LiteralTypeScriptType("'running' | 'paused' | 'stopped'")]
+        #[LiteralTypeScriptType("'running' | 'paused' | 'lunch' | 'stopped'")]
         public string $state,
         #[LiteralTypeScriptType('{ public_id: string | null; name: string }')]
         public array $project,
@@ -28,6 +28,10 @@ final class TimerData extends Data
         public ?array $task,
         public string $started_at,
         public ?string $running_since,
+        /** On (paid) lunch since. */
+        public ?string $lunch_started_at,
+        /** "idle" when SprintSync Desktop paused it after inactivity. */
+        public ?string $pause_reason,
         public int $accumulated_seconds,
         public int $elapsed_seconds,
         public int $longest_segment_seconds,
@@ -48,6 +52,8 @@ final class TimerData extends Data
             task: $session->task_title === null ? null : ['public_id' => $session->task?->public_id, 'title' => $session->task_title],
             started_at: $session->started_at->toIso8601String(),
             running_since: $session->segment_started_at?->toIso8601String(),
+            lunch_started_at: $session->lunch_started_at?->toIso8601String(),
+            pause_reason: $session->pause_reason,
             accumulated_seconds: $session->accumulated_seconds,
             elapsed_seconds: $session->elapsedSeconds($now),
             longest_segment_seconds: max($session->longest_segment_seconds, $session->runningSeconds($now)),

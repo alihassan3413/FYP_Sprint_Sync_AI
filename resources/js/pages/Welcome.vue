@@ -3,6 +3,24 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowUpRight, CalendarDays, Check, ChevronRight, Kanban, Lock, Menu, Mic, Play, Shield, Sparkles, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import { archName, type DesktopDownload, detectPlatform, formatBytes, platformChoices } from '@/lib/desktop';
+
+/** Stable builds for everyone; signed-in testers also get UAT builds (see routes/web.php). */
+const props = defineProps<{ desktopDownloads?: DesktopDownload[] }>();
+
+/* Detected after mount so server and client render the same markup first. */
+const visitorPlatform = ref<DesktopDownload['platform'] | null>(null);
+onMounted(() => (visitorPlatform.value = detectPlatform()));
+const desktopChoices = computed(() => platformChoices(props.desktopDownloads ?? [], visitorPlatform.value));
+const desktopOffered = computed(() => desktopChoices.value.filter((choice) => choice.download));
+const desktopHasTestBuild = computed(() => desktopOffered.value.some((choice) => choice.download?.channel === 'uat'));
+/* Other architectures (Intel Macs) and any Linux build, kept out of the main buttons. */
+const otherDesktopBuilds = computed(() => [
+    ...desktopChoices.value.flatMap((choice) => choice.alternatives),
+    ...(props.desktopDownloads ?? []).filter((download) => download.platform === 'linux'),
+]);
+const desktopFeatures = ['Offline-safe syncing', 'Paid lunch and time policies', 'Menu-bar and system-tray controls'];
+
 /* ------------------------------------------------------------------ *
  * The page obeys permissions.
  *
@@ -383,6 +401,7 @@ const navLinks = [
     { label: 'The lens', href: '#lens' },
     { label: 'How it works', href: '#how' },
     { label: 'For agencies', href: '#agencies' },
+    { label: 'Desktop', href: '#desktop' },
 ];
 
 const pillars = [
@@ -849,6 +868,139 @@ const clientCapabilities = ['View project board & sprints', 'Comment on tasks', 
                     <p class="mt-4 text-[13px] font-medium text-[var(--ss-ink)]/40">
                         Off by default. A new client sees the board and nothing else until you say otherwise.
                     </p>
+                </div>
+            </section>
+
+            <!-- ==================== DESKTOP ==================== -->
+            <section id="desktop" data-reveal class="ss-reveal mt-3 scroll-mt-4 sm:mt-4" data-testid="desktop-downloads">
+                <div class="grid grid-cols-1 items-center gap-8 rounded-[28px] bg-white p-6 sm:rounded-[40px] sm:p-10 lg:grid-cols-12 lg:gap-10">
+                    <div class="lg:col-span-7">
+                        <span class="text-[12px] font-extrabold tracking-[0.16em] text-[var(--ss-indigo)] uppercase">[ SprintSync Desktop ]</span>
+                        <h2 class="mt-4 text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.04] font-extrabold tracking-[-0.03em] text-[var(--ss-ink)]">
+                            Your timer, always within reach.
+                        </h2>
+                        <p class="mt-4 max-w-[52ch] text-[15px] leading-relaxed font-medium text-[var(--ss-ink)]/60">
+                            Track your work without keeping the browser open. It stays in sync with your workspace, even when your connection doesn't.
+                        </p>
+                        <ul class="mt-5 space-y-2.5">
+                            <li v-for="feature in desktopFeatures" :key="feature" class="flex items-center gap-3">
+                                <span class="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--ss-lime)]">
+                                    <Check class="size-3.5 text-[var(--ss-ink)]" :stroke-width="3" />
+                                </span>
+                                <span class="text-[14px] font-bold text-[var(--ss-ink)]">{{ feature }}</span>
+                            </li>
+                        </ul>
+
+                        <div class="mt-7 flex flex-col gap-3 sm:flex-row" data-testid="desktop-platforms">
+                            <template v-for="(choice, index) in desktopChoices" :key="choice.platform">
+                                <a
+                                    v-if="choice.download"
+                                    :href="choice.download.url"
+                                    class="inline-flex min-h-14 items-center justify-center gap-2.5 rounded-full px-7 py-3.5 text-[15px] font-extrabold transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[var(--ss-indigo)] focus-visible:ring-offset-2 focus-visible:outline-none motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:flex-1"
+                                    :class="index === 0 ? 'bg-[var(--ss-ink)] text-white' : 'bg-[var(--ss-lavender)] text-[var(--ss-ink)]'"
+                                    :data-testid="`download-${choice.platform}`"
+                                >
+                                    <IconSimpleIconsApple v-if="choice.platform === 'macos'" class="size-4 shrink-0" aria-hidden="true" />
+                                    <IconSimpleIconsWindows v-else class="size-4 shrink-0" aria-hidden="true" />
+                                    Download for {{ choice.label }}
+                                </a>
+                                <span
+                                    v-else
+                                    aria-disabled="true"
+                                    class="inline-flex min-h-14 items-center justify-center gap-2.5 rounded-full border border-dashed border-[rgba(11,11,15,0.18)] px-7 py-3.5 text-[15px] font-bold text-[var(--ss-ink)]/45 sm:flex-1"
+                                    :data-testid="`download-${choice.platform}-unavailable`"
+                                >
+                                    <IconSimpleIconsApple v-if="choice.platform === 'macos'" class="size-4 shrink-0" aria-hidden="true" />
+                                    <IconSimpleIconsWindows v-else class="size-4 shrink-0" aria-hidden="true" />
+                                    {{ choice.label }} · Coming soon
+                                </span>
+                            </template>
+                        </div>
+
+                        <div class="mt-4 space-y-1 text-[13px] font-medium text-[var(--ss-ink)]/55" data-testid="desktop-build-details">
+                            <p v-for="choice in desktopOffered" :key="choice.platform">
+                                SprintSync {{ choice.download!.version }} for {{ choice.label }} · {{ archName(choice.download!) }} ·
+                                {{ formatBytes(choice.download!.size_bytes) }}
+                                <span
+                                    v-if="choice.download!.channel === 'uat'"
+                                    class="ml-1 rounded-full bg-[var(--ss-lime)] px-2 py-0.5 text-[11px] font-extrabold text-[var(--ss-ink)]"
+                                    >UAT build · Unsigned test build</span
+                                >
+                            </p>
+                            <p v-if="!desktopOffered.length">
+                                Coming soon for macOS and Windows. Teams already on SprintSync can sign in to get the test build.
+                            </p>
+                            <p v-else-if="desktopOffered.length === desktopChoices.length">Available for macOS and Windows.</p>
+                        </div>
+
+                        <div v-if="desktopOffered.length" class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[13px] font-bold text-[var(--ss-ink)]/70">
+                            <details v-if="otherDesktopBuilds.length" class="group">
+                                <summary class="cursor-pointer underline-offset-2 hover:underline">Other downloads</summary>
+                                <ul class="mt-2 space-y-1 font-medium text-[var(--ss-ink)]/60">
+                                    <li v-for="download in otherDesktopBuilds" :key="download.url">
+                                        <a :href="download.url" class="underline underline-offset-2"
+                                            >{{ download.platform_label }} · {{ archName(download) }}</a
+                                        >
+                                        · {{ download.version }} · {{ formatBytes(download.size_bytes) }}
+                                    </li>
+                                </ul>
+                            </details>
+                            <details data-testid="desktop-install-help">
+                                <summary class="cursor-pointer underline-offset-2 hover:underline">Installation help</summary>
+                                <div class="mt-2 max-w-[56ch] space-y-2 font-medium text-[var(--ss-ink)]/65">
+                                    <p v-if="desktopHasTestBuild" class="font-bold text-[var(--ss-ink)]">
+                                        Test builds aren't code-signed yet, so your computer asks once before opening them.
+                                    </p>
+                                    <p>
+                                        <strong class="text-[var(--ss-ink)]">macOS:</strong> download, open the .dmg and drag SprintSync to
+                                        Applications. If macOS warns the first time, right-click SprintSync → Open (or System Settings → Privacy &amp;
+                                        Security → Open Anyway).
+                                    </p>
+                                    <p>
+                                        <strong class="text-[var(--ss-ink)]">Windows:</strong> run the installer. If SmartScreen says "Windows
+                                        protected your PC", choose More info → Run anyway.
+                                    </p>
+                                    <p>Then sign in with your SprintSync email and password.</p>
+                                </div>
+                            </details>
+                            <details data-testid="desktop-verify">
+                                <summary class="cursor-pointer underline-offset-2 hover:underline">Verify download</summary>
+                                <ul class="mt-2 space-y-1 font-mono text-[11px] font-medium break-all text-[var(--ss-ink)]/60">
+                                    <li v-for="download in desktopDownloads" :key="download.url">
+                                        {{ download.platform_label }} {{ archName(download) }} SHA-256: {{ download.sha256 }}
+                                    </li>
+                                </ul>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- A coded illustration of the desktop timer (like the hero demo), not a screenshot. -->
+                    <div class="lg:col-span-5" aria-hidden="true">
+                        <div class="mx-auto max-w-[340px] rounded-[24px] bg-[var(--ss-ink)] p-5 shadow-[0_30px_60px_-30px_rgba(11,11,15,0.55)]">
+                            <div class="flex items-center justify-between">
+                                <div class="flex gap-1.5">
+                                    <span class="size-2.5 rounded-full bg-white/15"></span>
+                                    <span class="size-2.5 rounded-full bg-white/15"></span>
+                                    <span class="size-2.5 rounded-full bg-white/15"></span>
+                                </div>
+                                <span class="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/70">
+                                    <span class="size-1.5 rounded-full bg-[var(--ss-lime)]"></span>
+                                    Synced
+                                </span>
+                            </div>
+                            <div class="mt-5 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
+                                <p class="text-[11px] font-extrabold tracking-[0.16em] text-white/40 uppercase">Website redesign</p>
+                                <p class="mt-1 text-[13px] font-bold text-white/70">Checkout flow</p>
+                                <p class="mt-3 font-mono text-[40px] leading-none font-bold tracking-tight text-white tabular-nums">01:24:37</p>
+                                <p class="mt-2 text-[12px] font-medium text-white/45">Today 5h 12m</p>
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-center text-[12px] font-extrabold">
+                                <span class="rounded-xl bg-white/10 py-2.5 text-white">Pause</span>
+                                <span class="rounded-xl bg-white/10 py-2.5 text-white">Lunch</span>
+                                <span class="rounded-xl bg-[var(--ss-lime)] py-2.5 text-[var(--ss-ink)]">Stop</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

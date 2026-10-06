@@ -14,6 +14,9 @@ final class TimeTrackingServiceProvider extends ModuleServiceProvider
 {
     protected string $module = 'TimeTracking';
 
+    /** The web pages, plus the desktop app's token-authenticated API. */
+    protected array $routeFiles = ['web' => 'web.php', 'api' => 'api.php'];
+
     protected array $policies = [
         TimeEntry::class => TimeEntryPolicy::class,
     ];

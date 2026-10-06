@@ -88,6 +88,8 @@ final class ErrorCode
 
     public const TIMER_NOT_RUNNING = 'TIME.TIMER.NOT_RUNNING';
 
+    public const TIMER_CHANGED = 'TIME.TIMER.CHANGED';
+
     public const TIME_NO_PROFILE = 'TIME.NO_PROFILE';
 
     public const TIME_OPERATION_CONFLICT = 'TIME.OPERATION.CONFLICT';

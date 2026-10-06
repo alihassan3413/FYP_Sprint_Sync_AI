@@ -32,6 +32,8 @@ const props = defineProps<{
     /** Present when editing an existing recurring invoice. */
     plan: BillingPlanData | null;
     teamMembers: TeamMemberOption[];
+    /** Projects whose tracked time an hourly recurring invoice can bill. */
+    projectOptions: { public_id: string; name: string }[];
     currencies: CurrencyOption[];
     /** Today in the workspace's timezone (Y-m-d). */
     today: string;
@@ -67,6 +69,7 @@ const form = useForm<{
     reminder_days_before: number;
     lines: LineForm[];
     adjustments: AdjustmentForm[];
+    projects: string[];
 }>({
     name: '',
     currency: 'USD',
@@ -78,6 +81,7 @@ const form = useForm<{
     reminder_days_before: 3,
     lines: [],
     adjustments: [],
+    projects: [],
 });
 
 let nextKey = 0;
@@ -110,6 +114,7 @@ function fill() {
             label: adjustment.label,
             value: adjustment.type === 'percentage' ? basisPointsToInput(adjustment.value) : minorToInput(adjustment.value),
         })),
+        projects: [...(plan?.project_public_ids ?? [])],
     });
     form.reset();
     form.clearErrors();
@@ -398,6 +403,28 @@ function close(value: boolean) {
                         </p>
                         <InputError :message="form.errors.send_day || form.errors.due_in_days" />
                     </div>
+
+                    <!-- Hourly: where the hours come from -->
+                    <fieldset v-if="isHourly" data-testid="time-projects">
+                        <legend class="mb-1 text-sm font-semibold">Hours from time tracking</legend>
+                        <p class="text-muted-foreground mb-2.5 text-xs">
+                            Each person's billable time on these projects is filled in as their recorded hours. You can still change the billed hours
+                            on each invoice. Leave all unticked to enter hours by hand.
+                        </p>
+                        <div v-if="projectOptions.length" class="flex flex-wrap gap-2">
+                            <label
+                                v-for="project in projectOptions"
+                                :key="project.public_id"
+                                class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm"
+                                :class="form.projects.includes(project.public_id) && 'border-foreground bg-muted'"
+                            >
+                                <input v-model="form.projects" type="checkbox" :value="project.public_id" class="size-3.5" />
+                                {{ project.name }}
+                            </label>
+                        </div>
+                        <p v-else class="text-muted-foreground text-xs">No projects yet.</p>
+                        <InputError :message="form.errors.projects" />
+                    </fieldset>
 
                     <!-- Delivery -->
                     <fieldset>

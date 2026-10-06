@@ -9,12 +9,14 @@ use App\Modules\Billing\Data\Currency;
 use App\Modules\Billing\Data\DeliveryMode;
 use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Database\Factories\BillingPlanFactory;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
 use App\Support\Models\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -87,6 +89,12 @@ final class BillingPlan extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(BillingPlanLine::class)->orderBy('position');
+    }
+
+    /** Projects whose tracked time is billed on this recurring invoice (hourly plans). */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'billing_plan_projects');
     }
 
     public function adjustments(): HasMany

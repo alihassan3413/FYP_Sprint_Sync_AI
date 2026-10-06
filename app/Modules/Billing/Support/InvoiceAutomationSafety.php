@@ -10,6 +10,7 @@ use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Data\SafetyResult;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Models\InvoiceLine;
+use App\Modules\TimeTracking\Contracts\TimeTotals;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -26,9 +27,15 @@ use Illuminate\Support\Collection;
  *
  * When "before" is zero, any non-zero amount is treated as unusual (there is
  * no percentage to compare against, so a person should look).
+ *
+ * Hours are compared as billed (quantity_centi), the hours the client pays
+ * for. Unresolved activity reviews for anyone on the invoice in its period
+ * also hold it for the owner; nothing is ever deducted automatically.
  */
 final class InvoiceAutomationSafety
 {
+    public function __construct(private readonly TimeTotals $totals) {}
+
     /** Totals may move by up to 25% month to month. */
     public const TOTAL_VARIANCE_PERCENT = 25;
 
@@ -66,6 +73,11 @@ final class InvoiceAutomationSafety
 
         if (! filter_var($invoice->bill_to['billing_email'] ?? null, FILTER_VALIDATE_EMAIL)) {
             $add(AutomationReason::RecipientInvalid, "The client's billing email is missing or not valid.");
+        }
+
+        $people = $invoice->lines->pluck('person_id')->filter()->map(fn ($id) => (int) $id)->values()->all();
+        if ($people !== [] && $this->totals->openActivityReviews($invoice->workspace_id, $people, CarbonImmutable::parse($invoice->period_start->toDateString()), CarbonImmutable::parse($invoice->period_end->toDateString())) > 0) {
+            $add(AutomationReason::TimeActivityReview, 'Time activity needs review before this invoice can be sent automatically.');
         }
 
         $previous = $this->previousIssued($invoice);

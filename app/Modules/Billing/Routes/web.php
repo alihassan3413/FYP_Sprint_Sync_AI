@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Modules\Billing\Http\Controllers\BillingPlanController;
 use App\Modules\Billing\Http\Controllers\ClientController;
 use App\Modules\Billing\Http\Controllers\ClientLogoController;
+use App\Modules\Billing\Http\Controllers\ExpenseController;
+use App\Modules\Billing\Http\Controllers\FinanceOverviewController;
 use App\Modules\Billing\Http\Controllers\InvoiceController;
 use App\Modules\Billing\Http\Controllers\InvoiceDeliveryController;
 use App\Modules\Billing\Http\Controllers\InvoicingSettingsController;
@@ -42,6 +44,7 @@ TenantRoute::prefixed('invoices', 'workspace.invoices.', function () {
     Route::post('{invoice}/sender', [InvoiceController::class, 'refreshSender'])->name('sender.refresh');
     Route::get('{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('pdf');
     Route::get('{invoice}/logo', [InvoiceController::class, 'logo'])->name('logo');
+    Route::post('{invoice}/refresh-hours', [InvoiceController::class, 'refreshHours'])->name('refresh-hours');
     Route::post('{invoice}/send-now', [InvoiceDeliveryController::class, 'sendNow'])->name('send-now');
     Route::post('{invoice}/delivery/retry', [InvoiceDeliveryController::class, 'retry'])->name('delivery.retry');
     Route::post('{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
@@ -60,4 +63,19 @@ TenantRoute::prefixed('settings/email-delivery', 'workspace.mail-settings.', fun
     Route::get('/', [MailSettingsController::class, 'edit'])->name('edit');
     Route::put('/', [MailSettingsController::class, 'update'])->name('update');
     Route::post('test', [MailSettingsController::class, 'test'])->middleware('throttle:5,10')->name('test');
+});
+
+TenantRoute::prefixed('expenses', 'workspace.expenses.', function () {
+    Route::get('/', [ExpenseController::class, 'index'])->name('index');
+    Route::post('/', [ExpenseController::class, 'store'])->name('store');
+    Route::post('{expense}/void', [ExpenseController::class, 'void'])->name('void');
+    Route::post('recurring', [ExpenseController::class, 'storeRecurring'])->name('recurring.store');
+    Route::put('recurring/{recurringExpense}', [ExpenseController::class, 'updateRecurring'])->name('recurring.update');
+    Route::post('recurring/{recurringExpense}/stop', [ExpenseController::class, 'stopRecurring'])->name('recurring.stop');
+});
+
+TenantRoute::prefixed('finance', 'workspace.finance.', function () {
+    Route::get('/', [FinanceOverviewController::class, 'show'])->name('overview');
+    Route::put('reporting-currency', [FinanceOverviewController::class, 'updateReportingCurrency'])->name('reporting-currency');
+    Route::post('exchange-rates', [FinanceOverviewController::class, 'storeRate'])->name('exchange-rates.store');
 });

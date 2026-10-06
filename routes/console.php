@@ -15,3 +15,4 @@ Schedule::command('billing:dispatch-approved-invoices')->everyMinute()->withoutO
 Schedule::command('billing:generate-recurring-invoices')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('billing:process-recurring-invoices')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('billing:send-owner-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('expenses:generate-recurring')->hourly()->withoutOverlapping();

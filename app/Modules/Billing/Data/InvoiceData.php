@@ -9,6 +9,7 @@ use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\InvoiceAttention;
 use App\Modules\Billing\Support\InvoicePdfRenderer;
 use App\Modules\Billing\Support\SenderSnapshot;
+use App\Modules\Billing\Support\TrackedHours;
 use Illuminate\Support\Arr;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
@@ -23,7 +24,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 final class InvoiceData extends Data
 {
     /**
-     * @param  list<array{position: int, description: string, role_label: string|null, quantity_centi: int|null, unit_price_minor: int, amount_minor: int|null}>  $lines
+     * @param  list<array{position: int, description: string, role_label: string|null, quantity_centi: int|null, unit_price_minor: int, amount_minor: int|null, tracked_seconds: int|null, tracked_quantity_centi: int|null, quantity_reason: string|null}>  $lines
      * @param  list<array{kind: string, type: string, label: string, value: int, amount_minor: int}>  $adjustments
      * @param  array{name: string, billing_email: string, cc_emails: list<string>, address: string|null, tax_id: string|null}  $bill_to
      */
@@ -33,7 +34,7 @@ final class InvoiceData extends Data
         public bool $is_editable,
         #[LiteralTypeScriptType('{ name: string; billing_email: string; cc_emails: string[]; address: string | null; tax_id: string | null }')]
         public array $bill_to,
-        #[LiteralTypeScriptType('{ position: number; description: string; role_label: string | null; quantity_centi: number | null; unit_price_minor: number; amount_minor: number | null }[]')]
+        #[LiteralTypeScriptType('{ position: number; description: string; role_label: string | null; quantity_centi: number | null; unit_price_minor: number; amount_minor: number | null; tracked_seconds: number | null; tracked_quantity_centi: number | null; quantity_reason: string | null }[]')]
         public array $lines,
         #[LiteralTypeScriptType("{ kind: 'fee' | 'tax' | 'discount'; type: 'percentage' | 'fixed'; label: string; value: number; amount_minor: number }[]")]
         public array $adjustments,
@@ -60,6 +61,9 @@ final class InvoiceData extends Data
         #[LiteralTypeScriptType("{ status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention'; status_label: string; recipient: string; cc: string[]; attempts: number; last_attempted_at: string | null; sent_at: string | null; error: string | null } | null")]
         public ?array $delivery,
         public bool $approved_automatically,
+        /** Hours come from time tracking (recorded) and can be overridden (billed). */
+        public bool $uses_time_tracking,
+        public ?string $tracked_at,
         /** Will be checked and sent automatically on its planned send date. */
         public bool $sends_automatically,
         /** Why automatic sending is waiting for the owner, while it is. */
@@ -74,7 +78,7 @@ final class InvoiceData extends Data
             version: $invoice->version,
             is_editable: $invoice->status->isEditable(),
             bill_to: $invoice->bill_to,
-            lines: $invoice->lines->map(fn ($line) => $line->only(['position', 'description', 'role_label', 'quantity_centi', 'unit_price_minor', 'amount_minor']))->values()->all(),
+            lines: $invoice->lines->map(fn ($line) => $line->only(['position', 'description', 'role_label', 'quantity_centi', 'unit_price_minor', 'amount_minor', 'tracked_seconds', 'tracked_quantity_centi', 'quantity_reason']))->values()->all(),
             adjustments: $invoice->adjustments->map(fn ($adjustment) => [
                 'kind' => $adjustment->kind->value,
                 'type' => $adjustment->type->value,
@@ -119,6 +123,8 @@ final class InvoiceData extends Data
                 'error' => $invoice->delivery->error,
             ],
             approved_automatically: $invoice->approved_automatically,
+            uses_time_tracking: TrackedHours::applies($invoice),
+            tracked_at: $invoice->tracked_at?->toIso8601String(),
             sends_automatically: InvoiceAttention::sendsAutomatically($invoice),
             automation_reasons: InvoiceAttention::reasons($invoice),
         );

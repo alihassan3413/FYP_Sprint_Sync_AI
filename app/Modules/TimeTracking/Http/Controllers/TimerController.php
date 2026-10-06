@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\TimeTracking\Http\Controllers;
 
 use App\Modules\People\Models\Person;
+use App\Modules\TimeTracking\Actions\EndLunchAction;
+use App\Modules\TimeTracking\Actions\IdlePauseTimerAction;
 use App\Modules\TimeTracking\Actions\PauseTimerAction;
 use App\Modules\TimeTracking\Actions\ResumeTimerAction;
+use App\Modules\TimeTracking\Actions\StartLunchAction;
 use App\Modules\TimeTracking\Actions\StartTimerAction;
 use App\Modules\TimeTracking\Actions\StopTimerAction;
 use App\Modules\TimeTracking\Data\TimerData;
 use App\Modules\TimeTracking\Exceptions\TimeTrackingException;
+use App\Modules\TimeTracking\Http\Requests\IdlePauseRequest;
 use App\Modules\TimeTracking\Http\Requests\StartTimerRequest;
 use App\Modules\TimeTracking\Http\Requests\TimerOperationRequest;
 use App\Modules\TimeTracking\Models\TimeEntry;
@@ -22,9 +26,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * The signed-in person's own timer. JSON for API clients (the desktop timer
- * later), a redirect with a message for the web page; the same actions
- * underneath. A person always acts on their own timer, never on someone
+ * The signed-in person's own timer. JSON for API clients (SprintSync
+ * Desktop, signed in with its device token), a redirect with a message for
+ * the web page; the same actions underneath. A person always acts on their own timer, never on someone
  * else's.
  */
 final class TimerController
@@ -61,19 +65,35 @@ final class TimerController
 
     public function pause(TimerOperationRequest $request, Workspace $workspace, PauseTimerAction $action): JsonResponse|RedirectResponse
     {
-        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key')), 'Timer paused.');
+        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->validated('session'), $request->occurredAt()), 'Timer paused.');
     }
 
     public function resume(TimerOperationRequest $request, Workspace $workspace, ResumeTimerAction $action): JsonResponse|RedirectResponse
     {
-        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key')), 'Timer resumed.');
+        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->validated('session'), $request->occurredAt()), 'Timer resumed.');
     }
 
     public function stop(TimerOperationRequest $request, Workspace $workspace, StopTimerAction $action): JsonResponse|RedirectResponse
     {
-        $session = $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->user(), $request->validated('session'));
+        $session = $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->user(), $request->validated('session'), $request->occurredAt());
 
         return $this->respond($request, $session, 'Timer stopped. Your time is saved.');
+    }
+
+    public function lunchStart(TimerOperationRequest $request, Workspace $workspace, StartLunchAction $action): JsonResponse|RedirectResponse
+    {
+        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->validated('session'), $request->occurredAt()), 'Lunch started. Enjoy your break.');
+    }
+
+    public function lunchEnd(TimerOperationRequest $request, Workspace $workspace, EndLunchAction $action): JsonResponse|RedirectResponse
+    {
+        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key'), $request->validated('session'), $request->occurredAt()), 'Lunch ended. The timer is running again.');
+    }
+
+    /** SprintSync Desktop only: the automatic pause after inactivity. */
+    public function idlePause(IdlePauseRequest $request, Workspace $workspace, IdlePauseTimerAction $action): JsonResponse|RedirectResponse
+    {
+        return $this->respond($request, $action->handle($this->me($request, $workspace), $request->key('operation_key'), (string) $request->validated('session'), $request->idleSince(), $request->detectedAt()), 'Timer paused after inactivity.');
     }
 
     private function me(Request $request, Workspace $workspace): Person

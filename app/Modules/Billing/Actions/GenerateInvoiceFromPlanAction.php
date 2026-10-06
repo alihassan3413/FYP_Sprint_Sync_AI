@@ -16,6 +16,7 @@ use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Support\InvoiceRecalculator;
 use App\Modules\Billing\Support\SenderSnapshot;
+use App\Modules\Billing\Support\TrackedHours;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -31,13 +32,19 @@ use LogicException;
  * amount), adjustments, who it is billed to, who it is from (the workspace's
  * invoicing details, including its logo) and the schedule dates. From here
  * on it never reads the plan, the client or the team to describe itself.
- * Fixed invoices start Ready to review; hourly ones start Needs hours.
+ * Fixed invoices start Ready to review. Hourly invoices whose recurring
+ * invoice bills projects take each person's billable tracked time for the
+ * period (TrackedHours): it is snapshotted as "recorded" and pre-filled as the
+ * hours to bill. Anyone with no recorded time stays blank (zero recorded is
+ * not taken to mean "nothing to bill"), so the invoice starts Needs hours
+ * until every line has hours; with all lines filled it starts Ready to review.
  */
 final class GenerateInvoiceFromPlanAction
 {
     public function __construct(
         private readonly RecordAuditLogAction $auditLogger,
         private readonly InvoiceRecalculator $recalculator,
+        private readonly TrackedHours $trackedHours,
     ) {}
 
     public function handle(BillingPlan $plan, BillingCycle $cycle, ?User $actor): Invoice
@@ -84,6 +91,25 @@ final class GenerateInvoiceFromPlanAction
         }
     }
 
+    private function prefillTrackedHours(Invoice $invoice): void
+    {
+        foreach ($invoice->lines()->get() as $line) {
+            if ($line->person_id === null) {
+                continue;
+            }
+
+            $seconds = $this->trackedHours->secondsFor($invoice, $line->person_id);
+            $line->forceFill([
+                'tracked_seconds' => $seconds,
+                'tracked_quantity_centi' => TrackedHours::centi($seconds),
+                'quantity_centi' => $seconds > 0 ? TrackedHours::centi($seconds) : null,
+            ])->save();
+        }
+
+        $invoice->tracked_at = now();
+        $invoice->unsetRelation('lines');
+    }
+
     private function create(BillingPlan $plan, BillingCycle $cycle, ?User $actor): Invoice
     {
         $client = $plan->client;
@@ -113,6 +139,7 @@ final class GenerateInvoiceFromPlanAction
                 'tax_id' => $client->tax_id,
             ],
             'bill_from' => SenderSnapshot::from($plan->workspace->invoicingProfile),
+            'time_project_ids' => $hourly && $plan->projects()->exists() ? $plan->projects()->pluck('projects.id')->all() : null,
         ])->save();
 
         $invoice->lines()->createMany($plan->lines->map(fn ($line) => [
@@ -132,7 +159,16 @@ final class GenerateInvoiceFromPlanAction
             'value' => $adjustment->value,
         ])->all());
 
-        $this->recalculator->recalculate($invoice);
+        if ($hourly && TrackedHours::applies($invoice)) {
+            $this->prefillTrackedHours($invoice);
+        }
+
+        $complete = $this->recalculator->recalculate($invoice);
+
+        if ($hourly && $complete) {
+            $invoice->status = InvoiceStatus::ReadyToReview;
+        }
+
         $invoice->save();
 
         $month = $cycle->periodStart->format('F Y');

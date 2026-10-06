@@ -14,6 +14,7 @@ declare global {
   const PAYMENT_STATUS_STYLES: typeof import('../lib/billing').PAYMENT_STATUS_STYLES
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
   const REMINDER_OPTIONS: typeof import('../lib/billing').REMINDER_OPTIONS
+  const archName: typeof import('../lib/desktop').archName
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
   const basisPointsToInput: typeof import('../lib/billing').basisPointsToInput
   const calculateTotals: typeof import('../lib/billing').calculateTotals
@@ -28,12 +29,13 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const deliveryNote: typeof import('../lib/billing').deliveryNote
+  const detectPlatform: typeof import('../lib/desktop').detectPlatform
   const detectTimezone: typeof import('../lib/timezones').detectTimezone
   const effectScope: typeof import('vue').effectScope
   const extensionOf: typeof import('../lib/attachments').extensionOf
   const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
   const formatBusinessDate: typeof import('../lib/time').formatBusinessDate
-  const formatBytes: typeof import('../lib/attachments').formatBytes
+  const formatBytes: typeof import('../lib/desktop').formatBytes
   const formatClock: typeof import('../lib/time').formatClock
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
@@ -97,6 +99,7 @@ declare global {
   const parseError: typeof import('../lib/errors/handleError').parseError
   const parseScaled: typeof import('../lib/billing').parseScaled
   const periodLabel: typeof import('../lib/billing').periodLabel
+  const platformChoices: typeof import('../lib/desktop').platformChoices
   const provide: typeof import('vue').provide
   const rankFindings: typeof import('../lib/health').rankFindings
   const reactive: typeof import('vue').reactive
@@ -217,6 +220,9 @@ declare global {
   export type { SearchableCommand } from '../lib/command-search'
   import('../lib/command-search')
   // @ts-ignore
+  export type { DesktopDownload, PlatformChoice } from '../lib/desktop'
+  import('../lib/desktop')
+  // @ts-ignore
   export type { HealthVerdict, FindingSeverity, HealthFinding, WorkloadEntry, ProjectHealth } from '../lib/health'
   import('../lib/health')
   // @ts-ignore
@@ -255,6 +261,7 @@ declare module 'vue' {
     readonly PAYMENT_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['PAYMENT_STATUS_STYLES']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
     readonly REMINDER_OPTIONS: UnwrapRef<typeof import('../lib/billing')['REMINDER_OPTIONS']>
+    readonly archName: UnwrapRef<typeof import('../lib/desktop')['archName']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
     readonly basisPointsToInput: UnwrapRef<typeof import('../lib/billing')['basisPointsToInput']>
     readonly calculateTotals: UnwrapRef<typeof import('../lib/billing')['calculateTotals']>
@@ -269,12 +276,13 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly deliveryNote: UnwrapRef<typeof import('../lib/billing')['deliveryNote']>
+    readonly detectPlatform: UnwrapRef<typeof import('../lib/desktop')['detectPlatform']>
     readonly detectTimezone: UnwrapRef<typeof import('../lib/timezones')['detectTimezone']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extensionOf: UnwrapRef<typeof import('../lib/attachments')['extensionOf']>
     readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
     readonly formatBusinessDate: UnwrapRef<typeof import('../lib/time')['formatBusinessDate']>
-    readonly formatBytes: UnwrapRef<typeof import('../lib/attachments')['formatBytes']>
+    readonly formatBytes: UnwrapRef<typeof import('../lib/desktop')['formatBytes']>
     readonly formatClock: UnwrapRef<typeof import('../lib/time')['formatClock']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
@@ -338,6 +346,7 @@ declare module 'vue' {
     readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
     readonly parseScaled: UnwrapRef<typeof import('../lib/billing')['parseScaled']>
     readonly periodLabel: UnwrapRef<typeof import('../lib/billing')['periodLabel']>
+    readonly platformChoices: UnwrapRef<typeof import('../lib/desktop')['platformChoices']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly rankFindings: UnwrapRef<typeof import('../lib/health')['rankFindings']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>

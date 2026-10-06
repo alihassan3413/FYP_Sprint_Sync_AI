@@ -6,9 +6,11 @@ namespace App\Modules\TimeTracking\Actions;
 
 use App\Modules\People\Models\Person;
 use App\Modules\TimeTracking\Data\TimerState;
-use App\Modules\TimeTracking\Exceptions\TimeTrackingException;
 use App\Modules\TimeTracking\Models\TimeSession;
+use App\Modules\TimeTracking\Support\ActiveTimer;
 use App\Modules\TimeTracking\Support\TimerOperationLog;
+use App\Modules\TimeTracking\Support\TimerStretches;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -17,24 +19,26 @@ use Illuminate\Support\Facades\DB;
  * accumulated_seconds by a conditional update from "running", so two pauses
  * (or a retry) count it once. Pausing a paused timer changes nothing.
  * Not audited: pause and resume would only add noise; the duration is kept.
+ * A change synced late from the desktop app counts from when it happened
+ * (occurred_at, see ActiveTimer).
  */
 final class PauseTimerAction
 {
     public function __construct(private readonly TimerOperationLog $operations) {}
 
-    public function handle(Person $person, string $operationKey): TimeSession
+    public function handle(Person $person, string $operationKey, ?string $sessionPublicId = null, ?CarbonImmutable $occurredAt = null): TimeSession
     {
         if ($replayed = $this->operations->replay($person, $operationKey, 'pause')) {
             return $replayed;
         }
 
         try {
-            return DB::transaction(function () use ($person, $operationKey) {
-                $session = TimeSession::query()->where('active_person_id', $person->id)->first() ?? throw TimeTrackingException::noActiveTimer();
-                $now = now();
+            return DB::transaction(function () use ($person, $operationKey, $sessionPublicId, $occurredAt) {
+                $session = ActiveTimer::for($person, $sessionPublicId);
+                $now = ActiveTimer::moment($session, $occurredAt);
                 $stretch = $session->runningSeconds($now);
 
-                TimeSession::query()
+                $paused = TimeSession::query()
                     ->whereKey($session->getKey())
                     ->where('state', TimerState::Running->value)
                     ->update([
@@ -42,8 +46,14 @@ final class PauseTimerAction
                         'accumulated_seconds' => $session->accumulated_seconds + $stretch,
                         'longest_segment_seconds' => max($session->longest_segment_seconds, $stretch),
                         'segment_started_at' => null,
-                        'updated_at' => $now,
+                        'pause_reason' => null,
+                        'state_changed_at' => $now,
+                        'updated_at' => now(),
                     ]);
+
+                if ($paused === 1) {
+                    TimerStretches::record($session, $session->segment_started_at, $now);
+                }
 
                 $this->operations->record($person, $operationKey, 'pause', $session);
 

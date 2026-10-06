@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarPlus, Clock, History, Loader2, Pause, Play, Plus, Square, Timer, UserRound } from 'lucide-vue-next';
+import { CalendarPlus, Clock, Coffee, History, Loader2, Pause, Play, Plus, Settings2, Square, Timer, UserRound } from 'lucide-vue-next';
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -25,7 +25,54 @@ const props = defineProps<{
     entries: TimeEntryData[];
     today: string;
     timezone: string;
+    /** The workspace's time rules that apply to everyone (shown so nothing is hidden). */
+    policy: {
+        idle_enabled: boolean;
+        idle_seconds: number | null;
+        weekly_target_seconds: number | null;
+        lunch_enabled: boolean;
+        lunch_allowance_seconds: number | null;
+        overtime_mode: string;
+        integrity_enabled: boolean;
+    };
+    breakdown: { today: Breakdown; week: Breakdown } | null;
+    idlePeriods: {
+        public_id: string;
+        started_at: string;
+        ended_at: string | null;
+        seconds: number;
+        threshold_seconds: number;
+        decision: 'pending' | 'kept' | 'discarded';
+        reason: string | null;
+    }[];
+    /** Owner: things to look at. */
+    reviews: {
+        public_id: string;
+        kind: 'lunch_excess' | 'idle_kept' | 'activity';
+        person: string;
+        summary: string;
+        work_date: string;
+        seconds: number | null;
+        decisions: string[];
+    }[];
+    /** Owner: this week for everyone. */
+    team: ({ public_id: string; name: string } & Breakdown)[];
 }>();
+
+type Breakdown = {
+    worked: number;
+    billable: number;
+    lunch_paid: number;
+    lunch_excess_open: number;
+    holiday: number;
+    paid_leave: number;
+    unpaid_leave_days: number;
+    compensated: number;
+    outside_schedule: number;
+    worked_on_holiday: number;
+    target: number | null;
+    over_target: number;
+};
 
 const { workspaceRoute } = useCurrentWorkspace();
 
@@ -63,7 +110,60 @@ function start() {
 
 const busy = ref(false);
 
-function timerAction(action: 'pause' | 'resume' | 'stop') {
+const lunchElapsed = computed(() =>
+    props.timer?.lunch_started_at ? Math.max(0, (now.value + offset.value - new Date(props.timer.lunch_started_at).getTime()) / 1000) : 0,
+);
+const lunchOver = computed(() => !!props.policy.lunch_allowance_seconds && lunchElapsed.value > props.policy.lunch_allowance_seconds);
+
+/* ---- Idle periods: keep as work (with a reason) or drop ---- */
+
+const keeping = ref<string | null>(null);
+const keepForm = useForm({ reason: '' });
+
+function keepIdle(publicId: string) {
+    keepForm.post(workspaceRoute('workspace.time.idle.keep', { idlePeriod: publicId }), {
+        preserveScroll: true,
+        onSuccess: () => {
+            keeping.value = null;
+            keepForm.reset();
+        },
+    });
+}
+
+function dropIdle(publicId: string) {
+    router.post(workspaceRoute('workspace.time.idle.drop', { idlePeriod: publicId }), {}, { preserveScroll: true });
+}
+
+/* ---- Owner reviews ---- */
+
+const DECISION_LABELS: Record<string, string> = {
+    counted: 'Count as paid + billable',
+    not_counted: "Don't count",
+    accepted: 'Accept',
+    rejected: 'Reject',
+    no_concern: 'No concern',
+    follow_up: 'Follow up',
+};
+
+function resolveReview(publicId: string, decision: string) {
+    router.post(workspaceRoute('workspace.time.reviews.resolve', { review: publicId }), { decision }, { preserveScroll: true });
+}
+
+/* ---- Plain-language policy, shown to everyone it applies to ---- */
+
+const policyNotice = computed(() => {
+    const parts: string[] = [];
+
+    if (props.policy.idle_enabled && props.policy.idle_seconds)
+        parts.push(`SprintSync Desktop pauses timers after ${Math.round(props.policy.idle_seconds / 60)} minutes of inactivity`);
+    if (props.policy.lunch_enabled && props.policy.lunch_allowance_seconds)
+        parts.push(`lunch is paid up to ${formatDuration(props.policy.lunch_allowance_seconds)} a day`);
+    if (props.policy.integrity_enabled) parts.push('activity integrity checks are on (unusually repetitive activity is flagged for review)');
+
+    return parts.length ? `This workspace: ${parts.join('; ')}. SprintSync never records screenshots, keystrokes, websites or applications.` : null;
+});
+
+function timerAction(action: 'pause' | 'resume' | 'stop' | 'lunch-start' | 'lunch-end') {
     if (busy.value) return;
 
     busy.value = true;
@@ -151,8 +251,10 @@ function saveVoid() {
 function entryActions(entry: TimeEntryData): DropdownEntry[] {
     const actions: DropdownEntry[] = [];
 
-    if (!entry.voided && entry.source !== 'adjustment') actions.push({ label: 'Correct hours', icon: Clock, onSelect: () => openCorrect(entry) });
-    if (!entry.voided && entry.source !== 'tracked') actions.push({ label: 'Void', icon: History, onSelect: () => (voiding.value = entry) });
+    if (!entry.voided && (entry.source === 'tracked' || entry.source === 'manual'))
+        actions.push({ label: 'Correct hours', icon: Clock, onSelect: () => openCorrect(entry) });
+    if (!entry.voided && (entry.source === 'manual' || entry.source === 'adjustment'))
+        actions.push({ label: 'Void', icon: History, onSelect: () => (voiding.value = entry) });
 
     return actions;
 }
@@ -168,6 +270,9 @@ function when(entry: TimeEntryData): string {
 
 function origin(entry: TimeEntryData): string {
     if (entry.source === 'tracked') return 'Tracked';
+    if (entry.source === 'lunch' && entry.adjusts_entry_public_id) return 'Lunch past the allowance, counted by the owner';
+    if (entry.source === 'lunch') return 'Paid lunch · counts as paid and billable up to the allowance';
+    if (entry.source === 'idle_kept') return 'Idle time kept as work';
     if (entry.adjusts_entry_public_id) return `Correction${entry.created_by ? ` by ${entry.created_by}` : ''}`;
     if (entry.source === 'adjustment') return `Previous hours${entry.created_by ? ` added by ${entry.created_by}` : ''}`;
 
@@ -204,13 +309,97 @@ function origin(entry: TimeEntryData): string {
                         </option>
                     </select>
                 </label>
-                <Button variant="outline" size="sm" class="gap-1.5" as-child>
-                    <Link :href="workspaceRoute('workspace.time.previous-hours.create')" data-testid="previous-hours-link">
-                        <CalendarPlus class="size-4" />
-                        Add previous hours
-                    </Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" class="gap-1.5" as-child>
+                        <Link :href="workspaceRoute('workspace.time.settings.edit')" data-testid="time-settings-link">
+                            <Settings2 class="size-4" />
+                            Time settings
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" class="gap-1.5" as-child>
+                        <Link :href="workspaceRoute('workspace.time.previous-hours.create')" data-testid="previous-hours-link">
+                            <CalendarPlus class="size-4" />
+                            Add previous hours
+                        </Link>
+                    </Button>
+                </div>
             </div>
+
+            <!-- Owner: what needs a look -->
+            <section v-if="canManageTeam && reviews.length" class="bg-card rounded-2xl border" data-testid="reviews">
+                <h2 class="text-muted-foreground border-b px-4 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase">To review</h2>
+                <ul class="divide-y">
+                    <li v-for="review in reviews" :key="review.public_id" class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium">{{ review.person }} · {{ formatPeriod(review.work_date, review.work_date) }}</p>
+                            <p class="text-muted-foreground text-sm">{{ review.summary }}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button
+                                v-for="decision in review.decisions"
+                                :key="decision"
+                                variant="outline"
+                                size="sm"
+                                :data-testid="`review-${decision}`"
+                                @click="resolveReview(review.public_id, decision)"
+                            >
+                                {{ DECISION_LABELS[decision] ?? decision }}
+                            </Button>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- Owner: the team this week -->
+            <section v-if="canManageTeam && team.length" class="bg-card overflow-x-auto rounded-2xl border" data-testid="team">
+                <h2 class="text-muted-foreground border-b px-4 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase">Team this week</h2>
+                <table class="w-full min-w-[640px] text-sm">
+                    <thead class="text-muted-foreground text-xs">
+                        <tr class="border-b">
+                            <th class="px-4 py-2 text-left font-medium">Person</th>
+                            <th class="px-2 py-2 text-right font-medium">Worked</th>
+                            <th class="px-2 py-2 text-right font-medium">Paid lunch</th>
+                            <th class="px-2 py-2 text-right font-medium">Leave</th>
+                            <th class="px-2 py-2 text-right font-medium">Holiday</th>
+                            <th class="px-2 py-2 text-right font-medium">Paid time</th>
+                            <th class="px-4 py-2 text-right font-medium">Over target</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y tabular-nums">
+                        <tr v-for="row in team" :key="row.public_id">
+                            <td class="px-4 py-2">
+                                <Link :href="workspaceRoute('workspace.time.index', { person: row.public_id })" class="font-medium hover:underline">{{
+                                    row.name
+                                }}</Link>
+                            </td>
+                            <td class="px-2 py-2 text-right">{{ formatDuration(row.worked) }}</td>
+                            <td class="px-2 py-2 text-right">{{ formatDuration(row.lunch_paid) }}</td>
+                            <td class="px-2 py-2 text-right">{{ formatDuration(row.paid_leave) }}</td>
+                            <td class="px-2 py-2 text-right">{{ formatDuration(row.holiday) }}</td>
+                            <td class="px-2 py-2 text-right font-medium">{{ formatDuration(row.compensated) }}</td>
+                            <td
+                                class="px-4 py-2 text-right"
+                                :class="row.over_target > 0 && policy.overtime_mode === 'review' && 'font-semibold text-amber-700'"
+                            >
+                                {{ row.target === null ? '—' : formatDuration(row.over_target) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <p v-if="policyNotice" class="bg-muted/60 text-muted-foreground rounded-xl px-4 py-3 text-xs" data-testid="policy-notice">
+                {{ policyNotice }}
+                <template v-if="policy.idle_enabled">
+                    Full idle detection requires SprintSync Desktop; the web timer can't tell whether your computer is in use.
+                    <a
+                        :href="`${route('home')}#desktop`"
+                        class="text-foreground font-medium whitespace-nowrap underline underline-offset-2"
+                        data-testid="get-desktop"
+                        >Get SprintSync Desktop</a
+                    ></template
+                >
+            </p>
 
             <div v-if="!viewing" class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm" data-testid="no-profile">
                 Your account isn't linked to a Team profile yet, so there's no time to show for you.
@@ -222,55 +411,99 @@ function origin(entry: TimeEntryData): string {
                 <!-- Timer -->
                 <section v-if="isSelf" class="bg-card rounded-3xl border p-5 sm:p-6" data-testid="timer">
                     <template v-if="timer">
-                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="min-w-0">
-                                <p class="flex items-center gap-2 text-sm">
-                                    <span
-                                        class="size-2 rounded-full"
-                                        :class="timer.state === 'running' ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'"
-                                    />
-                                    <span class="font-medium" data-testid="timer-state">{{ timer.state === 'running' ? 'Running' : 'Paused' }}</span>
-                                </p>
-                                <p class="mt-1 truncate font-semibold">
-                                    {{ timer.project.name
-                                    }}<span v-if="timer.task" class="text-muted-foreground font-normal"> · {{ timer.task.title }}</span>
-                                </p>
-                                <p class="text-muted-foreground text-xs">
-                                    Started {{ formatTimeOfDay(timer.started_at, timezone)
-                                    }}<template v-if="!timer.billable"> · Non-billable</template>
-                                </p>
+                        <!-- Lunch: a paid break, its own state -->
+                        <div v-if="timer.state === 'lunch'" class="text-center" data-testid="lunch">
+                            <p class="text-sm font-semibold">Lunch break</p>
+                            <p class="text-muted-foreground text-xs">
+                                Paid break<template v-if="policy.lunch_allowance_seconds">
+                                    · Allowed {{ formatDuration(policy.lunch_allowance_seconds) }}</template
+                                >
+                            </p>
+                            <p
+                                class="mt-3 text-4xl font-semibold tracking-tight tabular-nums"
+                                :class="lunchOver && 'text-amber-600'"
+                                data-testid="lunch-clock"
+                            >
+                                {{ formatClock(lunchElapsed) }}
+                            </p>
+                            <p v-if="lunchOver" class="mt-1 text-xs text-amber-700">
+                                Past the paid lunch allowance. The extra only counts if the owner decides it should.
+                            </p>
+                            <Button class="mt-5 gap-1.5" :disabled="busy" data-testid="end-lunch" @click="timerAction('lunch-end')">End lunch</Button>
+                        </div>
+
+                        <template v-else>
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="flex items-center gap-2 text-sm">
+                                        <span
+                                            class="size-2 rounded-full"
+                                            :class="timer.state === 'running' ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'"
+                                        />
+                                        <span class="font-medium" data-testid="timer-state">{{
+                                            timer.state === 'running' ? 'Running' : 'Paused'
+                                        }}</span>
+                                    </p>
+                                    <p class="mt-1 truncate font-semibold">
+                                        {{ timer.project.name
+                                        }}<span v-if="timer.task" class="text-muted-foreground font-normal"> · {{ timer.task.title }}</span>
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Started {{ formatTimeOfDay(timer.started_at, timezone)
+                                        }}<template v-if="!timer.billable"> · Non-billable</template>
+                                    </p>
+                                </div>
+                                <p class="text-4xl font-semibold tracking-tight tabular-nums" data-testid="timer-clock">{{ formatClock(elapsed) }}</p>
                             </div>
-                            <p class="text-4xl font-semibold tracking-tight tabular-nums" data-testid="timer-clock">{{ formatClock(elapsed) }}</p>
-                        </div>
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            <Button
-                                v-if="timer.state === 'running'"
-                                variant="outline"
-                                class="gap-1.5"
-                                :disabled="busy"
-                                data-testid="pause-timer"
-                                @click="timerAction('pause')"
+                            <p
+                                v-if="timer.state === 'paused' && timer.pause_reason === 'idle'"
+                                class="mt-4 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
+                                data-testid="idle-paused"
                             >
-                                <Pause class="size-4" />
-                                Pause
-                            </Button>
-                            <Button
-                                v-else
-                                variant="outline"
-                                class="gap-1.5"
-                                :disabled="busy"
-                                data-testid="resume-timer"
-                                @click="timerAction('resume')"
-                            >
-                                <Play class="size-4" />
-                                Resume
-                            </Button>
-                            <Button class="gap-1.5" :disabled="busy" data-testid="stop-timer" @click="timerAction('stop')">
-                                <Loader2 v-if="busy" class="size-4 animate-spin" />
-                                <Square v-else class="size-4" />
-                                Stop
-                            </Button>
-                        </div>
+                                Timer paused after {{ policy.idle_seconds ? Math.round(policy.idle_seconds / 60) : '' }} minutes of inactivity.
+                                Resume, or review the idle time below.
+                            </p>
+                            <div class="mt-5 flex flex-wrap gap-2">
+                                <Button
+                                    v-if="timer.state === 'running' && policy.lunch_enabled"
+                                    variant="outline"
+                                    class="gap-1.5"
+                                    :disabled="busy"
+                                    data-testid="start-lunch"
+                                    @click="timerAction('lunch-start')"
+                                >
+                                    <Coffee class="size-4" />
+                                    Lunch
+                                </Button>
+                                <Button
+                                    v-if="timer.state === 'running'"
+                                    variant="outline"
+                                    class="gap-1.5"
+                                    :disabled="busy"
+                                    data-testid="pause-timer"
+                                    @click="timerAction('pause')"
+                                >
+                                    <Pause class="size-4" />
+                                    Pause
+                                </Button>
+                                <Button
+                                    v-else
+                                    variant="outline"
+                                    class="gap-1.5"
+                                    :disabled="busy"
+                                    data-testid="resume-timer"
+                                    @click="timerAction('resume')"
+                                >
+                                    <Play class="size-4" />
+                                    Resume
+                                </Button>
+                                <Button class="gap-1.5" :disabled="busy" data-testid="stop-timer" @click="timerAction('stop')">
+                                    <Loader2 v-if="busy" class="size-4 animate-spin" />
+                                    <Square v-else class="size-4" />
+                                    Stop
+                                </Button>
+                            </div>
+                        </template>
                     </template>
 
                     <form v-else class="grid gap-4 sm:grid-cols-2" @submit.prevent="start">
@@ -344,6 +577,127 @@ function origin(entry: TimeEntryData): string {
                         <p class="mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-2xl">{{ formatDuration(tile.value) }}</p>
                     </div>
                 </div>
+
+                <!-- Worked vs paid, never one blended number -->
+                <section v-if="breakdown" class="grid gap-3 sm:grid-cols-2" data-testid="breakdown">
+                    <div class="bg-card rounded-2xl border p-4 text-sm">
+                        <p class="mb-2 font-semibold">Today</p>
+                        <dl class="space-y-1 tabular-nums">
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Worked</dt>
+                                <dd>{{ formatDuration(breakdown.today.worked) }}</dd>
+                            </div>
+                            <div v-if="breakdown.today.lunch_paid" class="flex justify-between">
+                                <dt class="text-muted-foreground">Paid lunch</dt>
+                                <dd>{{ formatDuration(breakdown.today.lunch_paid) }}</dd>
+                            </div>
+                            <div v-if="breakdown.today.holiday" class="flex justify-between">
+                                <dt class="text-muted-foreground">Holiday</dt>
+                                <dd>{{ formatDuration(breakdown.today.holiday) }}</dd>
+                            </div>
+                            <div v-if="breakdown.today.paid_leave" class="flex justify-between">
+                                <dt class="text-muted-foreground">Paid leave</dt>
+                                <dd>{{ formatDuration(breakdown.today.paid_leave) }}</dd>
+                            </div>
+                            <div class="flex justify-between border-t pt-1 font-medium">
+                                <dt>Paid time</dt>
+                                <dd>{{ formatDuration(breakdown.today.compensated) }}</dd>
+                            </div>
+                            <div class="flex justify-between" data-testid="billable-today">
+                                <dt class="text-muted-foreground">Billable</dt>
+                                <dd>{{ formatDuration(breakdown.today.billable) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                    <div class="bg-card rounded-2xl border p-4 text-sm">
+                        <p class="mb-2 font-semibold">This week</p>
+                        <dl class="space-y-1 tabular-nums">
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Worked</dt>
+                                <dd>{{ formatDuration(breakdown.week.worked) }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Paid lunch</dt>
+                                <dd>{{ formatDuration(breakdown.week.lunch_paid) }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Paid leave</dt>
+                                <dd>{{ formatDuration(breakdown.week.paid_leave) }}</dd>
+                            </div>
+                            <div v-if="breakdown.week.holiday" class="flex justify-between">
+                                <dt class="text-muted-foreground">Holiday</dt>
+                                <dd>{{ formatDuration(breakdown.week.holiday) }}</dd>
+                            </div>
+                            <div class="flex justify-between border-t pt-1 font-medium">
+                                <dt>Paid time</dt>
+                                <dd>{{ formatDuration(breakdown.week.compensated) }}</dd>
+                            </div>
+                            <div class="flex justify-between" data-testid="billable-week">
+                                <dt class="text-muted-foreground">Billable</dt>
+                                <dd>{{ formatDuration(breakdown.week.billable) }}</dd>
+                            </div>
+                            <div v-if="breakdown.week.target !== null" class="flex justify-between" data-testid="over-target">
+                                <dt class="text-muted-foreground">Over weekly target ({{ formatDuration(breakdown.week.target) }})</dt>
+                                <dd>{{ formatDuration(breakdown.week.over_target) }}</dd>
+                            </div>
+                            <div v-if="breakdown.week.outside_schedule" class="flex justify-between">
+                                <dt class="text-muted-foreground">Outside scheduled hours</dt>
+                                <dd>{{ formatDuration(breakdown.week.outside_schedule) }}</dd>
+                            </div>
+                            <div v-if="breakdown.week.lunch_excess_open" class="flex justify-between text-amber-700">
+                                <dt>Lunch past the paid time (waiting for review)</dt>
+                                <dd>{{ formatDuration(breakdown.week.lunch_excess_open) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </section>
+
+                <!-- Idle time: keep as work (with a reason) or drop -->
+                <section
+                    v-if="idlePeriods.some((period) => period.decision === 'pending')"
+                    class="bg-card rounded-2xl border"
+                    data-testid="idle-periods"
+                >
+                    <h2 class="text-muted-foreground border-b px-4 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase">Idle time</h2>
+                    <ul class="divide-y">
+                        <li
+                            v-for="period in idlePeriods.filter((item) => item.decision === 'pending')"
+                            :key="period.public_id"
+                            class="grid gap-2 px-4 py-3 text-sm"
+                        >
+                            <p>
+                                <span class="font-medium"
+                                    >{{ formatTimeOfDay(period.started_at, timezone)
+                                    }}{{ period.ended_at ? ` – ${formatTimeOfDay(period.ended_at, timezone)}` : ' (still paused)' }}</span
+                                >
+                                <span class="text-muted-foreground"
+                                    ><template v-if="period.ended_at"> · {{ formatDuration(period.seconds) }}</template> without activity. Not counted
+                                    as work unless you keep it.</span
+                                >
+                            </p>
+                            <form
+                                v-if="isSelf && keeping === period.public_id"
+                                class="flex flex-col gap-2 sm:flex-row"
+                                @submit.prevent="keepIdle(period.public_id)"
+                            >
+                                <input
+                                    v-model="keepForm.reason"
+                                    class="h-9 flex-1 rounded-md border px-2"
+                                    placeholder="What was it? e.g. Client phone call"
+                                    data-testid="idle-reason"
+                                />
+                                <Button type="submit" size="sm" :disabled="keepForm.processing">Keep as work</Button>
+                            </form>
+                            <InputError v-if="keeping === period.public_id" :message="keepForm.errors.reason" />
+                            <div v-if="isSelf && keeping !== period.public_id" class="flex gap-2">
+                                <Button size="sm" variant="outline" data-testid="keep-idle" @click="keeping = period.public_id">Keep as work…</Button>
+                                <Button size="sm" variant="ghost" :disabled="!period.ended_at" @click="dropIdle(period.public_id)"
+                                    >Don't count it</Button
+                                >
+                            </div>
+                        </li>
+                    </ul>
+                </section>
 
                 <!-- Entries -->
                 <section>

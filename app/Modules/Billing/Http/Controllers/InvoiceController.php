@@ -7,6 +7,7 @@ namespace App\Modules\Billing\Http\Controllers;
 use App\Modules\Billing\Actions\ApproveInvoiceAction;
 use App\Modules\Billing\Actions\CancelInvoiceSendingAction;
 use App\Modules\Billing\Actions\RefreshInvoiceSenderAction;
+use App\Modules\Billing\Actions\RefreshInvoiceTrackedHoursAction;
 use App\Modules\Billing\Actions\UpdateInvoiceLinesAction;
 use App\Modules\Billing\Data\InvoiceData;
 use App\Modules\Billing\Data\InvoiceSummaryData;
@@ -19,6 +20,7 @@ use App\Modules\Billing\Support\InvoicePdfRenderer;
 use App\Modules\Billing\Support\OfficialInvoicePdf;
 use App\Modules\Billing\Support\PaymentTotals;
 use App\Modules\Billing\Support\SenderSnapshot;
+use App\Modules\Billing\Support\TrackedHours;
 use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -55,7 +57,7 @@ final class InvoiceController
         ]);
     }
 
-    public function show(Request $request, Workspace $workspace, Invoice $invoice): Response
+    public function show(Request $request, Workspace $workspace, Invoice $invoice, TrackedHours $trackedHours): Response
     {
         abort_unless($request->user()->can('view', $invoice), 403);
 
@@ -72,13 +74,54 @@ final class InvoiceController
             'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
             'hasCompleteInvoicingDetails' => SenderSnapshot::isComplete(SenderSnapshot::from($workspace->invoicingProfile)),
             'canSend' => $request->user()->can('send', $invoice),
+            'trackedUpdate' => $this->trackedUpdate($invoice, $trackedHours),
             'mailConnected' => $workspace->mailSettings()->exists(),
         ]);
     }
 
+    public function refreshHours(Request $request, Workspace $workspace, Invoice $invoice, RefreshInvoiceTrackedHoursAction $action): RedirectResponse
+    {
+        abort_unless($request->user()->can('update', $invoice), 403);
+
+        $action->handle($invoice, $request->user());
+
+        return back()->with('success', 'Recorded hours refreshed. Hours you changed yourself were kept.');
+    }
+
+    /**
+     * Has time been recorded (or corrected) for this period since the draft
+     * read it? Only drafts: approved and issued invoices never change.
+     *
+     * @return array{delta_seconds: int, lines: int}|null
+     */
+    private function trackedUpdate(Invoice $invoice, TrackedHours $trackedHours): ?array
+    {
+        if (! $invoice->status->isEditable() || ! TrackedHours::applies($invoice)) {
+            return null;
+        }
+
+        $delta = 0;
+        $lines = 0;
+
+        foreach ($invoice->lines as $line) {
+            if ($line->person_id === null) {
+                continue;
+            }
+
+            $difference = $trackedHours->secondsFor($invoice, $line->person_id) - (int) $line->tracked_seconds;
+
+            if ($difference !== 0) {
+                $delta += $difference;
+                $lines++;
+            }
+        }
+
+        return $lines === 0 ? null : ['delta_seconds' => $delta, 'lines' => $lines];
+    }
+
     public function updateLines(UpdateInvoiceLinesRequest $request, Workspace $workspace, Invoice $invoice, UpdateInvoiceLinesAction $action): RedirectResponse
     {
-        $action->handle($invoice, $request->values(), $request->user());
+        $action->handle($invoice, $request->values(), $request->user(), $request->reasons());
 
         return back();
     }

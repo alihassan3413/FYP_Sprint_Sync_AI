@@ -18,7 +18,7 @@ final class TimeEntryData extends Data
 {
     public function __construct(
         public string $public_id,
-        #[LiteralTypeScriptType("'tracked' | 'manual' | 'adjustment'")]
+        #[LiteralTypeScriptType("'tracked' | 'manual' | 'adjustment' | 'idle_kept' | 'lunch'")]
         public string $source,
         public string $source_label,
         public string $person_name,

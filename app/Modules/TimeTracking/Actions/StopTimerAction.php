@@ -12,8 +12,14 @@ use App\Modules\TimeTracking\Data\TimeEntrySource;
 use App\Modules\TimeTracking\Data\TimerState;
 use App\Modules\TimeTracking\Exceptions\TimeTrackingException;
 use App\Modules\TimeTracking\Models\TimeEntry;
+use App\Modules\TimeTracking\Models\TimeIdlePeriod;
 use App\Modules\TimeTracking\Models\TimeSession;
+use App\Modules\TimeTracking\Support\ActiveTimer;
+use App\Modules\TimeTracking\Support\LunchBreaks;
+use App\Modules\TimeTracking\Support\Schedules;
 use App\Modules\TimeTracking\Support\TimerOperationLog;
+use App\Modules\TimeTracking\Support\TimerStretches;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +33,14 @@ use Illuminate\Support\Facades\DB;
  * the client names the timer it means ($sessionPublicId), by that timer once
  * it is stopped. Time is never added twice.
  *
+ * A stop synced late from the desktop app ends the time when the person
+ * pressed Stop (occurred_at, see ActiveTimer), not when it arrived.
+ *
+ * Stopping during lunch ends the lunch first (a paid-lunch entry); stopping
+ * during an idle pause closes the idle period. The tracked entry records how
+ * much of the work fell outside the person's expected schedule, judged by the
+ * schedule in force when the timer started.
+ *
  * The entry belongs to the business day the timer started on, in the
  * workspace's timezone, so 18:05 → 02:03 is one session on the 12th.
  */
@@ -35,9 +49,11 @@ final class StopTimerAction
     public function __construct(
         private readonly TimerOperationLog $operations,
         private readonly RecordAuditLogAction $auditLogger,
+        private readonly LunchBreaks $lunches,
+        private readonly Schedules $schedules,
     ) {}
 
-    public function handle(Person $person, string $operationKey, User $actor, ?string $sessionPublicId = null): TimeSession
+    public function handle(Person $person, string $operationKey, User $actor, ?string $sessionPublicId = null, ?CarbonImmutable $occurredAt = null): TimeSession
     {
         if ($replayed = $this->operations->replay($person, $operationKey, 'stop')) {
             return $replayed->load('entry');
@@ -51,34 +67,46 @@ final class StopTimerAction
             }
 
             if ($named === null) {
-                throw TimeTrackingException::noActiveTimer();
+                throw TimeTrackingException::timerChanged();
             }
         }
 
         try {
-            [$session, $entry] = DB::transaction(function () use ($person, $operationKey) {
-                $session = TimeSession::query()->where('active_person_id', $person->id)->first() ?? throw TimeTrackingException::noActiveTimer();
-                $now = now();
+            [$session, $entry] = DB::transaction(function () use ($person, $operationKey, $sessionPublicId, $occurredAt) {
+                $session = ActiveTimer::for($person, $sessionPublicId);
+                $now = ActiveTimer::moment($session, $occurredAt);
                 $stretch = $session->runningSeconds($now);
                 $seconds = $session->accumulated_seconds + $stretch;
                 $longest = max($session->longest_segment_seconds, $stretch);
 
                 $stopped = TimeSession::query()
                     ->whereKey($session->getKey())
-                    ->whereIn('state', [TimerState::Running->value, TimerState::Paused->value])
+                    ->whereIn('state', [TimerState::Running->value, TimerState::Paused->value, TimerState::Lunch->value])
                     ->update([
                         'state' => TimerState::Stopped->value,
                         'active_person_id' => null,
                         'accumulated_seconds' => $seconds,
                         'longest_segment_seconds' => $longest,
                         'segment_started_at' => null,
+                        'lunch_started_at' => null,
+                        'pause_reason' => null,
                         'stopped_at' => $now,
-                        'updated_at' => $now,
+                        'state_changed_at' => $now,
+                        'updated_at' => now(),
                     ]);
 
                 if ($stopped !== 1) {
                     throw TimeTrackingException::noActiveTimer();
                 }
+
+                TimerStretches::record($session, $session->state === TimerState::Running ? $session->segment_started_at : null, $now);
+                $this->lunches->close($session, $now);
+
+                if ($session->pause_reason === 'idle') {
+                    TimeIdlePeriod::query()->where('time_session_id', $session->id)->whereNull('ended_at')->update(['ended_at' => $now, 'updated_at' => now()]);
+                }
+
+                $schedule = $this->schedules->for($session->person, $session->started_at);
 
                 $workDate = $session->started_at->copy()->setTimezone($session->timezone)->toDateString();
                 $entry = TimeEntry::query()->forceCreate([
@@ -94,6 +122,7 @@ final class StopTimerAction
                     'ended_at' => $now,
                     'duration_seconds' => $seconds,
                     'longest_segment_seconds' => $longest,
+                    'outside_schedule_seconds' => $schedule === null ? null : $this->schedules->outsideSeconds($schedule, TimerStretches::for($session)),
                     'period_start' => $workDate,
                     'period_end' => $workDate,
                     'timezone' => $session->timezone,
@@ -117,7 +146,13 @@ final class StopTimerAction
             AuditAction::TIME_TIMER_STOPPED,
             "{$actor->name} stopped {$person->name}'s timer on {$session->project_name} ({$this->hours($entry->duration_seconds)}).",
             $entry,
-            ['person' => $person->name, 'project' => $session->project_name, 'duration_seconds' => $entry->duration_seconds],
+            [
+                'person' => $person->name,
+                'project' => $session->project_name,
+                'duration_seconds' => $entry->duration_seconds,
+                /* Synced from the desktop app after being offline: stopped earlier than it arrived. */
+                'synced_late' => $occurredAt !== null && $entry->ended_at->diffInSeconds(now()) > 60,
+            ],
         );
 
         return $session->setRelation('entry', $entry);

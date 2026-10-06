@@ -7,6 +7,7 @@ namespace App\Modules\Billing\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Billing\Data\PricingMode;
 use App\Modules\Billing\Data\StoreBillingPlanData;
 use App\Modules\Billing\Models\BillingPlan;
 use App\Modules\Billing\Models\Client;
@@ -57,7 +58,10 @@ final class SaveBillingPlanAction
                     array_keys($data->adjustments),
                 ));
 
-                $plan->unsetRelation('lines')->unsetRelation('adjustments');
+                /* Time comes from projects only for hourly plans. */
+                $plan->projects()->sync($data->pricing_mode === PricingMode::Hourly ? $data->project_ids : []);
+
+                $plan->unsetRelation('lines')->unsetRelation('adjustments')->unsetRelation('projects');
 
                 if ($isNew || $before !== $this->fingerprint($plan)) {
                     $this->audit($client, $plan, $actor, $isNew);
@@ -102,7 +106,7 @@ final class SaveBillingPlanAction
      */
     private function fingerprint(BillingPlan $plan): string
     {
-        $plan->load(['lines', 'adjustments']);
+        $plan->load(['lines', 'adjustments', 'projects:id']);
 
         return json_encode([
             $plan->only(['name', 'generation_day', 'send_day', 'due_in_days', 'reminder_days_before']),
@@ -112,6 +116,7 @@ final class SaveBillingPlanAction
             $plan->delivery_mode->value,
             $plan->lines->map->only(['position', 'person_id', 'description', 'role_label', 'unit_price_minor'])->all(),
             $plan->adjustments->map(fn ($adjustment) => [$adjustment->position, $adjustment->kind->value, $adjustment->type->value, $adjustment->label, $adjustment->value])->all(),
+            $plan->projects->modelKeys(),
         ], JSON_THROW_ON_ERROR);
     }
 }

@@ -32,10 +32,13 @@ use Illuminate\Support\Carbon;
  * @property TimerState $state
  * @property int|null $active_person_id
  * @property Carbon $started_at
+ * @property Carbon|null $lunch_started_at while on lunch
+ * @property string|null $pause_reason "idle" after an automatic idle pause
  * @property Carbon|null $segment_started_at when the current running stretch began (null while paused or stopped)
  * @property int $accumulated_seconds finished running stretches
  * @property int $longest_segment_seconds longest uninterrupted stretch so far
  * @property Carbon|null $stopped_at
+ * @property Carbon|null $state_changed_at when it last started, paused, resumed or stopped
  * @property string $timezone
  * @property bool $billable
  * @property string|null $note
@@ -53,7 +56,9 @@ final class TimeSession extends Model
             'state' => TimerState::class,
             'started_at' => 'datetime',
             'segment_started_at' => 'datetime',
+            'lunch_started_at' => 'datetime',
             'stopped_at' => 'datetime',
+            'state_changed_at' => 'datetime',
             'accumulated_seconds' => 'integer',
             'longest_segment_seconds' => 'integer',
             'billable' => 'boolean',

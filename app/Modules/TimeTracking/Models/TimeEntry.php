@@ -39,6 +39,9 @@ use LogicException;
  * @property Carbon|null $started_at
  * @property Carbon|null $ended_at
  * @property int $duration_seconds
+ * @property int|null $from_session_id the timer a lunch or kept-idle entry came from
+ * @property int|null $paid_seconds lunch only: the paid part (up to the allowance)
+ * @property int|null $outside_schedule_seconds tracked only: work outside the expected schedule
  * @property int|null $longest_segment_seconds longest uninterrupted stretch (tracked only)
  * @property Carbon $period_start
  * @property Carbon $period_end
@@ -70,6 +73,8 @@ final class TimeEntry extends Model
             'period_end' => 'date',
             'voided_at' => 'datetime',
             'duration_seconds' => 'integer',
+            'paid_seconds' => 'integer',
+            'outside_schedule_seconds' => 'integer',
             'longest_segment_seconds' => 'integer',
             'billable' => 'boolean',
         ];

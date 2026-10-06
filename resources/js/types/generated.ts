@@ -123,6 +123,23 @@ export enum AuditAction {
     TIME_ADJUSTMENT_ADDED = 'time.adjustment_added',
     TIME_HISTORICAL_ADDED = 'time.historical_added',
     TIME_ENTRY_VOIDED = 'time.entry_voided',
+    TIME_POLICY_CHANGED = 'time.policy_changed',
+    TIME_SCHEDULE_CHANGED = 'time.schedule_changed',
+    TIME_HOLIDAY_ADDED = 'time.holiday_added',
+    TIME_HOLIDAY_REMOVED = 'time.holiday_removed',
+    TIME_LEAVE_ADDED = 'time.leave_added',
+    TIME_LEAVE_REMOVED = 'time.leave_removed',
+    TIME_IDLE_KEPT = 'time.idle_kept',
+    TIME_ACTIVITY_FLAGGED = 'time.activity_flagged',
+    TIME_REVIEW_RESOLVED = 'time.review_resolved',
+    INVOICE_HOURS_REFRESHED = 'invoice.hours_refreshed',
+    INVOICE_HOURS_OVERRIDDEN = 'invoice.hours_overridden',
+    EXPENSE_RECORDED = 'expense.recorded',
+    EXPENSE_VOIDED = 'expense.voided',
+    EXPENSE_RECURRING_SAVED = 'expense.recurring_saved',
+    EXPENSE_RECURRING_STOPPED = 'expense.recurring_stopped',
+    FX_RATE_ENTERED = 'fx.rate_entered',
+    FINANCE_REPORTING_CURRENCY_CHANGED = 'finance.reporting_currency_changed',
     PERSON_CREATED = 'person.created',
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
@@ -133,6 +150,8 @@ export enum AuditAction {
     ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated',
     ACCOUNT_AVATAR_REMOVED = 'account.avatar_removed',
     ACCOUNT_DELETED = 'account.deleted',
+    ACCOUNT_DESKTOP_SIGNED_IN = 'account.desktop_signed_in',
+    ACCOUNT_DESKTOP_SIGNED_OUT = 'account.desktop_signed_out',
 }
 export type AuditLogEntryData = {
     id: number;
@@ -153,6 +172,7 @@ export enum AutomationReason {
     MailNotConnected = 'mail_not_connected',
     SenderIncomplete = 'sender_incomplete',
     RecipientInvalid = 'recipient_invalid',
+    TimeActivityReview = 'time_activity_review',
     LateHours = 'late_hours',
 }
 export enum BillingPeriod {
@@ -190,6 +210,7 @@ export type BillingPlanData = {
     due_invoice_public_id?: string;
     first_invoice_needs_review: boolean;
     due_missed_while_paused: boolean;
+    project_public_ids: Array<any>;
 };
 export type BillingPlanLineData = {
     person_public_id?: string;
@@ -259,6 +280,19 @@ export type DepartmentData = {
     public_id: string;
     name: string;
 };
+export enum ExpenseCategory {
+    Payroll = 'payroll',
+    OfficeRent = 'office_rent',
+    Utilities = 'utilities',
+    Software = 'software',
+    Contractors = 'contractors',
+    Marketing = 'marketing',
+    Travel = 'travel',
+    Equipment = 'equipment',
+    ProfessionalServices = 'professional_services',
+    TaxesFees = 'taxes_fees',
+    Other = 'other',
+}
 export enum FinancePermission {
     View = 'billing.view',
     Manage = 'billing.manage',
@@ -294,6 +328,9 @@ export type InvoiceData = {
         quantity_centi: number | null;
         unit_price_minor: number;
         amount_minor: number | null;
+        tracked_seconds: number | null;
+        tracked_quantity_centi: number | null;
+        quantity_reason: string | null;
     }[];
     adjustments: { kind: 'fee' | 'tax' | 'discount'; type: 'percentage' | 'fixed'; label: string; value: number; amount_minor: number }[];
     subtotal_minor: number;
@@ -335,6 +372,8 @@ export type InvoiceData = {
         error: string | null;
     } | null;
     approved_automatically: boolean;
+    uses_time_tracking: boolean;
+    tracked_at?: string;
     sends_automatically: boolean;
     automation_reasons: { code: AutomationReason; message: string }[];
 };
@@ -373,6 +412,10 @@ export type InvoiceSummaryData = {
         action: string;
     } | null;
 };
+export enum LeaveType {
+    Paid = 'paid',
+    Unpaid = 'unpaid',
+}
 export type LinkedUserData = {
     id: number;
     name: string;
@@ -419,6 +462,10 @@ export enum NotificationType {
     TASK_ASSIGNED = 'task_assigned',
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
+}
+export enum OvertimeMode {
+    TrackOnly = 'track_only',
+    Review = 'review',
 }
 export type PaymentData = {
     public_id: string;
@@ -509,6 +556,20 @@ export type ProjectSummaryData = {
     completed_tasks: number;
     completion_percentage: number;
 };
+export enum ReleaseChannel {
+    Stable = 'stable',
+    Uat = 'uat',
+}
+export enum ReleasePlatform {
+    MacOS = 'macos',
+    Windows = 'windows',
+    Linux = 'linux',
+}
+export enum ReviewKind {
+    LunchExcess = 'lunch_excess',
+    IdleKept = 'idle_kept',
+    Activity = 'activity',
+}
 export type SignupPointData = {
     date: string;
     count: number;
@@ -692,7 +753,7 @@ export type TaskData = {
 };
 export type TimeEntryData = {
     public_id: string;
-    source: 'tracked' | 'manual' | 'adjustment';
+    source: 'tracked' | 'manual' | 'adjustment' | 'idle_kept' | 'lunch';
     source_label: string;
     person_name: string;
     project_name: string;
@@ -713,14 +774,18 @@ export enum TimeEntrySource {
     Tracked = 'tracked',
     Manual = 'manual',
     Adjustment = 'adjustment',
+    IdleKept = 'idle_kept',
+    Lunch = 'lunch',
 }
 export type TimerData = {
     public_id: string;
-    state: 'running' | 'paused' | 'stopped';
+    state: 'running' | 'paused' | 'lunch' | 'stopped';
     project: { public_id: string | null; name: string };
     task?: { public_id: string | null; title: string } | null;
     started_at: string;
     running_since?: string;
+    lunch_started_at?: string;
+    pause_reason?: string;
     accumulated_seconds: number;
     elapsed_seconds: number;
     longest_segment_seconds: number;
@@ -732,6 +797,7 @@ export type TimerData = {
 export enum TimerState {
     Running = 'running',
     Paused = 'paused',
+    Lunch = 'lunch',
     Stopped = 'stopped',
 }
 export type TopAssistantUserData = {

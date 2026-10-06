@@ -19,6 +19,22 @@ final class TimeTrackingException extends AppException
         return new self(code: ErrorCode::TIMER_NOT_RUNNING, status: 409, message: "There's no timer running.");
     }
 
+    /** A late or targeted change no longer fits the timer (another device changed it first). */
+    public static function timerChanged(): self
+    {
+        return new self(code: ErrorCode::TIMER_CHANGED, status: 409, message: "Your timer changed on another device. We've refreshed it.");
+    }
+
+    public static function lunchNotEnabled(): self
+    {
+        return new self(code: ErrorCode::TIME_INVALID, status: 422, message: "Paid lunch isn't turned on for this workspace.");
+    }
+
+    public static function wrongState(string $message): self
+    {
+        return new self(code: ErrorCode::TIMER_CHANGED, status: 409, message: $message);
+    }
+
     public static function noProfile(): self
     {
         return new self(code: ErrorCode::TIME_NO_PROFILE, status: 403, message: "Your account isn't linked to a Team profile yet, so time can't be recorded for you.");

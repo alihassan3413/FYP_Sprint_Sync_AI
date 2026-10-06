@@ -9,6 +9,8 @@ use App\Modules\Billing\Models\Client;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Models\InvoicingProfile;
 use App\Modules\Billing\Models\WorkspaceMailSettings;
+use App\Modules\Expenses\Models\Expense;
+use App\Modules\Expenses\Models\RecurringExpense;
 use App\Modules\People\Models\Department;
 use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
@@ -136,6 +138,16 @@ final class Workspace extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class)->chaperone();
+    }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class)->chaperone();
+    }
+
+    public function recurringExpenses(): HasMany
+    {
+        return $this->hasMany(RecurringExpense::class)->chaperone();
     }
 
     public function timeEntries(): HasMany

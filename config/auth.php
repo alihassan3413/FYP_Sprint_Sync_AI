@@ -42,6 +42,15 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        /*
+         * SprintSync Desktop: a revocable per-device token sent as a Bearer
+         * header (see App\Modules\Desktop). Only the desktop API routes use it.
+         */
+        'desktop' => [
+            'driver' => 'desktop-token',
+            'provider' => 'users',
+        ],
     ],
 
     /*
