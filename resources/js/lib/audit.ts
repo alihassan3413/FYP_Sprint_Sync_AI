@@ -57,6 +57,8 @@ const CATEGORY_BADGE_VARIANT: Record<string, 'purple' | 'info' | 'success' | 'wa
     Projects: 'purple',
     Tasks: 'success',
     Meetings: 'warning',
+    Billing: 'success',
+    'Team profiles': 'info',
 };
 
 export function categoryBadgeVariant(category: string): 'purple' | 'info' | 'success' | 'warning' | 'neutral' {

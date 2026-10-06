@@ -1,3 +1,16 @@
+export enum ActorType {
+    User = 'user',
+    System = 'system',
+}
+export enum AdjustmentKind {
+    Fee = 'fee',
+    Tax = 'tax',
+    Discount = 'discount',
+}
+export enum AdjustmentType {
+    Percentage = 'percentage',
+    Fixed = 'fixed',
+}
 export type AnalyticsData = {
     total_tasks: number;
     completed_tasks: number;
@@ -49,6 +62,7 @@ export enum AuditAction {
     WORKSPACE_CREATED = 'workspace.created',
     WORKSPACE_RENAMED = 'workspace.renamed',
     WORKSPACE_DELETED = 'workspace.deleted',
+    WORKSPACE_TIMEZONE_CHANGED = 'workspace.timezone_changed',
     MEMBER_INVITED = 'member.invited',
     MEMBER_REMOVED = 'member.removed',
     MEMBER_ROLE_CHANGED = 'member.role_changed',
@@ -77,11 +91,67 @@ export enum AuditAction {
     MEETING_SCHEDULED = 'meeting.scheduled',
     MEETING_UPDATED = 'meeting.updated',
     MEETING_CANCELLED = 'meeting.cancelled',
+    CLIENT_CREATED = 'client.created',
+    CLIENT_UPDATED = 'client.updated',
+    CLIENT_ARCHIVED = 'client.archived',
+    CLIENT_RESTORED = 'client.restored',
+    BILLING_PLAN_CREATED = 'billing_plan.created',
+    BILLING_PLAN_UPDATED = 'billing_plan.updated',
+    BILLING_PLAN_PAUSED = 'billing_plan.paused',
+    BILLING_PLAN_RESUMED = 'billing_plan.resumed',
+    INVOICE_GENERATED = 'invoice.generated',
+    INVOICE_UPDATED = 'invoice.updated',
+    INVOICE_READY = 'invoice.ready',
+    INVOICE_APPROVED = 'invoice.approved',
+    INVOICE_REAPPROVED = 'invoice.reapproved',
+    INVOICE_SEND_CANCELLED = 'invoice.send_cancelled',
+    INVOICE_ISSUED = 'invoice.issued',
+    INVOICING_UPDATED = 'invoicing.updated',
+    PAYMENT_RECORDED = 'payment.recorded',
+    PAYMENT_VOIDED = 'payment.voided',
+    MAIL_SETTINGS_SAVED = 'mail.settings_saved',
+    MAIL_TEST_SUCCEEDED = 'mail.test_succeeded',
+    MAIL_TEST_FAILED = 'mail.test_failed',
+    INVOICE_DELIVERY_SENT = 'invoice.delivery_sent',
+    INVOICE_DELIVERY_FAILED = 'invoice.delivery_failed',
+    INVOICE_DELIVERY_UNCERTAIN = 'invoice.delivery_uncertain',
+    INVOICE_DELIVERY_RETRIED = 'invoice.delivery_retried',
+    INVOICE_AUTOMATION_HELD = 'invoice.automation_held',
+    TIME_TIMER_STARTED = 'time.timer_started',
+    TIME_TIMER_STOPPED = 'time.timer_stopped',
+    TIME_MANUAL_ADDED = 'time.manual_added',
+    TIME_ADJUSTMENT_ADDED = 'time.adjustment_added',
+    TIME_HISTORICAL_ADDED = 'time.historical_added',
+    TIME_ENTRY_VOIDED = 'time.entry_voided',
+    TIME_POLICY_CHANGED = 'time.policy_changed',
+    TIME_SCHEDULE_CHANGED = 'time.schedule_changed',
+    TIME_HOLIDAY_ADDED = 'time.holiday_added',
+    TIME_HOLIDAY_REMOVED = 'time.holiday_removed',
+    TIME_LEAVE_ADDED = 'time.leave_added',
+    TIME_LEAVE_REMOVED = 'time.leave_removed',
+    TIME_IDLE_KEPT = 'time.idle_kept',
+    TIME_ACTIVITY_FLAGGED = 'time.activity_flagged',
+    TIME_REVIEW_RESOLVED = 'time.review_resolved',
+    INVOICE_HOURS_REFRESHED = 'invoice.hours_refreshed',
+    INVOICE_HOURS_OVERRIDDEN = 'invoice.hours_overridden',
+    EXPENSE_RECORDED = 'expense.recorded',
+    EXPENSE_VOIDED = 'expense.voided',
+    EXPENSE_RECURRING_SAVED = 'expense.recurring_saved',
+    EXPENSE_RECURRING_STOPPED = 'expense.recurring_stopped',
+    FX_RATE_ENTERED = 'fx.rate_entered',
+    FINANCE_REPORTING_CURRENCY_CHANGED = 'finance.reporting_currency_changed',
+    PERSON_CREATED = 'person.created',
+    PERSON_UPDATED = 'person.updated',
+    PERSON_USER_LINKED = 'person.user_linked',
+    PERSON_USER_UNLINKED = 'person.user_unlinked',
+    DEPARTMENT_CREATED = 'department.created',
     ACCOUNT_PROFILE_UPDATED = 'account.profile_updated',
     ACCOUNT_PASSWORD_CHANGED = 'account.password_changed',
     ACCOUNT_AVATAR_UPDATED = 'account.avatar_updated',
     ACCOUNT_AVATAR_REMOVED = 'account.avatar_removed',
     ACCOUNT_DELETED = 'account.deleted',
+    ACCOUNT_DESKTOP_SIGNED_IN = 'account.desktop_signed_in',
+    ACCOUNT_DESKTOP_SIGNED_OUT = 'account.desktop_signed_out',
 }
 export type AuditLogEntryData = {
     id: number;
@@ -93,6 +163,61 @@ export type AuditLogEntryData = {
     project_name?: string;
     created_at: string;
 };
+export enum AutomationReason {
+    FirstInvoice = 'first_invoice',
+    TotalVariance = 'total_variance',
+    HoursVariance = 'hours_variance',
+    MissingHours = 'missing_hours',
+    SendDateMissed = 'send_date_missed',
+    MailNotConnected = 'mail_not_connected',
+    SenderIncomplete = 'sender_incomplete',
+    RecipientInvalid = 'recipient_invalid',
+    TimeActivityReview = 'time_activity_review',
+    LateHours = 'late_hours',
+}
+export enum BillingPeriod {
+    PreviousMonth = 'previous_month',
+    CurrentMonth = 'current_month',
+}
+export type BillingPlanAdjustmentData = {
+    kind: 'fee' | 'tax' | 'discount';
+    type: 'percentage' | 'fixed';
+    label: string;
+    value: number;
+};
+export type BillingPlanData = {
+    public_id: string;
+    name: string;
+    currency: string;
+    pricing_mode: 'fixed' | 'hourly';
+    generation_day: number;
+    send_day: number;
+    billing_period: 'previous_month' | 'current_month';
+    due_in_days: number;
+    delivery_mode: 'review_before_sending' | 'auto_send';
+    reminder_days_before?: number;
+    paused: boolean;
+    lines: Array<BillingPlanLineData>;
+    adjustments: Array<BillingPlanAdjustmentData>;
+    subtotal_minor?: number;
+    adjustment_amounts_minor?: number[] | null;
+    total_minor?: number;
+    next_generation_on: string;
+    next_send_on: string;
+    next_period_start: string;
+    next_period_end: string;
+    due_period_start: string;
+    due_invoice_public_id?: string;
+    first_invoice_needs_review: boolean;
+    due_missed_while_paused: boolean;
+    project_public_ids: Array<any>;
+};
+export type BillingPlanLineData = {
+    person_public_id?: string;
+    description: string;
+    role_label?: string;
+    unit_price_minor: number;
+};
 export type BoardColumnData = {
     id: number;
     name: string;
@@ -101,12 +226,33 @@ export type BoardColumnData = {
     is_done: boolean;
     project_id: number;
 };
+export type ClientData = {
+    public_id: string;
+    name: string;
+    billing_email: string;
+    cc_emails: Array<string>;
+    currency: string;
+    address?: string;
+    tax_id?: string;
+    logo_url?: string;
+    archived_at?: string;
+    created_at: string;
+};
 export enum ClientPermission {
     BoardView = 'client.board.view',
     TasksComment = 'client.tasks.comment',
     TasksRequest = 'client.tasks.request',
     TasksClose = 'client.tasks.close',
     MeetingsView = 'client.meetings.view',
+}
+export enum Currency {
+    USD = 'USD',
+    PKR = 'PKR',
+    EUR = 'EUR',
+    GBP = 'GBP',
+    AED = 'AED',
+    CAD = 'CAD',
+    AUD = 'AUD',
 }
 export type DashboardMeetingData = {
     id: number;
@@ -119,6 +265,167 @@ export type DashboardMeetingData = {
     is_past: boolean;
     url: string;
 };
+export enum DeliveryMode {
+    ReviewBeforeSending = 'review_before_sending',
+    AutoSend = 'auto_send',
+}
+export enum DeliveryStatus {
+    Pending = 'pending',
+    Sending = 'sending',
+    Sent = 'sent',
+    Failed = 'failed',
+    NeedsAttention = 'needs_attention',
+}
+export type DepartmentData = {
+    public_id: string;
+    name: string;
+};
+export enum ExpenseCategory {
+    Payroll = 'payroll',
+    OfficeRent = 'office_rent',
+    Utilities = 'utilities',
+    Software = 'software',
+    Contractors = 'contractors',
+    Marketing = 'marketing',
+    Travel = 'travel',
+    Equipment = 'equipment',
+    ProfessionalServices = 'professional_services',
+    TaxesFees = 'taxes_fees',
+    Other = 'other',
+}
+export enum FinancePermission {
+    View = 'billing.view',
+    Manage = 'billing.manage',
+    Approve = 'billing.approve',
+    Payments = 'billing.payments',
+    PeopleView = 'people.view',
+    PeopleManage = 'people.manage',
+    Compensation = 'people.compensation',
+}
+export type HealthSignalData = {
+    code: string;
+    severity: string;
+    headline: string;
+    detail: string;
+    suggestion?: string;
+};
+export enum HealthVerdict {
+    NoData = 'no_data',
+    Healthy = 'healthy',
+    Watch = 'watch',
+    AtRisk = 'at_risk',
+    Critical = 'critical',
+}
+export type InvoiceData = {
+    summary: InvoiceSummaryData;
+    version: number;
+    is_editable: boolean;
+    bill_to: { name: string; billing_email: string; cc_emails: string[]; address: string | null; tax_id: string | null };
+    lines: {
+        position: number;
+        description: string;
+        role_label: string | null;
+        quantity_centi: number | null;
+        unit_price_minor: number;
+        amount_minor: number | null;
+        tracked_seconds: number | null;
+        tracked_quantity_centi: number | null;
+        quantity_reason: string | null;
+    }[];
+    adjustments: { kind: 'fee' | 'tax' | 'discount'; type: 'percentage' | 'fixed'; label: string; value: number; amount_minor: number }[];
+    subtotal_minor: number;
+    generated_on: string;
+    due_in_days: number;
+    issue_date?: string;
+    due_date?: string;
+    approved_at?: string;
+    approved_by?: string;
+    send_after?: string;
+    issued_at?: string;
+    client_public_id?: string;
+    bill_from?: {
+        business_name: string;
+        legal_name: string | null;
+        billing_email: string;
+        phone: string | null;
+        address_line1: string;
+        address_line2: string | null;
+        city: string;
+        region: string | null;
+        postal_code: string | null;
+        country: string;
+        tax_id: string | null;
+    } | null;
+    sender_complete: boolean;
+    logo_url?: string;
+    pdf_url: string;
+    pdf_filename: string;
+    payments: PaymentData[];
+    delivery?: {
+        status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention';
+        status_label: string;
+        recipient: string;
+        cc: string[];
+        attempts: number;
+        last_attempted_at: string | null;
+        sent_at: string | null;
+        error: string | null;
+    } | null;
+    approved_automatically: boolean;
+    uses_time_tracking: boolean;
+    tracked_at?: string;
+    sends_automatically: boolean;
+    automation_reasons: { code: AutomationReason; message: string }[];
+};
+export enum InvoiceStatus {
+    NeedsHours = 'needs_hours',
+    ReadyToReview = 'ready_to_review',
+    Approved = 'approved',
+    Issued = 'issued',
+}
+export type InvoiceSummaryData = {
+    public_id: string;
+    number?: string;
+    title: string;
+    client_name: string;
+    status: 'needs_hours' | 'ready_to_review' | 'approved' | 'issued';
+    status_label: string;
+    pricing_mode: 'fixed' | 'hourly';
+    delivery_mode: 'review_before_sending' | 'auto_send';
+    currency: string;
+    period_start: string;
+    period_end: string;
+    planned_send_on: string;
+    total_minor: number;
+    lines_missing_hours: number;
+    payment_status?: 'unpaid' | 'partially_paid' | 'paid' | null;
+    payment_status_label?: string;
+    paid_minor: number;
+    balance_due_minor: number;
+    delivery_status?: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null;
+    sent_at?: string;
+    attention?: {
+        kind: 'needs_hours' | 'safety_review' | 'ready_to_send' | 'ready_to_review' | 'email_failed';
+        priority: number;
+        label: string;
+        reason: string;
+        action: string;
+    } | null;
+};
+export enum LeaveType {
+    Paid = 'paid',
+    Unpaid = 'unpaid',
+}
+export type LinkedUserData = {
+    id: number;
+    name: string;
+    email: string;
+};
+export enum MailEncryption {
+    Tls = 'tls',
+    Ssl = 'ssl',
+    None = 'none',
+}
 export type MeetingData = {
     id: number;
     title: string;
@@ -156,6 +463,44 @@ export enum NotificationType {
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
 }
+export enum OvertimeMode {
+    TrackOnly = 'track_only',
+    Review = 'review',
+}
+export type PaymentData = {
+    public_id: string;
+    amount_minor: number;
+    received_on: string;
+    method: string;
+    method_label: string;
+    reference?: string;
+    note?: string;
+    recorded_by?: string;
+    voided_at?: string;
+    voided_by?: string;
+    void_reason?: string;
+};
+export enum PaymentMethod {
+    BankTransfer = 'bank_transfer',
+    Cash = 'cash',
+    Card = 'card',
+    Check = 'check',
+    Other = 'other',
+}
+export enum PaymentStatus {
+    Unpaid = 'unpaid',
+    PartiallyPaid = 'partially_paid',
+    Paid = 'paid',
+}
+export type PersonData = {
+    public_id: string;
+    name: string;
+    email?: string;
+    title?: string;
+    department?: DepartmentData;
+    linked_user?: LinkedUserData;
+    created_at: string;
+};
 export type PlatformMetricsData = {
     users_total: number;
     users_verified: number;
@@ -169,6 +514,10 @@ export type PlatformMetricsData = {
     meetings_total: number;
     signups: Array<SignupPointData>;
 };
+export enum PricingMode {
+    Fixed = 'fixed',
+    Hourly = 'hourly',
+}
 export type ProjectData = {
     id: number;
     name: string;
@@ -176,6 +525,25 @@ export type ProjectData = {
     workspace_id: number;
     created_at: string;
     updated_at: string;
+};
+export type ProjectHealthData = {
+    project_id: number;
+    project_name: string;
+    verdict: string;
+    verdict_label: string;
+    total_tasks: number;
+    completed_tasks: number;
+    open_tasks: number;
+    completion_percentage: number;
+    overdue_tasks: number;
+    unassigned_open_tasks: number;
+    stale_open_tasks: number;
+    people_with_open_work: number;
+    busiest_share_percentage: number;
+    active_sprint_name?: string;
+    active_sprint_health?: string;
+    signals: Array<HealthSignalData>;
+    workload: Array<WorkloadEntryData>;
 };
 export enum ProjectRole {
     MANAGER = 'manager',
@@ -188,6 +556,20 @@ export type ProjectSummaryData = {
     completed_tasks: number;
     completion_percentage: number;
 };
+export enum ReleaseChannel {
+    Stable = 'stable',
+    Uat = 'uat',
+}
+export enum ReleasePlatform {
+    MacOS = 'macos',
+    Windows = 'windows',
+    Linux = 'linux',
+}
+export enum ReviewKind {
+    LunchExcess = 'lunch_excess',
+    IdleKept = 'idle_kept',
+    Activity = 'activity',
+}
 export type SignupPointData = {
     date: string;
     count: number;
@@ -308,6 +690,8 @@ export type StoreTaskData = {
     assigned_to?: number;
     due_date?: string;
     sprint_id?: number;
+    board_column_id?: number;
+    attachment_ids: { [key: number]: number };
 };
 export type StoreWorkspaceRoleData = {
     name: string;
@@ -331,6 +715,16 @@ export type TaskCommentData = {
     user_id: number;
     user_name: string;
     created_at: string;
+    attachments: Array<{
+        id: number;
+        name: string;
+        mime: string;
+        size: number;
+        width: number | null;
+        height: number | null;
+        url: string;
+        is_image: boolean;
+    }>;
 };
 export type TaskData = {
     id: number;
@@ -346,7 +740,66 @@ export type TaskData = {
     comments: Array<TaskCommentData>;
     created_at: string;
     updated_at: string;
+    attachments: Array<{
+        id: number;
+        name: string;
+        mime: string;
+        size: number;
+        width: number | null;
+        height: number | null;
+        url: string;
+        is_image: boolean;
+    }>;
 };
+export type TimeEntryData = {
+    public_id: string;
+    source: 'tracked' | 'manual' | 'adjustment' | 'idle_kept' | 'lunch';
+    source_label: string;
+    person_name: string;
+    project_name: string;
+    task_title?: string;
+    started_at?: string;
+    ended_at?: string;
+    period_start: string;
+    period_end: string;
+    duration_seconds: number;
+    billable: boolean;
+    note?: string;
+    created_by?: string;
+    adjusts_entry_public_id?: string;
+    voided: boolean;
+    void_reason?: string;
+};
+export enum TimeEntrySource {
+    Tracked = 'tracked',
+    Manual = 'manual',
+    Adjustment = 'adjustment',
+    IdleKept = 'idle_kept',
+    Lunch = 'lunch',
+}
+export type TimerData = {
+    public_id: string;
+    state: 'running' | 'paused' | 'lunch' | 'stopped';
+    project: { public_id: string | null; name: string };
+    task?: { public_id: string | null; title: string } | null;
+    started_at: string;
+    running_since?: string;
+    lunch_started_at?: string;
+    pause_reason?: string;
+    accumulated_seconds: number;
+    elapsed_seconds: number;
+    longest_segment_seconds: number;
+    billable: boolean;
+    note?: string;
+    server_time: string;
+    entry_public_id?: string;
+};
+export enum TimerState {
+    Running = 'running',
+    Paused = 'paused',
+    Lunch = 'lunch',
+    Stopped = 'stopped',
+}
 export type TopAssistantUserData = {
     id: number;
     name: string;
@@ -376,11 +829,20 @@ export enum UserRole {
     MEMBER = 'member',
     CLIENT = 'client',
 }
+export type WorkloadEntryData = {
+    user_id?: number;
+    name: string;
+    open_tasks: number;
+    overdue_tasks: number;
+    completed_tasks: number;
+    share_percentage: number;
+};
 export type WorkspaceData = {
     name: string;
     slug: string;
     settings: { [key: string]: any } | null;
     is_active: boolean;
+    timezone?: string | null;
 };
 export type WorkspaceInvitationData = {
     email: string;
@@ -394,8 +856,6 @@ export enum WorkspacePermission {
     MembersInvite = 'members.invite',
     MembersRemove = 'members.remove',
     MembersRoles = 'members.roles',
-    BillingView = 'billing.view',
-    BillingManage = 'billing.manage',
     IntegrationsView = 'integrations.view',
     IntegrationsManage = 'integrations.manage',
     IntegrationsDeploy = 'integrations.deploy',

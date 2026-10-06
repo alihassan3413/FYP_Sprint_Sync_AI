@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Http\Controllers;
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Billing\Models\InvoicingProfile;
 use App\Modules\Workspace\Actions\CreateWorkspaceAction;
 use App\Modules\Workspace\Actions\DeleteWorkspaceAction;
 use App\Modules\Workspace\Actions\UpdateWorkspaceAction;
@@ -28,6 +29,7 @@ final class WorkspaceController
                 'id' => $workspace->id,
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
+                'timezone' => $workspace->timezone,
                 'created_at' => $workspace->created_at->toIso8601String(),
             ],
             'canViewAuditLog' => $request->user()->can('viewAny', [AuditLog::class, $workspace]),
@@ -35,6 +37,9 @@ final class WorkspaceController
             'canDeleteWorkspace' => $request->user()->can('delete', $workspace),
             'canManageMembers' => $request->user()->can('manageMembers', $workspace),
             'canInviteMembers' => $request->user()->can('invite', $workspace),
+            'canViewTeam' => $request->user()->can('viewTeam', $workspace),
+            'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
+            'emailDeliveryConnected' => $workspace->mailSettings()->whereNotNull('verified_at')->exists(),
         ]);
     }
 

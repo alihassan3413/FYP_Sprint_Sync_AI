@@ -11,3 +11,8 @@ Artisan::command('inspire', function () {
 Schedule::command('assistant:prune')->dailyAt('03:15')->withoutOverlapping();
 Schedule::command('attachments:prune')->dailyAt('03:30')->withoutOverlapping();
 Schedule::command('meetings:transcribe-completed')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('billing:dispatch-approved-invoices')->everyMinute()->withoutOverlapping();
+Schedule::command('billing:generate-recurring-invoices')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('billing:process-recurring-invoices')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('billing:send-owner-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('expenses:generate-recurring')->hourly()->withoutOverlapping();

@@ -7,8 +7,8 @@ namespace App\Modules\Tasks\Data;
 use App\Modules\Attachments\Models\Attachment;
 use App\Modules\Tasks\Models\TaskComment;
 use Spatie\LaravelData\Data;
+use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
-use Spatie\TypeScriptTransformer\Attributes\TypeScriptType;
 
 #[TypeScript]
 final class TaskCommentData extends Data
@@ -33,7 +33,7 @@ final class TaskCommentData extends Data
         public int $user_id,
         public string $user_name,
         public string $created_at,
-        #[TypeScriptType('Array<{ id: number; name: string; mime: string; size: number; width: number | null; height: number | null; url: string; is_image: boolean }>')]
+        #[LiteralTypeScriptType('Array<{ id: number; name: string; mime: string; size: number; width: number | null; height: number | null; url: string; is_image: boolean }>')]
         public array $attachments = [],
     ) {}
 

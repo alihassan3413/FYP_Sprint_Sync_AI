@@ -1,0 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Billing\Data;
+
+use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Support\InvoiceAttention;
+use Spatie\LaravelData\Data;
+use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
+
+/**
+ * One row of the invoice list. Public ids only; dates are calendar dates.
+ */
+#[TypeScript]
+final class InvoiceSummaryData extends Data
+{
+    public function __construct(
+        public string $public_id,
+        public ?string $number,
+        public string $title,
+        public string $client_name,
+        #[LiteralTypeScriptType("'needs_hours' | 'ready_to_review' | 'approved' | 'issued'")]
+        public string $status,
+        public string $status_label,
+        #[LiteralTypeScriptType("'fixed' | 'hourly'")]
+        public string $pricing_mode,
+        #[LiteralTypeScriptType("'review_before_sending' | 'auto_send'")]
+        public string $delivery_mode,
+        public string $currency,
+        public string $period_start,
+        public string $period_end,
+        public string $planned_send_on,
+        public int $total_minor,
+        public int $lines_missing_hours,
+        /** Only once issued: unpaid / partially_paid / paid. */
+        #[LiteralTypeScriptType("'unpaid' | 'partially_paid' | 'paid' | null")]
+        public ?string $payment_status,
+        public ?string $payment_status_label,
+        public int $paid_minor,
+        public int $balance_due_minor,
+        /** The email's progress, separate from the invoice's own status; null until there is a delivery. */
+        #[LiteralTypeScriptType("'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention' | null")]
+        public ?string $delivery_status,
+        public ?string $sent_at,
+        /** What the owner needs to do with it and why (Needs you); null when nothing. */
+        #[LiteralTypeScriptType("{ kind: 'needs_hours' | 'safety_review' | 'ready_to_send' | 'ready_to_review' | 'email_failed'; priority: number; label: string; reason: string; action: string } | null")]
+        public ?array $attention,
+    ) {}
+
+    public static function fromModel(Invoice $invoice): self
+    {
+        return new self(
+            public_id: $invoice->public_id,
+            number: $invoice->number,
+            title: $invoice->title,
+            client_name: $invoice->bill_to['name'],
+            status: $invoice->status->value,
+            status_label: $invoice->status->label(),
+            pricing_mode: $invoice->pricing_mode->value,
+            delivery_mode: $invoice->delivery_mode->value,
+            currency: $invoice->currency->value,
+            period_start: $invoice->period_start->toDateString(),
+            period_end: $invoice->period_end->toDateString(),
+            planned_send_on: $invoice->planned_send_on->toDateString(),
+            total_minor: $invoice->total_minor,
+            lines_missing_hours: (int) ($invoice->lines_missing_hours ?? $invoice->lines->whereNull('quantity_centi')->count()),
+            payment_status: $invoice->paymentStatus()?->value,
+            payment_status_label: $invoice->paymentStatus()?->label(),
+            paid_minor: $invoice->paidMinor(),
+            balance_due_minor: $invoice->balanceDueMinor(),
+            delivery_status: $invoice->delivery?->status->value,
+            sent_at: $invoice->delivery?->sent_at?->toIso8601String(),
+            attention: InvoiceAttention::for($invoice),
+        );
+    }
+}

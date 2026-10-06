@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { Loader2 } from 'lucide-vue-next';
+import { timezoneOptions } from '@/lib/timezones';
+import { Globe, Loader2 } from 'lucide-vue-next';
 
 interface WorkspaceProfile {
     id: number;
     name: string;
     slug: string;
+    timezone: string;
 }
 
 const props = defineProps<{
@@ -21,7 +23,10 @@ const { workspaceRoute } = useCurrentWorkspace();
 const form = useForm({
     name: props.workspace.name,
     slug: props.workspace.slug,
+    timezone: props.workspace.timezone,
 });
+
+const timezoneChoices = timezoneOptions();
 
 const slugTouched = ref(true);
 
@@ -41,6 +46,7 @@ watch(
         if (open) {
             form.name = props.workspace.name;
             form.slug = props.workspace.slug;
+            form.timezone = props.workspace.timezone;
             slugTouched.value = true;
         }
     },
@@ -78,7 +84,13 @@ function handleClose(value: boolean) {
 </script>
 
 <template>
-    <AppModal :open="open" title="Rename workspace" description="Update your workspace name and URL identifier." size="md" @update:open="handleClose">
+    <AppModal
+        :open="open"
+        title="Edit workspace"
+        description="Update your workspace name, URL identifier and timezone."
+        size="md"
+        @update:open="handleClose"
+    >
         <form id="rename-workspace-form" class="space-y-5 pt-2" @submit.prevent="submit">
             <AppFormInput
                 id="rename-workspace-name"
@@ -102,6 +114,26 @@ function handleClose(value: boolean) {
                 autocomplete="off"
                 @input="slugTouched = true"
             />
+
+            <div class="grid gap-2">
+                <Label for="rename-workspace-timezone">Timezone</Label>
+                <select
+                    id="rename-workspace-timezone"
+                    v-model="form.timezone"
+                    class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+                    :aria-invalid="!!form.errors.timezone"
+                    :class="form.errors.timezone && 'border-destructive focus-visible:ring-destructive'"
+                >
+                    <option v-for="option in timezoneChoices" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
+                <p class="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <Globe class="size-3.5 shrink-0" />
+                    <span>Invoice dates, reminders and scheduled sending follow this timezone.</span>
+                </p>
+                <InputError :message="form.errors.timezone" />
+            </div>
         </form>
 
         <template #footer>

@@ -11,6 +11,7 @@ use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Database\Factories\TaskFactory;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
+ * @property string $public_id opaque id for other modules' URLs and payloads (time tracking); its own routes still use id
  * @property string $title
  * @property string|null $description
  * @property int $board_column_id
@@ -33,7 +35,18 @@ use Illuminate\Support\Carbon;
 final class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    /**
+     * public_id is generated on create; the integer key and the existing
+     * numeric routes are unchanged.
+     *
+     * @return array<int, string>
+     */
+    public function uniqueIds(): array
+    {
+        return ['public_id'];
+    }
 
     protected $fillable = [
         'title',

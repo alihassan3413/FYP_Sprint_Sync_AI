@@ -8,36 +8,20 @@ use App\Models\User;
 use App\Modules\Teams\Actions\RemoveWorkspaceMemberAction;
 use App\Modules\Teams\Actions\UpdateWorkspaceMemberRoleAction;
 use App\Modules\Teams\Http\Requests\UpdateTeamMemberRequest;
-use App\Modules\Teams\Services\TeamRoster;
 use App\Modules\Workspace\Models\Workspace;
-use App\Modules\Workspace\Models\WorkspaceRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 
 final class TeamMemberController
 {
-    public function __construct(private readonly TeamRoster $roster) {}
-
-    public function index(Request $request, Workspace $workspace): Response
+    /**
+     * The roster now lives in People. Old links and bookmarks still work.
+     */
+    public function index(Request $request, Workspace $workspace): RedirectResponse
     {
         abort_unless($request->user()->can('viewTeam', $workspace), 403);
 
-        return Inertia::render('teams/index', [
-            'members' => $this->roster->forWorkspace($workspace, $request->user()),
-            'canManageMembers' => $request->user()->can('manageMembers', $workspace),
-            'canInviteMembers' => $request->user()->can('invite', $workspace),
-            'seatLimit' => (int) config('workspace.seat_limit'),
-            'workspaceRoles' => $workspace->roles()
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (WorkspaceRole $role) => [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                ])
-                ->values(),
-        ]);
+        return to_route('workspace.people.index', $workspace);
     }
 
     public function update(

@@ -31,6 +31,7 @@ final class CreateWorkspaceAction
             $workspace = Workspace::create([
                 'name' => $data->name,
                 'slug' => $data->slug,
+                'timezone' => $data->timezone ?? $owner->resolvedTimezone(),
                 'settings' => $data->settings,
                 'is_active' => $data->is_active,
                 'owner_id' => $owner->id,

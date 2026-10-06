@@ -7,6 +7,7 @@ namespace App\Modules\Audit\Actions;
 use App\Models\User;
 use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Workspace\Data\FinancePermission;
 use App\Modules\Workspace\Models\Workspace;
 use App\UserRole;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -52,6 +53,34 @@ final class SearchAuditLogAction
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function visibleCategories(Workspace $workspace, User $viewer): array
+    {
+        return array_values(array_diff(AuditAction::categories(), $this->hiddenCategories($workspace, $viewer)));
+    }
+
+    /**
+     * Categories whose entries carry finance or people data, minus the ones
+     * this viewer is allowed to see.
+     *
+     * @return array<int, string>
+     */
+    private function hiddenCategories(Workspace $workspace, User $viewer): array
+    {
+        $restricted = [
+            AuditAction::BILLING_CATEGORY => FinancePermission::View,
+            AuditAction::PEOPLE_CATEGORY => FinancePermission::PeopleView,
+            AuditAction::TIME_CATEGORY => FinancePermission::PeopleView,
+        ];
+
+        return array_keys(array_filter(
+            $restricted,
+            fn (FinancePermission $permission) => ! $workspace->allowsFinance($viewer, $permission),
+        ));
+    }
+
+    /**
      * @return Collection<int, object{id: int, name: string}>
      */
     public function visibleProjects(Workspace $workspace, User $viewer): Collection
@@ -80,6 +109,10 @@ final class SearchAuditLogAction
         if (! $workspace->userHasAtLeast($viewer, UserRole::ADMIN)) {
             $managedProjectIds = $workspace->managedProjectsFor($viewer)->pluck('id');
             $query->whereIn('project_id', $managedProjectIds);
+        }
+
+        foreach ($this->hiddenCategories($workspace, $viewer) as $category) {
+            $query->whereNotIn('action', AuditAction::valuesForCategory($category));
         }
 
         return $query;

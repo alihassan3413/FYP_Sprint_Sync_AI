@@ -2,13 +2,27 @@
 import { type BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 
-import { AlertTriangle, ArrowRight, Bell, Building2, CreditCard, Info, Lock, Mail, ScrollText, ShieldCheck, Users } from 'lucide-vue-next';
+import {
+    AlertTriangle,
+    ArrowRight,
+    Bell,
+    Building2,
+    CreditCard,
+    Info,
+    Lock,
+    Mail,
+    ReceiptText,
+    ScrollText,
+    ShieldCheck,
+    Users,
+} from 'lucide-vue-next';
 
 const props = defineProps<{
     workspaceProfile: {
         id: number;
         name: string;
         slug: string;
+        timezone: string;
         created_at: string;
     };
     canViewAuditLog: boolean;
@@ -16,6 +30,9 @@ const props = defineProps<{
     canDeleteWorkspace: boolean;
     canManageMembers: boolean;
     canInviteMembers: boolean;
+    canViewTeam: boolean;
+    canManageInvoicing: boolean;
+    emailDeliveryConnected: boolean;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -56,16 +73,60 @@ const settings = computed<SettingsCard[]>(() => [
     {
         key: 'roles',
         icon: ShieldCheck,
-        title: 'Role Management',
-        description: 'Define custom workspace roles and assign fine-grained permissions to control what members can see and do.',
+        title: 'Access & permissions',
+        description: 'Who can do what inside SprintSync: Owner, Admin, Member, and custom access roles you define.',
         badge: 'available',
         badgeLabel: 'Available',
         action: {
-            label: 'Manage roles',
+            label: 'Manage access roles',
             href: workspaceRoute('workspace.roles.index'),
         },
         highlighted: true,
     },
+    ...(props.canViewTeam
+        ? [
+              {
+                  key: 'people',
+                  icon: Users,
+                  title: 'Team',
+                  description: 'Everyone who works with your business, their job and department, and who can sign in to SprintSync.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Open Team',
+                      href: workspaceRoute('workspace.people.index'),
+                  },
+              },
+          ]
+        : []),
+    ...(props.canManageInvoicing
+        ? [
+              {
+                  key: 'invoicing',
+                  icon: ReceiptText,
+                  title: 'Invoicing',
+                  description: 'Your business name, address, tax ID and logo, as they appear on the invoices you send.',
+                  badge: 'available' as const,
+                  badgeLabel: 'Available',
+                  action: {
+                      label: 'Edit invoicing details',
+                      href: workspaceRoute('workspace.invoicing.edit'),
+                  },
+              },
+              {
+                  key: 'email-delivery',
+                  icon: Mail,
+                  title: 'Email delivery',
+                  description: 'The email account your invoices are sent from, so clients receive them from your own address.',
+                  badge: (props.emailDeliveryConnected ? 'available' : 'later') as BadgeVariant,
+                  badgeLabel: props.emailDeliveryConnected ? 'Connected' : 'Not connected',
+                  action: {
+                      label: props.emailDeliveryConnected ? 'Manage email delivery' : 'Connect email',
+                      href: workspaceRoute('workspace.mail-settings.edit'),
+                  },
+              },
+          ]
+        : []),
     ...(props.canViewAuditLog
         ? [
               {
@@ -88,42 +149,12 @@ const settings = computed<SettingsCard[]>(() => [
                   key: 'profile',
                   icon: Building2,
                   title: 'Workspace Profile',
-                  description: 'Update your workspace name and URL identifier.',
+                  description: 'Update your workspace name, URL identifier and timezone.',
                   badge: 'available' as const,
                   badgeLabel: 'Available',
                   action: {
-                      label: 'Rename workspace',
+                      label: 'Edit workspace',
                       onClick: () => (isRenameModalOpen.value = true),
-                  },
-              },
-          ]
-        : []),
-    {
-        key: 'members',
-        icon: Users,
-        title: 'Members',
-        description: props.canManageMembers
-            ? 'View every member of this workspace, change their roles, and remove access.'
-            : 'See who belongs to this workspace.',
-        badge: 'available',
-        badgeLabel: 'Available',
-        action: {
-            label: props.canManageMembers ? 'Manage members' : 'View members',
-            href: workspaceRoute('workspace.teams.index'),
-        },
-    },
-    ...(props.canInviteMembers
-        ? [
-              {
-                  key: 'invitations',
-                  icon: Mail,
-                  title: 'Invitations',
-                  description: 'Invite new teammates by email and manage invitations that are still pending.',
-                  badge: 'available' as const,
-                  badgeLabel: 'Available',
-                  action: {
-                      label: 'Invite a teammate',
-                      href: workspaceRoute('workspace.invitations.create'),
                   },
               },
           ]

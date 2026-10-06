@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Archive, BarChart3, BookOpen, Folder, FolderKanban, LayoutGrid, ShieldCheck, Users2 } from 'lucide-vue-next';
+import { Archive, BarChart3, Building2, FolderKanban, LayoutGrid, PieChart, ReceiptText, ShieldCheck, Timer, Users2, Wallet } from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
@@ -28,10 +27,18 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
+    if (navigation.value?.time) {
+        items.push({
+            title: 'Time',
+            href: workspaceRoute('workspace.time.index'),
+            icon: Timer,
+        });
+    }
+
     if (navigation.value?.team) {
         items.push({
-            title: 'Teams',
-            href: workspaceRoute('workspace.teams.index'),
+            title: 'Team',
+            href: workspaceRoute('workspace.people.index'),
             icon: Users2,
         });
     }
@@ -65,18 +72,36 @@ const mainNavItems = computed<NavItem[]>(() => {
     return items;
 });
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen,
-    },
-];
+/**
+ * Money is its own group so finance never blends into project work. It only
+ * appears for people with finance access (the workspace owner in v1).
+ */
+const moneyNavItems = computed<NavItem[]>(() =>
+    navigation.value?.finance
+        ? [
+              {
+                  title: 'Overview',
+                  href: workspaceRoute('workspace.finance.overview'),
+                  icon: PieChart,
+              },
+              {
+                  title: 'Invoices',
+                  href: workspaceRoute('workspace.invoices.index'),
+                  icon: ReceiptText,
+              },
+              {
+                  title: 'Clients',
+                  href: workspaceRoute('workspace.clients.index'),
+                  icon: Building2,
+              },
+              {
+                  title: 'Expenses',
+                  href: workspaceRoute('workspace.expenses.index'),
+                  icon: Wallet,
+              },
+          ]
+        : [],
+);
 </script>
 
 <template>
@@ -93,10 +118,10 @@ const footerNavItems: NavItem[] = [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+            <NavMain v-if="moneyNavItems.length" :items="moneyNavItems" label="Money" />
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

@@ -1,0 +1,71 @@
+# UAT packaging. Builds are unsigned until the signing identities exist;
+# production also needs notarization and a signed update feed (README.md).
+#
+# appId is permanent: it names the app's data folder, its Keychain / DPAPI
+# entries and OS permissions. Never change it.
+appId: com.sprintsync.desktop
+productName: SprintSync
+copyright: Copyright © 2026 SprintSync
+directories:
+  output: dist
+  # Icons generated from public/favicon.svg by `npm run icons`.
+  buildResources: build
+files:
+  - out/**
+  - resources/**
+  - package.json
+asar: true
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  artifactName: ${productName}-${version}-macos-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  # UAT: ad-hoc signature only ("-"). Apple silicon refuses to run a bundle
+  # whose signature is broken (packaging and fuses change the binary), and
+  # ad-hoc is not a Developer ID: Gatekeeper still treats the app as an
+  # unsigned, un-notarized test build. Production replaces this with the
+  # Developer ID identity, hardenedRuntime: true and notarization.
+  identity: '-'
+  hardenedRuntime: false
+win:
+  icon: build/icon.ico
+  executableName: SprintSync
+  artifactName: ${productName}-${version}-windows-${arch}.${ext}
+  # Once a code-signing certificate exists, add its publisher name here
+  # (publisherName) and the signing settings; see README.md.
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  shortcutName: SprintSync
+linux:
+  icon: build/icons
+  executableName: sprintsync
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  target: AppImage
+  category: Office
+dmg:
+  title: ${productName} ${version}
+  artifactName: ${productName}-${version}-macos-${arch}.${ext}
+# Electron fuses, flipped in the packaged binary: it can't be run as plain
+# Node, ignores NODE_OPTIONS / --inspect, and only loads its own, checked app
+# archive. (file:// keeps its default privileges because the window is a
+# bundled file.)
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableCookieEncryption: true
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true

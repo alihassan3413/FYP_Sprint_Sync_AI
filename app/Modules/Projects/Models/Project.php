@@ -11,6 +11,7 @@ use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Workspace\Models\Workspace;
 use App\ProjectRole;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
+ * @property string $public_id opaque id for other modules' URLs and payloads (time tracking); its own routes still use id
  * @property string $name
  * @property string|null $description
  * @property int $workspace_id
@@ -26,7 +28,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    /**
+     * public_id is generated on create; the integer key and the existing
+     * numeric routes are unchanged.
+     *
+     * @return array<int, string>
+     */
+    public function uniqueIds(): array
+    {
+        return ['public_id'];
+    }
 
     protected $fillable = [
         'name',

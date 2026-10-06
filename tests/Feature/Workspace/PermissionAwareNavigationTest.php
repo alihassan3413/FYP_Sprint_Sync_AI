@@ -159,7 +159,7 @@ final class PermissionAwareNavigationTest extends TestCase
 
     public function test_a_custom_role_without_project_visibility_stays_locked_out(): void
     {
-        $viewer = $this->customRoleMember([WorkspacePermission::BillingView]);
+        $viewer = $this->customRoleMember([WorkspacePermission::IntegrationsView]);
 
         $this->dashboard($viewer)
             ->assertInertia(fn ($page) => $page

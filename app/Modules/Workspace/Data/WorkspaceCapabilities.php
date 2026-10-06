@@ -16,6 +16,8 @@ final class WorkspaceCapabilities
         public readonly bool $viewArchive,
         public readonly bool $viewAudit,
         public readonly bool $viewWorkspaceSettings,
+        public readonly bool $viewFinance,
+        public readonly bool $viewTime,
         public readonly bool $createProjects,
         public readonly bool $manageWorkspace,
         public readonly bool $manageMembers,
@@ -36,6 +38,8 @@ final class WorkspaceCapabilities
             'archive' => $this->viewArchive,
             'audit' => $this->viewAudit,
             'workspaceSettings' => $this->viewWorkspaceSettings,
+            'finance' => $this->viewFinance,
+            'time' => $this->viewTime,
         ];
     }
 

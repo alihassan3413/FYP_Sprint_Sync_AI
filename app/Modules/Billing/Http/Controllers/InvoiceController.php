@@ -1,0 +1,205 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Billing\Http\Controllers;
+
+use App\Modules\Billing\Actions\ApproveInvoiceAction;
+use App\Modules\Billing\Actions\CancelInvoiceSendingAction;
+use App\Modules\Billing\Actions\RefreshInvoiceSenderAction;
+use App\Modules\Billing\Actions\RefreshInvoiceTrackedHoursAction;
+use App\Modules\Billing\Actions\UpdateInvoiceLinesAction;
+use App\Modules\Billing\Data\InvoiceData;
+use App\Modules\Billing\Data\InvoiceSummaryData;
+use App\Modules\Billing\Data\PaymentMethod;
+use App\Modules\Billing\Http\Requests\ApproveInvoiceRequest;
+use App\Modules\Billing\Http\Requests\UpdateInvoiceLinesRequest;
+use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Models\InvoicingProfile;
+use App\Modules\Billing\Support\InvoicePdfRenderer;
+use App\Modules\Billing\Support\OfficialInvoicePdf;
+use App\Modules\Billing\Support\PaymentTotals;
+use App\Modules\Billing\Support\SenderSnapshot;
+use App\Modules\Billing\Support\TrackedHours;
+use App\Modules\Workspace\Models\Workspace;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+final class InvoiceController
+{
+    public function index(Request $request, Workspace $workspace, PaymentTotals $totals): Response
+    {
+        abort_unless($request->user()->can('viewAny', [Invoice::class, $workspace]), 403);
+
+        $invoices = PaymentTotals::withPaid($workspace->invoices()->getQuery())
+            ->with('delivery')
+            ->withCount(['lines as lines_missing_hours' => fn ($query) => $query->whereNull('quantity_centi')])
+            ->orderByDesc('period_start')
+            ->orderByDesc('id')
+            ->get();
+
+        $summaries = $invoices->map(InvoiceSummaryData::fromModel(...));
+
+        return Inertia::render('invoices/index', [
+            'needsYou' => $summaries->filter(fn (InvoiceSummaryData $invoice) => $invoice->attention !== null)
+                ->sortBy(fn (InvoiceSummaryData $invoice) => $invoice->attention['priority'], SORT_NUMERIC)
+                ->values(),
+            'invoices' => $summaries->values(),
+            'waitingToBePaid' => $totals->waiting($workspace),
+            'receivedThisMonth' => $totals->receivedThisMonth($workspace),
+        ]);
+    }
+
+    public function show(Request $request, Workspace $workspace, Invoice $invoice, TrackedHours $trackedHours): Response
+    {
+        abort_unless($request->user()->can('view', $invoice), 403);
+
+        $invoice->load(['lines', 'adjustments', 'approver:id,name', 'client:id,public_id', 'delivery']);
+
+        return Inertia::render('invoices/show', [
+            'invoice' => InvoiceData::fromModel($invoice),
+            'canEdit' => $request->user()->can('update', $invoice),
+            'canApprove' => $request->user()->can('approve', $invoice),
+            'sendDelayMinutes' => (int) config('finance.approval_send_delay_minutes'),
+            'canRecordPayments' => $request->user()->can('recordPayment', $invoice),
+            'paymentMethods' => PaymentMethod::options(),
+            'today' => CarbonImmutable::now($workspace->timezone)->toDateString(),
+            'canManageInvoicing' => $request->user()->can('manage', [InvoicingProfile::class, $workspace]),
+            'hasCompleteInvoicingDetails' => SenderSnapshot::isComplete(SenderSnapshot::from($workspace->invoicingProfile)),
+            'canSend' => $request->user()->can('send', $invoice),
+            'trackedUpdate' => $this->trackedUpdate($invoice, $trackedHours),
+            'mailConnected' => $workspace->mailSettings()->exists(),
+        ]);
+    }
+
+    public function refreshHours(Request $request, Workspace $workspace, Invoice $invoice, RefreshInvoiceTrackedHoursAction $action): RedirectResponse
+    {
+        abort_unless($request->user()->can('update', $invoice), 403);
+
+        $action->handle($invoice, $request->user());
+
+        return back()->with('success', 'Recorded hours refreshed. Hours you changed yourself were kept.');
+    }
+
+    /**
+     * Has time been recorded (or corrected) for this period since the draft
+     * read it? Only drafts: approved and issued invoices never change.
+     *
+     * @return array{delta_seconds: int, lines: int}|null
+     */
+    private function trackedUpdate(Invoice $invoice, TrackedHours $trackedHours): ?array
+    {
+        if (! $invoice->status->isEditable() || ! TrackedHours::applies($invoice)) {
+            return null;
+        }
+
+        $delta = 0;
+        $lines = 0;
+
+        foreach ($invoice->lines as $line) {
+            if ($line->person_id === null) {
+                continue;
+            }
+
+            $difference = $trackedHours->secondsFor($invoice, $line->person_id) - (int) $line->tracked_seconds;
+
+            if ($difference !== 0) {
+                $delta += $difference;
+                $lines++;
+            }
+        }
+
+        return $lines === 0 ? null : ['delta_seconds' => $delta, 'lines' => $lines];
+    }
+
+    public function updateLines(UpdateInvoiceLinesRequest $request, Workspace $workspace, Invoice $invoice, UpdateInvoiceLinesAction $action): RedirectResponse
+    {
+        $action->handle($invoice, $request->values(), $request->user(), $request->reasons());
+
+        return back();
+    }
+
+    public function approve(ApproveInvoiceRequest $request, Workspace $workspace, Invoice $invoice, ApproveInvoiceAction $action): RedirectResponse
+    {
+        $invoice = $action->handle($invoice, $request->integer('version'), $request->user());
+
+        return back()->with('success', $invoice->isIssued()
+            ? "This invoice was already issued as {$invoice->number}."
+            : 'Approved. Scheduled to send in '.self::delayLabel().'. You can cancel sending if you need to make a change.');
+    }
+
+    public function cancelSending(Request $request, Workspace $workspace, Invoice $invoice, CancelInvoiceSendingAction $action): RedirectResponse
+    {
+        abort_unless($request->user()->can('cancelSending', $invoice), 403);
+
+        $action->handle($invoice, $request->user());
+
+        return back()->with('success', 'Sending cancelled. You can edit the invoice again.');
+    }
+
+    /**
+     * The invoice as a PDF. Before it is issued: a DRAFT rendered on demand.
+     * Once issued: the stored official document, written once and never
+     * regenerated (OfficialInvoicePdf).
+     */
+    public function pdf(Request $request, Workspace $workspace, Invoice $invoice, InvoicePdfRenderer $renderer, OfficialInvoicePdf $official): HttpResponse|StreamedResponse
+    {
+        abort_unless($request->user()->can('view', $invoice), 403);
+
+        $filename = $renderer->filename($invoice);
+
+        if (! $invoice->isIssued()) {
+            return response($renderer->pdf($invoice->load(['lines', 'adjustments'])), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename),
+                'Cache-Control' => 'private, no-store',
+            ]);
+        }
+
+        return Storage::disk(OfficialInvoicePdf::DISK)->download($official->ensure($invoice), $filename, [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    /** The logo this invoice was prepared with (its own snapshot), for the invoice page. */
+    public function logo(Request $request, Workspace $workspace, Invoice $invoice): StreamedResponse
+    {
+        abort_unless($request->user()->can('view', $invoice), 403);
+
+        $path = $invoice->bill_from['logo_path'] ?? null;
+        abort_if($path === null || ! Storage::disk(InvoicingProfile::LOGO_DISK)->exists($path), 404);
+
+        return Storage::disk(InvoicingProfile::LOGO_DISK)->response($path, null, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=31536000, immutable',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function refreshSender(Request $request, Workspace $workspace, Invoice $invoice, RefreshInvoiceSenderAction $action): RedirectResponse
+    {
+        abort_unless($request->user()->can('update', $invoice), 403);
+
+        $action->handle($invoice, $request->user());
+
+        return back()->with('success', 'This invoice now uses your current invoicing details.');
+    }
+
+    /** "1 hour", "30 minutes", "2 hours" from finance.approval_send_delay_minutes. */
+    private static function delayLabel(): string
+    {
+        $minutes = (int) config('finance.approval_send_delay_minutes');
+
+        return $minutes % 60 === 0
+            ? trans_choice('{1} 1 hour|[2,*] :count hours', intdiv($minutes, 60))
+            : trans_choice('{1} 1 minute|[2,*] :count minutes', $minutes);
+    }
+}

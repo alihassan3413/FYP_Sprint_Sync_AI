@@ -38,8 +38,12 @@ function handleClose(value: boolean) {
 <template>
     <AppModal
         :open="open"
-        title="Remove member"
-        :description="member ? `${member.name} will immediately lose access to this workspace.` : undefined"
+        title="Remove SprintSync access"
+        :description="
+            member
+                ? `${member.name} will no longer be able to sign in to this workspace. They stay on your team; only their login is removed.`
+                : undefined
+        "
         size="sm"
         @update:open="handleClose"
     >
@@ -47,7 +51,7 @@ function handleClose(value: boolean) {
             <Button type="button" variant="outline" :disabled="processing" @click="handleClose(false)"> Cancel </Button>
             <Button type="button" variant="destructive" :disabled="processing" @click="confirm">
                 <Loader2 v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ processing ? 'Removing…' : 'Remove member' }}
+                {{ processing ? 'Removing…' : 'Remove access' }}
             </Button>
         </template>
     </AppModal>

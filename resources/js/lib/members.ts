@@ -5,7 +5,8 @@
  * a Vue file. Pure functions only — no rendering concerns here.
  */
 
-export type MemberStatus = 'active' | 'away' | 'offline' | 'pending' | 'suspended';
+/** 'none' = a People profile with no SprintSync access (owner view only). */
+export type MemberStatus = 'active' | 'away' | 'offline' | 'pending' | 'suspended' | 'none';
 export type MemberRole = 'owner' | 'admin' | 'member' | 'client' | 'guest' | 'billing';
 
 export interface WorkspaceRoleOption {
@@ -13,11 +14,20 @@ export interface WorkspaceRoleOption {
     name: string;
 }
 
+/** Job details merged onto a row, only for viewers allowed to see People profiles. */
+export interface MemberProfile {
+    public_id: string;
+    title: string | null;
+    department: string | null;
+}
+
 export interface Member {
-    id: number;
+    /** User id for members; "invitation-…" / "person-…" for the other rows. */
+    id: number | string;
     name: string;
     email: string;
-    role: MemberRole;
+    /** Null on rows with no SprintSync access */
+    role: MemberRole | null;
     /** Custom workspace role assigned on top of the system role, if any */
     workspace_role_id?: number | null;
     workspace_role_name?: string | null;
@@ -32,6 +42,9 @@ export interface Member {
     invitation_id?: number | null;
     /** Acceptance link for a pending invitation — only sent to viewers who can invite */
     invite_url?: string | null;
+    person?: MemberProfile | null;
+    /** A member whose email matches this profile, not linked yet */
+    link_suggested?: boolean;
 }
 
 /**

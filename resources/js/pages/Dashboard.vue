@@ -96,9 +96,9 @@ const onboardingSteps = computed<ChecklistStep[]>(() => [
     {
         key: 'roles',
         title: 'Assign roles',
-        description: 'Decide who can manage projects and billing.',
+        description: 'Decide who can manage projects and settings.',
         done: props.onboarding.role_assigned,
-        href: workspaceRoute('workspace.teams.index'),
+        href: workspaceRoute('workspace.people.index'),
         minutes: 1,
     },
     {
@@ -291,7 +291,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                 <div class="flex flex-col gap-4">
                     <UpcomingMeetingsCard :upcoming="upcomingMeetings" :past="pastMeetings" />
 
-                    <OnlineNowCard v-if="showWorkspaceOverview" :members="onlineMembers" :view-all-href="workspaceRoute('workspace.teams.index')" />
+                    <OnlineNowCard v-if="showWorkspaceOverview" :members="onlineMembers" :view-all-href="workspaceRoute('workspace.people.index')" />
 
                     <!-- Tip card — small, only shows when relevant -->
                     <div v-if="capabilities.canManageWorkspace && !allDone" class="bg-muted/20 rounded-3xl border border-dashed p-4 text-xs">

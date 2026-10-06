@@ -9,10 +9,17 @@ declare global {
   const DEFAULT_ATTACHMENT_LIMITS: typeof import('../lib/attachments').DEFAULT_ATTACHMENT_LIMITS
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
+  const INVOICE_STATUS_STYLES: typeof import('../lib/billing').INVOICE_STATUS_STYLES
   const Link: typeof import('@inertiajs/vue3').Link
+  const PAYMENT_STATUS_STYLES: typeof import('../lib/billing').PAYMENT_STATUS_STYLES
   const PROJECT_ROLES: typeof import('../lib/projects').PROJECT_ROLES
+  const REMINDER_OPTIONS: typeof import('../lib/billing').REMINDER_OPTIONS
+  const archName: typeof import('../lib/desktop').archName
   const archiveTypeLabel: typeof import('../lib/archive').archiveTypeLabel
+  const basisPointsToInput: typeof import('../lib/billing').basisPointsToInput
+  const calculateTotals: typeof import('../lib/billing').calculateTotals
   const categoryBadgeVariant: typeof import('../lib/audit').categoryBadgeVariant
+  const clientInitials: typeof import('../lib/clients').clientInitials
   const cn: typeof import('../lib/utils').cn
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
@@ -21,19 +28,28 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const deliveryNote: typeof import('../lib/billing').deliveryNote
+  const detectPlatform: typeof import('../lib/desktop').detectPlatform
   const detectTimezone: typeof import('../lib/timezones').detectTimezone
   const effectScope: typeof import('vue').effectScope
   const extensionOf: typeof import('../lib/attachments').extensionOf
   const formatAuditTimestamp: typeof import('../lib/audit').formatAuditTimestamp
-  const formatBytes: typeof import('../lib/attachments').formatBytes
+  const formatBusinessDate: typeof import('../lib/time').formatBusinessDate
+  const formatBytes: typeof import('../lib/desktop').formatBytes
+  const formatClock: typeof import('../lib/time').formatClock
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
-  const formatDuration: typeof import('../lib/meetings').formatDuration
+  const formatDuration: typeof import('../lib/time').formatDuration
   const formatLastActive: typeof import('../lib/members').formatLastActive
   const formatMeetingDate: typeof import('../lib/meetings').formatMeetingDate
   const formatMeetingTime: typeof import('../lib/meetings').formatMeetingTime
+  const formatMoney: typeof import('../lib/money').formatMoney
   const formatOccurredAt: typeof import('../lib/archive').formatOccurredAt
+  const formatPeriod: typeof import('../lib/time').formatPeriod
+  const formatShortDate: typeof import('../lib/billing').formatShortDate
   const formatSprintRange: typeof import('../lib/sprints').formatSprintRange
+  const formatTimeOfDay: typeof import('../lib/time').formatTimeOfDay
+  const generationDayFor: typeof import('../lib/billing').generationDayFor
   const getCodeHandler: typeof import('../lib/errors/errorCodeHandlers').getCodeHandler
   const getCsrfToken: typeof import('../lib/csrf').getCsrfToken
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -44,6 +60,7 @@ declare global {
   const greeting: typeof import('../lib/activity').greeting
   const h: typeof import('vue').h
   const handleError: typeof import('../lib/errors/handleError').handleError
+  const hoursToInput: typeof import('../lib/billing').hoursToInput
   const initializeTheme: typeof import('../composables/useAppearance').initializeTheme
   const inject: typeof import('vue').inject
   const isOverdue: typeof import('../lib/tasks').isOverdue
@@ -55,9 +72,14 @@ declare global {
   const isShallow: typeof import('vue').isShallow
   const isSupportedTimezone: typeof import('../lib/timezones').isSupportedTimezone
   const isValidMeetingLink: typeof import('../lib/meetings').isValidMeetingLink
+  const lineAmount: typeof import('../lib/billing').lineAmount
   const markRaw: typeof import('vue').markRaw
   const meaningfulTokens: typeof import('../lib/command-search').meaningfulTokens
   const memberPresence: typeof import('../lib/members').memberPresence
+  const minorToInput: typeof import('../lib/billing').minorToInput
+  const minorUnits: typeof import('../lib/money').minorUnits
+  const monthName: typeof import('../lib/billing').monthName
+  const nextCycle: typeof import('../lib/billing').nextCycle
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -73,14 +95,20 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const ordinal: typeof import('../lib/billing').ordinal
   const parseError: typeof import('../lib/errors/handleError').parseError
+  const parseScaled: typeof import('../lib/billing').parseScaled
+  const periodLabel: typeof import('../lib/billing').periodLabel
+  const platformChoices: typeof import('../lib/desktop').platformChoices
   const provide: typeof import('vue').provide
   const rankFindings: typeof import('../lib/health').rankFindings
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const requestKey: typeof import('../lib/time').requestKey
   const resolveComponent: typeof import('vue').resolveComponent
   const router: typeof import('@inertiajs/vue3').router
+  const rowStatus: typeof import('../lib/billing').rowStatus
   const scoreCommand: typeof import('../lib/command-search').scoreCommand
   const searchCommands: typeof import('../lib/command-search').searchCommands
   const severityDot: typeof import('../lib/health').severityDot
@@ -183,8 +211,17 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus, DeliveryStatus } from '../lib/billing'
+  import('../lib/billing')
+  // @ts-ignore
+  export type { Client, CurrencyOption } from '../lib/clients'
+  import('../lib/clients')
+  // @ts-ignore
   export type { SearchableCommand } from '../lib/command-search'
   import('../lib/command-search')
+  // @ts-ignore
+  export type { DesktopDownload, PlatformChoice } from '../lib/desktop'
+  import('../lib/desktop')
   // @ts-ignore
   export type { HealthVerdict, FindingSeverity, HealthFinding, WorkloadEntry, ProjectHealth } from '../lib/health'
   import('../lib/health')
@@ -192,8 +229,11 @@ declare global {
   export type { MeetingParticipant, MeetingTranscript, Meeting } from '../lib/meetings'
   import('../lib/meetings')
   // @ts-ignore
-  export type { MemberStatus, MemberRole, WorkspaceRoleOption, Member } from '../lib/members'
+  export type { MemberStatus, MemberRole, WorkspaceRoleOption, MemberProfile, Member } from '../lib/members'
   import('../lib/members')
+  // @ts-ignore
+  export type { Department, LinkedUser, Person, LinkableUser } from '../lib/people'
+  import('../lib/people')
   // @ts-ignore
   export type { Project, ProjectRoleValue, ProjectMember } from '../lib/projects'
   import('../lib/projects')
@@ -216,10 +256,17 @@ declare module 'vue' {
     readonly DEFAULT_ATTACHMENT_LIMITS: UnwrapRef<typeof import('../lib/attachments')['DEFAULT_ATTACHMENT_LIMITS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
+    readonly INVOICE_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['INVOICE_STATUS_STYLES']>
     readonly Link: UnwrapRef<typeof import('@inertiajs/vue3')['Link']>
+    readonly PAYMENT_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['PAYMENT_STATUS_STYLES']>
     readonly PROJECT_ROLES: UnwrapRef<typeof import('../lib/projects')['PROJECT_ROLES']>
+    readonly REMINDER_OPTIONS: UnwrapRef<typeof import('../lib/billing')['REMINDER_OPTIONS']>
+    readonly archName: UnwrapRef<typeof import('../lib/desktop')['archName']>
     readonly archiveTypeLabel: UnwrapRef<typeof import('../lib/archive')['archiveTypeLabel']>
+    readonly basisPointsToInput: UnwrapRef<typeof import('../lib/billing')['basisPointsToInput']>
+    readonly calculateTotals: UnwrapRef<typeof import('../lib/billing')['calculateTotals']>
     readonly categoryBadgeVariant: UnwrapRef<typeof import('../lib/audit')['categoryBadgeVariant']>
+    readonly clientInitials: UnwrapRef<typeof import('../lib/clients')['clientInitials']>
     readonly cn: UnwrapRef<typeof import('../lib/utils')['cn']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -228,19 +275,28 @@ declare module 'vue' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly deliveryNote: UnwrapRef<typeof import('../lib/billing')['deliveryNote']>
+    readonly detectPlatform: UnwrapRef<typeof import('../lib/desktop')['detectPlatform']>
     readonly detectTimezone: UnwrapRef<typeof import('../lib/timezones')['detectTimezone']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extensionOf: UnwrapRef<typeof import('../lib/attachments')['extensionOf']>
     readonly formatAuditTimestamp: UnwrapRef<typeof import('../lib/audit')['formatAuditTimestamp']>
-    readonly formatBytes: UnwrapRef<typeof import('../lib/attachments')['formatBytes']>
+    readonly formatBusinessDate: UnwrapRef<typeof import('../lib/time')['formatBusinessDate']>
+    readonly formatBytes: UnwrapRef<typeof import('../lib/desktop')['formatBytes']>
+    readonly formatClock: UnwrapRef<typeof import('../lib/time')['formatClock']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
-    readonly formatDuration: UnwrapRef<typeof import('../lib/meetings')['formatDuration']>
+    readonly formatDuration: UnwrapRef<typeof import('../lib/time')['formatDuration']>
     readonly formatLastActive: UnwrapRef<typeof import('../lib/members')['formatLastActive']>
     readonly formatMeetingDate: UnwrapRef<typeof import('../lib/meetings')['formatMeetingDate']>
     readonly formatMeetingTime: UnwrapRef<typeof import('../lib/meetings')['formatMeetingTime']>
+    readonly formatMoney: UnwrapRef<typeof import('../lib/money')['formatMoney']>
     readonly formatOccurredAt: UnwrapRef<typeof import('../lib/archive')['formatOccurredAt']>
+    readonly formatPeriod: UnwrapRef<typeof import('../lib/time')['formatPeriod']>
+    readonly formatShortDate: UnwrapRef<typeof import('../lib/billing')['formatShortDate']>
     readonly formatSprintRange: UnwrapRef<typeof import('../lib/sprints')['formatSprintRange']>
+    readonly formatTimeOfDay: UnwrapRef<typeof import('../lib/time')['formatTimeOfDay']>
+    readonly generationDayFor: UnwrapRef<typeof import('../lib/billing')['generationDayFor']>
     readonly getCodeHandler: UnwrapRef<typeof import('../lib/errors/errorCodeHandlers')['getCodeHandler']>
     readonly getCsrfToken: UnwrapRef<typeof import('../lib/csrf')['getCsrfToken']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -251,6 +307,7 @@ declare module 'vue' {
     readonly greeting: UnwrapRef<typeof import('../lib/activity')['greeting']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly handleError: UnwrapRef<typeof import('../lib/errors/handleError')['handleError']>
+    readonly hoursToInput: UnwrapRef<typeof import('../lib/billing')['hoursToInput']>
     readonly initializeTheme: UnwrapRef<typeof import('../composables/useAppearance')['initializeTheme']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isOverdue: UnwrapRef<typeof import('../lib/tasks')['isOverdue']>
@@ -262,9 +319,14 @@ declare module 'vue' {
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly isSupportedTimezone: UnwrapRef<typeof import('../lib/timezones')['isSupportedTimezone']>
     readonly isValidMeetingLink: UnwrapRef<typeof import('../lib/meetings')['isValidMeetingLink']>
+    readonly lineAmount: UnwrapRef<typeof import('../lib/billing')['lineAmount']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly meaningfulTokens: UnwrapRef<typeof import('../lib/command-search')['meaningfulTokens']>
     readonly memberPresence: UnwrapRef<typeof import('../lib/members')['memberPresence']>
+    readonly minorToInput: UnwrapRef<typeof import('../lib/billing')['minorToInput']>
+    readonly minorUnits: UnwrapRef<typeof import('../lib/money')['minorUnits']>
+    readonly monthName: UnwrapRef<typeof import('../lib/billing')['monthName']>
+    readonly nextCycle: UnwrapRef<typeof import('../lib/billing')['nextCycle']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
@@ -280,14 +342,20 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly ordinal: UnwrapRef<typeof import('../lib/billing')['ordinal']>
     readonly parseError: UnwrapRef<typeof import('../lib/errors/handleError')['parseError']>
+    readonly parseScaled: UnwrapRef<typeof import('../lib/billing')['parseScaled']>
+    readonly periodLabel: UnwrapRef<typeof import('../lib/billing')['periodLabel']>
+    readonly platformChoices: UnwrapRef<typeof import('../lib/desktop')['platformChoices']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly rankFindings: UnwrapRef<typeof import('../lib/health')['rankFindings']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
+    readonly requestKey: UnwrapRef<typeof import('../lib/time')['requestKey']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly router: UnwrapRef<typeof import('@inertiajs/vue3')['router']>
+    readonly rowStatus: UnwrapRef<typeof import('../lib/billing')['rowStatus']>
     readonly scoreCommand: UnwrapRef<typeof import('../lib/command-search')['scoreCommand']>
     readonly searchCommands: UnwrapRef<typeof import('../lib/command-search')['searchCommands']>
     readonly severityDot: UnwrapRef<typeof import('../lib/health')['severityDot']>

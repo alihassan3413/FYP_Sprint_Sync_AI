@@ -7,10 +7,15 @@ use App\Modules\Archive\Providers\ArchiveServiceProvider;
 use App\Modules\Assistant\Providers\AssistantServiceProvider;
 use App\Modules\Attachments\Providers\AttachmentsServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
+use App\Modules\Billing\Providers\BillingServiceProvider;
+use App\Modules\Desktop\Providers\DesktopServiceProvider;
+use App\Modules\Expenses\Providers\ExpensesServiceProvider;
 use App\Modules\Meetings\Providers\MeetingsServiceProvider;
+use App\Modules\People\Providers\PeopleServiceProvider;
 use App\Modules\Projects\Providers\ProjectsServiceProvider;
 use App\Modules\Tasks\Providers\TasksServiceProvider;
 use App\Modules\Teams\Providers\TeamsServiceProvider;
+use App\Modules\TimeTracking\Providers\TimeTrackingServiceProvider;
 use App\Modules\Workspace\Providers\WorkspaceServiceProvider;
 use App\Providers\AppServiceProvider;
 
@@ -26,5 +31,10 @@ return [
     AnalyticsServiceProvider::class,
     AttachmentsServiceProvider::class,
     AuditServiceProvider::class,
+    BillingServiceProvider::class,
+    PeopleServiceProvider::class,
+    TimeTrackingServiceProvider::class,
+    DesktopServiceProvider::class,
+    ExpensesServiceProvider::class,
     AdminServiceProvider::class,
 ];

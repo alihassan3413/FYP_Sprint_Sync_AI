@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Audit\Models;
 
 use App\Models\User;
+use App\Modules\Audit\Data\ActorType;
 use App\Modules\Audit\Database\Factories\AuditLogFactory;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Workspace\Models\Workspace;
@@ -34,6 +35,7 @@ final class AuditLog extends Model
         'workspace_id',
         'project_id',
         'user_id',
+        'actor_type',
         'action',
         'subject_type',
         'subject_id',
@@ -45,6 +47,7 @@ final class AuditLog extends Model
     {
         return [
             'metadata' => 'array',
+            'actor_type' => ActorType::class,
             'created_at' => 'datetime',
         ];
     }

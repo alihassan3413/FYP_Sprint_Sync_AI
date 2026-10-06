@@ -58,6 +58,14 @@ export default defineConfig({
                 IconsResolver({
                     prefix: 'Icon',
                 }),
+                // Inertia's <Head> and <Link> are used in templates without an
+                // import. AutoImport only covers script identifiers, so without
+                // this they compile to native <head>/<link> elements: titles
+                // never update and links render as empty, unclickable tags.
+                (componentName) =>
+                    componentName === 'Head' || componentName === 'Link'
+                        ? { name: componentName, from: '@inertiajs/vue3' }
+                        : undefined,
             ],
         }),
     ],

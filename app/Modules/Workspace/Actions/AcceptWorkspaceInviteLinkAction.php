@@ -7,6 +7,7 @@ namespace App\Modules\Workspace\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\People\Actions\LinkJoiningMemberAction;
 use App\Modules\Workspace\Exceptions\WorkspaceException;
 use App\Modules\Workspace\Models\WorkspaceInviteLink;
 use App\UserRole;
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 final class AcceptWorkspaceInviteLinkAction
 {
-    public function __construct(private readonly RecordAuditLogAction $auditLogger) {}
+    public function __construct(
+        private readonly RecordAuditLogAction $auditLogger,
+        private readonly LinkJoiningMemberAction $linkPerson,
+    ) {}
 
     public function handle(WorkspaceInviteLink $link, User $user): WorkspaceInviteLink
     {
@@ -40,6 +44,8 @@ final class AcceptWorkspaceInviteLinkAction
             $user->forceFill(['current_workspace_id' => $workspace->id])->save();
 
             $link->increment('uses');
+
+            $this->linkPerson->handle($workspace, $user);
         });
 
         $this->auditLogger->handle(
