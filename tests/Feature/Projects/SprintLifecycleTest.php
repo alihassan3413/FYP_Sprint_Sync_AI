@@ -237,4 +237,38 @@ final class SprintLifecycleTest extends TestCase
 
         $this->assertNull($task->fresh()->completed_at);
     }
+
+    public function test_an_existing_task_can_be_moved_into_a_sprint_created_later(): void
+    {
+        $task = $this->task();
+        $sprint = Sprint::factory()->create(['project_id' => $this->project->id]);
+
+        $this->actingAs($this->owner)
+            ->put(route('workspace.projects.tasks.update', [
+                'workspace' => $this->workspace->slug,
+                'project' => $this->project->id,
+                'task' => $task->id,
+            ]), ['title' => $task->title, 'description' => $task->description, 'sprint_id' => $sprint->id])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertSame($sprint->id, $task->fresh()->sprint_id);
+    }
+
+    public function test_a_task_cannot_be_moved_into_another_projects_sprint(): void
+    {
+        $task = $this->task();
+        $otherProject = Project::factory()->forWorkspace($this->workspace)->create();
+        $foreignSprint = Sprint::factory()->create(['project_id' => $otherProject->id]);
+
+        $this->actingAs($this->owner)
+            ->put(route('workspace.projects.tasks.update', [
+                'workspace' => $this->workspace->slug,
+                'project' => $this->project->id,
+                'task' => $task->id,
+            ]), ['title' => $task->title, 'sprint_id' => $foreignSprint->id])
+            ->assertSessionHasErrors('sprint_id');
+
+        $this->assertNull($task->fresh()->sprint_id);
+    }
 }
