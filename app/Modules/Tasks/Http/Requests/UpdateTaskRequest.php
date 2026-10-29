@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Http\Requests;
 
 use App\Models\User;
+use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Models\Sprint;
 use App\Modules\Tasks\Data\StoreTaskData;
 use App\Modules\Tasks\Models\Task;
 use App\UserRole;
@@ -64,6 +66,11 @@ final class UpdateTaskRequest extends FormRequest
     public function task(): Task
     {
         return $this->route('task');
+    }
+
+    public function project(): Project
+    {
+        return $this->route('project');
     }
 
     public function toDTO(): StoreTaskData

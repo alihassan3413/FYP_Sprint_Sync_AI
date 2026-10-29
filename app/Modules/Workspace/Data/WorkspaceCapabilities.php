@@ -33,6 +33,7 @@ final class WorkspaceCapabilities
     {
         return [
             'projects' => $this->viewProjects,
+            'myWork' => $this->viewProjects,
             'team' => $this->viewTeam,
             'analytics' => $this->viewAnalytics,
             'archive' => $this->viewArchive,

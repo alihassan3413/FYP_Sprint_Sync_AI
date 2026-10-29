@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tasks\Http\Controllers\BoardColumnController;
+use App\Modules\Tasks\Http\Controllers\MyWorkController;
 use App\Modules\Tasks\Http\Controllers\TaskCommentController;
 use App\Modules\Tasks\Http\Controllers\TaskController;
 use App\Support\Routing\TenantRoute;
@@ -24,4 +25,8 @@ TenantRoute::prefixed('projects/{project}/board-columns', 'workspace.projects.bo
     Route::post('/', [BoardColumnController::class, 'store'])->name('store');
     Route::patch('reorder', [BoardColumnController::class, 'reorder'])->name('reorder');
     Route::delete('{boardColumn}', [BoardColumnController::class, 'destroy'])->name('destroy');
+});
+
+TenantRoute::prefixed('my-work', 'workspace.my-work.', function () {
+    Route::get('/', MyWorkController::class)->name('index');
 });

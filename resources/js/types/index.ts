@@ -55,6 +55,7 @@ export interface NotificationsContext {
 
 export interface NavigationContext {
     projects: boolean;
+    myWork?: boolean;
     team: boolean;
     analytics: boolean;
     archive: boolean;
