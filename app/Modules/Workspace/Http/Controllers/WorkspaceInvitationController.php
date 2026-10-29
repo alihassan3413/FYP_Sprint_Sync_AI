@@ -112,6 +112,7 @@ final class WorkspaceInvitationController
                 'email' => $invitation->email,
                 'role' => $invitation->role->value,
                 'custom_role' => $invitation->customRole?->name,
+                'timezone' => $invitation->timezone,
                 'workspace' => ['name' => $invitation->workspace->name],
             ],
         ]);

@@ -16,6 +16,7 @@ use App\Modules\People\Http\Requests\GivePersonAccessRequest;
 use App\Modules\People\Http\Requests\StorePersonRequest;
 use App\Modules\People\Http\Requests\UpdatePersonRequest;
 use App\Modules\People\Models\Person;
+use App\Modules\People\Models\TeamImport;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Models\WorkspaceRole;
 use App\UserRole;
@@ -40,6 +41,7 @@ final class PersonController
         $canManagePeople = $user->can('create', [Person::class, $workspace]);
 
         return Inertia::render('people/index', [
+            'canImport' => $user->can('create', [TeamImport::class, $workspace]),
             'members' => $directory->handle($workspace, $user, $canViewProfiles),
             'canViewProfiles' => $canViewProfiles,
             'canManagePeople' => $canManagePeople,

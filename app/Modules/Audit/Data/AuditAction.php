@@ -100,6 +100,8 @@ enum AuditAction: string
     case PERSON_UPDATED = 'person.updated';
     case PERSON_USER_LINKED = 'person.user_linked';
     case PERSON_USER_UNLINKED = 'person.user_unlinked';
+    case PERSON_IMPORT_CONFIRMED = 'person.import_confirmed';
+    case PERSON_IMPORT_COMPLETED = 'person.import_completed';
     case DEPARTMENT_CREATED = 'department.created';
 
     case ACCOUNT_PROFILE_UPDATED = 'account.profile_updated';
@@ -252,6 +254,8 @@ enum AuditAction: string
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',
             self::PERSON_USER_UNLINKED => 'Person unlinked from user',
+            self::PERSON_IMPORT_CONFIRMED => 'Teammate import started',
+            self::PERSON_IMPORT_COMPLETED => 'Teammate import finished',
             self::DEPARTMENT_CREATED => 'Department created',
             self::ACCOUNT_PROFILE_UPDATED => 'Profile updated',
             self::ACCOUNT_PASSWORD_CHANGED => 'Password changed',

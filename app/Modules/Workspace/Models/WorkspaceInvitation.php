@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string $email
  * @property UserRole $role
  * @property int|null $workspace_role_id
+ * @property string|null $timezone
  * @property string $token
  * @property int $workspace_id
  * @property int $invited_by
@@ -33,6 +34,7 @@ final class WorkspaceInvitation extends Model
         'email',
         'role',
         'workspace_role_id',
+        'timezone',
         'token',
         'workspace_id',
         'invited_by',

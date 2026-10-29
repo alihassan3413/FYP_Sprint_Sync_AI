@@ -19,6 +19,11 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #56 added bulk teammate import from XLSX/CSV on the Team page:
+upload, per-row validation and preview, confirm, chunked queued processing and
+a downloadable issue report. **No FR status changes** — it is admin tooling over
+the existing people, invitation, role and schedule actions, not a new FR.
+
 Entry #55 added a `/` command picker to the Assistant input: a searchable,
 authorization-filtered list of the 18 tools, matched against natural phrasing
 ("want to create workspace" finds the workspace tool). **No FR status changes**
@@ -5601,6 +5606,75 @@ reports 8 files, **none of them touched by this entry** — pre-existing
 formatting drift in `app.ts`, `NotificationBell.vue`, the two project modals,
 `TaskCommentThread.vue` and three pages; worth a separate `npm run format`
 pass.
+
+### 56. Bulk teammate import (XLSX/CSV)
+
+Owners and admins can now invite a whole team from a spreadsheet: **Team →
+Import teammates** offers an `.xlsx`/`.csv` template, a drag-and-drop upload,
+a preview that classifies every row, an explicit confirm, live progress and a
+final result with a downloadable issue report.
+
+**Upload never changes anything.** `StageTeamImportAction` stores the file on
+the private disk (`team-imports/{public_id}/`), hashes it, parses it and
+validates every row into `team_imports` / `team_import_rows` with status
+`ready`, `warning`, `skipped` or `error` and the reasons. Invitations are only
+sent after **Confirm**, which moves the import `validated → queued` with a
+conditional update, so a double click or a second tab confirms once. An
+unconfirmed import expires after 24 hours (`people:prune-team-imports`, hourly),
+and the file is deleted on completion, cancel or expiry; orphaned upload
+folders are swept too.
+
+**No new dependency.** XLSX is read with `ZipArchive` + `XMLReader` (first
+sheet via the workbook relationships, shared and inline strings, sparse
+cells) and the template is written the same way; production provisioning
+already installs `php-zip` and `php-xml`. Limits: 2 MB and 500 rows.
+
+**Email is the identity key and the existing flows do the work.**
+`ProcessTeamImportRowAction` reuses `CreatePersonAction`,
+`GivePersonAccessAction`, `CreateWorkspaceInvitationAction` and
+`SaveWorkScheduleAction`: no passwords are imported and no accounts are
+created. Existing workspace members and pending invitations are skipped;
+someone with a SprintSync account elsewhere gets the normal invitation (no
+duplicate user, and they join only by accepting); an existing team profile
+without a login is reused rather than duplicated; guests (`client`) get an
+invitation but no team profile. Every row is re-checked when processed, so
+someone who joined between preview and confirm is skipped, not re-invited.
+
+**Columns resolve to existing records only.** `role` is `admin`, `member` or
+`client`, optionally with an existing custom role (`member: Quote Lead`); an
+unknown custom role is a row error, never created. `schedule` is `default` or a
+teammate's email, whose current own schedule is copied as a new version for
+the new person; anything else is a warning and the workspace schedule applies.
+There is no `team` column because the product has no Team entity — `department`
+is the grouping, created on first use exactly as the Team page already does
+(the preview says so). `timezone` pre-fills the invitation's accept page
+(new nullable `workspace_invitations.timezone`); the person can still change it.
+
+**Processing is chunked and retry-safe.** `ProcessTeamImportJob`
+(`ShouldBeUniqueUntilProcessing`) handles 25 rows, then re-queues itself until
+none remain. Each row is locked and stamped `processed_at` in one transaction,
+so a retried or duplicated job never re-sends an invitation; a row that throws
+is recorded as `failed` with its message and the rest carry on. Completion is a
+one-time conditional update.
+
+**Audit.** `person.import_confirmed` records who started which file and how
+many rows; `person.import_completed` records the invited / linked / skipped /
+failed counts. Both sit in the owner-gated "Team profiles" audit category.
+
+**Issue report.** `GET team/imports/{import}/issues` streams a CSV of every row
+needing attention with its original values, status, result and messages;
+cells starting with `= + - @` are prefixed to prevent spreadsheet formula
+injection.
+
+Tests: `tests/Feature/People/TeamImportTest.php` (22, incl. a data provider)
+covers templates, owner/admin/member/guest/outsider access, preview
+classification, an Excel-style workbook with shared strings, bad files (type,
+size, missing columns, empty, too many rows, corrupt), duplicate staging, the
+full confirm flow, double confirm, retry-safe chunking over 60 rows, re-checks
+at processing time, cancel, expiry and orphan cleanup, the issue report and the
+accept-page timezone. Full suite: 1926 passed. Pint, ESLint and the production
+build pass; `vue-tsc` still reports only the two pre-existing tsconfig
+type-entry errors (TS2688).
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

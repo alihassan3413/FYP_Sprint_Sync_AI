@@ -18,5 +18,7 @@ final class WorkspaceInvitationData extends Data
         public UserRole $role,
 
         public ?int $workspace_role_id = null,
+
+        public ?string $timezone = null,
     ) {}
 }
