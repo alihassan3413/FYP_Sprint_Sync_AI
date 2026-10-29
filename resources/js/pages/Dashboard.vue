@@ -14,7 +14,7 @@ import type { Member } from '@/lib/members';
 
 const props = defineProps<{
     user: { name: string; email: string };
-    workspaceMeta: { name: string; created_at: string; plan?: string }; // ← was `workspace`
+    workspaceMeta: { name: string; created_at: string; plan?: string; timezone?: string }; // ← was `workspace`
     members: Member[];
     pendingInvitesCount: number;
     activity: ActivityEntry[];
@@ -143,6 +143,7 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
                     <h1 class="mt-1 text-[clamp(1.9rem,4vw,2.75rem)] leading-[1.02] font-semibold tracking-[-0.035em]">
                         {{ isPersonalScope ? 'My' : 'Team' }} <span class="dash-mark">Dashboard</span>
                     </h1>
+                    <WorkingClock v-if="workspaceMeta.timezone" class="mt-2" :timezone="workspaceMeta.timezone" caption="Workspace time" />
                 </div>
 
                 <div class="flex shrink-0 flex-wrap items-center gap-2">

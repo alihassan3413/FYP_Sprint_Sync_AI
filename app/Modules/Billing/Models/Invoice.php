@@ -7,6 +7,8 @@ namespace App\Modules\Billing\Models;
 use App\Models\User;
 use App\Modules\Billing\Data\Currency;
 use App\Modules\Billing\Data\DeliveryMode;
+use App\Modules\Billing\Data\InvoiceDisplayStatus;
+use App\Modules\Billing\Data\InvoiceSource;
 use App\Modules\Billing\Data\InvoiceStatus;
 use App\Modules\Billing\Data\PaymentStatus;
 use App\Modules\Billing\Data\PricingMode;
@@ -76,10 +78,14 @@ final class Invoice extends Model
 
     protected $guarded = ['id', 'public_id'];
 
+    protected $attributes = ['source' => 'plan'];
+
     protected function casts(): array
     {
         return [
             'status' => InvoiceStatus::class,
+            'source' => InvoiceSource::class,
+            'voided_at' => 'datetime',
             'pricing_mode' => PricingMode::class,
             'delivery_mode' => DeliveryMode::class,
             'currency' => Currency::class,
@@ -166,6 +172,26 @@ final class Invoice extends Model
     public function isIssued(): bool
     {
         return $this->status === InvoiceStatus::Issued;
+    }
+
+    public function isManual(): bool
+    {
+        return $this->source === InvoiceSource::Manual;
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->voided_at !== null;
+    }
+
+    public function displayStatus(): InvoiceDisplayStatus
+    {
+        return match (true) {
+            $this->isVoided() => InvoiceDisplayStatus::Void,
+            ! $this->isIssued() => InvoiceDisplayStatus::Draft,
+            $this->paymentStatus() === PaymentStatus::Paid => InvoiceDisplayStatus::Paid,
+            default => InvoiceDisplayStatus::Sent,
+        };
     }
 
     public function delivery(): HasOne

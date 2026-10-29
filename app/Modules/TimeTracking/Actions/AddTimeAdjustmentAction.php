@@ -54,7 +54,7 @@ final class AddTimeAdjustmentAction
                     throw TimeTrackingException::invalid('That would make this time negative. At most '.$this->hours($effective).' can be removed.');
                 }
 
-                return $this->create($entry->person, $entry->project_id, $entry->task_id, $entry->project_name, $entry->task_title, $entry->period_start->toImmutable(), $entry->period_end->toImmutable(), $seconds, $reason, $entry->billable, $idempotencyKey, $actor, $entry->id);
+                return $this->create($entry->person, $entry->project_id, $entry->task_id, $entry->project_name, $entry->task_title, $entry->period_start->toImmutable(), $entry->period_end->toImmutable(), $seconds, $reason, $entry->billable, $idempotencyKey, $actor, $entry->id, $entry->timezone);
             });
         } catch (UniqueConstraintViolationException $exception) {
             return $this->existing($entry->workspace_id, $idempotencyKey) ?? throw $exception;
@@ -78,7 +78,7 @@ final class AddTimeAdjustmentAction
         }
 
         try {
-            $adjustment = $this->create($person, $project->id, $task?->id, $project->name, $task?->title, $periodStart, $periodEnd, $seconds, $reason, $billable, $idempotencyKey, $actor, null);
+            $adjustment = $this->create($person, $project->id, $task?->id, $project->name, $task?->title, $periodStart, $periodEnd, $seconds, $reason, $billable, $idempotencyKey, $actor, null, $project->effectiveTimezone());
         } catch (UniqueConstraintViolationException $exception) {
             return $this->existing($person->workspace_id, $idempotencyKey) ?? throw $exception;
         }
@@ -88,7 +88,7 @@ final class AddTimeAdjustmentAction
         return $adjustment;
     }
 
-    private function create(Person $person, ?int $projectId, ?int $taskId, string $projectName, ?string $taskTitle, CarbonImmutable $start, CarbonImmutable $end, int $seconds, string $reason, bool $billable, string $key, User $actor, ?int $adjusts): TimeEntry
+    private function create(Person $person, ?int $projectId, ?int $taskId, string $projectName, ?string $taskTitle, CarbonImmutable $start, CarbonImmutable $end, int $seconds, string $reason, bool $billable, string $key, User $actor, ?int $adjusts, string $timezone): TimeEntry
     {
         return TimeEntry::query()->forceCreate([
             'workspace_id' => $person->workspace_id,
@@ -102,7 +102,7 @@ final class AddTimeAdjustmentAction
             'duration_seconds' => $seconds,
             'period_start' => $start->toDateString(),
             'period_end' => $end->toDateString(),
-            'timezone' => $person->workspace->timezone,
+            'timezone' => $timezone,
             'billable' => $billable,
             'note' => $reason,
             'idempotency_key' => $key,

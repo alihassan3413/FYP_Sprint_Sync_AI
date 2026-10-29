@@ -53,6 +53,7 @@ final class DashboardController
             'workspaceMeta' => [
                 'name' => $workspace->name,
                 'created_at' => $workspace->created_at->toIso8601String(),
+                'timezone' => $workspace->timezone,
             ],
             'members' => $capabilities->manageMembers ? $this->members($workspace, $user) : collect(),
             'pendingInvitesCount' => $capabilities->manageMembers ? $workspace->pendingInvitations()->count() : 0,

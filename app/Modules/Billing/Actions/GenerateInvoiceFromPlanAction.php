@@ -131,13 +131,7 @@ final class GenerateInvoiceFromPlanAction
             'generated_on' => $cycle->generationDate,
             'planned_send_on' => $cycle->sendDate,
             'due_in_days' => $plan->due_in_days,
-            'bill_to' => [
-                'name' => $client->name,
-                'billing_email' => $client->billing_email,
-                'cc_emails' => $client->cc_emails ?? [],
-                'address' => $client->address,
-                'tax_id' => $client->tax_id,
-            ],
+            'bill_to' => $client->billingSnapshot(),
             'bill_from' => SenderSnapshot::from($plan->workspace->invoicingProfile),
             'time_project_ids' => $hourly && $plan->projects()->exists() ? $plan->projects()->pluck('projects.id')->all() : null,
         ])->save();

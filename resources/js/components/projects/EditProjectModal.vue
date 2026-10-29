@@ -62,7 +62,9 @@ function handleClose(value: boolean) {
             />
 
             <div class="grid gap-1.5">
-                <Label for="edit-project-description" class="text-sm font-medium">Description <span class="text-muted-foreground font-normal">(optional)</span></Label>
+                <Label for="edit-project-description" class="text-sm font-medium"
+                    >Description <span class="text-muted-foreground font-normal">(optional)</span></Label
+                >
                 <Textarea
                     id="edit-project-description"
                     v-model="form.description"

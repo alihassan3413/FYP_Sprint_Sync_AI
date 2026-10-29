@@ -18,6 +18,9 @@ final class ProjectData extends Data
         public int $workspace_id,
         public string $created_at,
         public string $updated_at,
+        public ?string $timezone = null,
+        public string $effective_timezone = 'UTC',
+        public string $workspace_timezone = 'UTC',
     ) {}
 
     public static function fromModel(Project $project): self
@@ -29,6 +32,9 @@ final class ProjectData extends Data
             workspace_id: $project->workspace_id,
             created_at: $project->created_at->toIso8601String(),
             updated_at: $project->updated_at->toIso8601String(),
+            timezone: $project->timezone,
+            effective_timezone: $project->effectiveTimezone(),
+            workspace_timezone: $project->workspace?->timezone ?? (string) config('app.timezone'),
         );
     }
 }

@@ -54,6 +54,10 @@ final class RecordPaymentAction
                     throw PaymentException::invoiceNotIssued();
                 }
 
+                if ($invoice->isVoided()) {
+                    throw PaymentException::invoiceVoided();
+                }
+
                 $payment = $invoice->payments()->forceCreate([
                     'workspace_id' => $invoice->workspace_id,
                     'idempotency_key' => $idempotencyKey,

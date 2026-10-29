@@ -44,8 +44,14 @@ final class Project extends Model
     protected $fillable = [
         'name',
         'description',
+        'timezone',
         'workspace_id',
     ];
+
+    public function effectiveTimezone(): string
+    {
+        return $this->timezone ?? $this->workspace?->timezone ?? (string) config('app.timezone');
+    }
 
     public function sprints(): HasMany
     {

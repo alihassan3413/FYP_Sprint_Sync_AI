@@ -60,7 +60,7 @@ final class StartTimerAction
                     'segment_started_at' => $now,
                     'accumulated_seconds' => 0,
                     'longest_segment_seconds' => 0,
-                    'timezone' => $person->workspace->timezone,
+                    'timezone' => $project->effectiveTimezone(),
                     'billable' => $billable,
                     'note' => $note,
                     'started_by' => $actor->id,

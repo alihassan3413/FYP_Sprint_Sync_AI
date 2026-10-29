@@ -58,7 +58,7 @@ final class InvoiceData extends Data
         #[LiteralTypeScriptType('PaymentData[]')]
         public array $payments,
         /** The email delivery. The error is already a short, safe sentence. */
-        #[LiteralTypeScriptType("{ status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention'; status_label: string; recipient: string; cc: string[]; attempts: number; last_attempted_at: string | null; sent_at: string | null; error: string | null } | null")]
+        #[LiteralTypeScriptType("{ status: 'pending' | 'sending' | 'sent' | 'failed' | 'needs_attention'; status_label: string; recipient: string; cc: string[]; recipients: string[]; bcc: string[]; message: string | null; attempts: number; last_attempted_at: string | null; sent_at: string | null; error: string | null } | null")]
         public ?array $delivery,
         public bool $approved_automatically,
         /** Hours come from time tracking (recorded) and can be overridden (billed). */
@@ -69,6 +69,10 @@ final class InvoiceData extends Data
         /** Why automatic sending is waiting for the owner, while it is. */
         #[LiteralTypeScriptType('{ code: AutomationReason; message: string }[]')]
         public array $automation_reasons,
+        public ?string $notes = null,
+        public ?string $voided_at = null,
+        public ?string $void_reason = null,
+        public ?string $currency_code = null,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -117,6 +121,9 @@ final class InvoiceData extends Data
                 'status_label' => $invoice->delivery->status->label(),
                 'recipient' => $invoice->delivery->recipient,
                 'cc' => $invoice->delivery->cc ?? [],
+                'recipients' => $invoice->delivery->recipients ?? [$invoice->delivery->recipient],
+                'bcc' => $invoice->delivery->bcc ?? [],
+                'message' => $invoice->delivery->message,
                 'attempts' => $invoice->delivery->attempts,
                 'last_attempted_at' => $invoice->delivery->last_attempted_at?->toIso8601String(),
                 'sent_at' => $invoice->delivery->sent_at?->toIso8601String(),
@@ -127,6 +134,10 @@ final class InvoiceData extends Data
             tracked_at: $invoice->tracked_at?->toIso8601String(),
             sends_automatically: InvoiceAttention::sendsAutomatically($invoice),
             automation_reasons: InvoiceAttention::reasons($invoice),
+            notes: $invoice->notes,
+            voided_at: $invoice->voided_at?->toIso8601String(),
+            void_reason: $invoice->void_reason,
+            currency_code: $invoice->currency->value,
         );
     }
 }

@@ -4,6 +4,7 @@ import { CalendarPlus, Clock, Coffee, History, Loader2, Pause, Play, Plus, Setti
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatBusinessDate, formatClock, formatClockTime, formatDuration, formatPeriod, formatTimeOfDay, requestKey } from '@/lib/time';
+import { zoneLabel } from '@/lib/timezones';
 import { type BreadcrumbItem } from '@/types';
 import type { TimeEntryData, TimerData } from '@/types/generated';
 
@@ -264,7 +265,7 @@ function entryActions(entry: TimeEntryData): DropdownEntry[] {
 /** "9:12 AM – 12:30 PM" for tracked time, otherwise the day or period it belongs to. */
 function when(entry: TimeEntryData): string {
     if (entry.started_at && entry.ended_at) {
-        return `${formatPeriod(entry.period_start, entry.period_start)} · ${formatTimeOfDay(entry.started_at, props.timezone)} – ${formatTimeOfDay(entry.ended_at, props.timezone)}`;
+        return `${formatPeriod(entry.period_start, entry.period_start)} · ${formatTimeOfDay(entry.started_at, entry.timezone ?? props.timezone)} – ${formatTimeOfDay(entry.ended_at, entry.timezone ?? props.timezone)}${entry.timezone && entry.timezone !== props.timezone ? ` ${zoneLabel(entry.timezone)}` : ''}`;
     }
 
     return formatPeriod(entry.period_start, entry.period_end);
@@ -298,7 +299,10 @@ const workdayContext = computed(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
             <AppPageHeader eyebrow="Work" title="Time" description="Track time on your projects, or add time you worked without a timer." />
-            <p class="text-muted-foreground -mt-4 text-xs" data-testid="workday-context">{{ workdayContext }}</p>
+            <div class="-mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <p class="text-muted-foreground text-xs" data-testid="workday-context">{{ workdayContext }}</p>
+                <WorkingClock :timezone="timezone" caption="Workspace time" />
+            </div>
 
             <!-- Owner: whose time, and previous hours -->
             <div v-if="canManageTeam" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -462,8 +466,9 @@ const workdayContext = computed(() => {
                                         }}<span v-if="timer.task" class="text-muted-foreground font-normal"> · {{ timer.task.title }}</span>
                                     </p>
                                     <p class="text-muted-foreground text-xs">
-                                        Started {{ formatTimeOfDay(timer.started_at, timezone)
-                                        }}<template v-if="!timer.billable"> · Non-billable</template>
+                                        Started {{ formatTimeOfDay(timer.started_at, timer.timezone ?? timezone)
+                                        }}<template v-if="timer.timezone && timer.timezone !== timezone"> {{ zoneLabel(timer.timezone) }}</template
+                                        ><template v-if="!timer.billable"> · Non-billable</template>
                                     </p>
                                 </div>
                                 <p class="text-4xl font-semibold tracking-tight tabular-nums" data-testid="timer-clock">{{ formatClock(elapsed) }}</p>

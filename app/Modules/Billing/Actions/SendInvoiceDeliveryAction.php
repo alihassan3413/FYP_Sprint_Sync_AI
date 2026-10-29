@@ -68,6 +68,10 @@ final class SendInvoiceDeliveryAction
                 throw new MailDeliveryFailure('Email delivery is not connected for this workspace.', false);
             }
 
+            if ($invoice->isVoided()) {
+                throw new MailDeliveryFailure('This invoice was voided before it was sent.', false);
+            }
+
             $this->pdf->ensure($invoice);
             $this->mailer->send($settings, new InvoiceEmail($invoice->refresh(), $delivery));
         } catch (MailDeliveryFailure $failure) {

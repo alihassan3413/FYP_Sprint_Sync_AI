@@ -34,7 +34,7 @@ final class PaymentTotals
     {
         $owed = [];
 
-        self::withPaid($workspace->invoices()->where('status', InvoiceStatus::Issued->value)->getQuery())
+        self::withPaid($workspace->invoices()->where('status', InvoiceStatus::Issued->value)->whereNull('voided_at')->getQuery())
             ->get(['id', 'currency', 'total_minor'])
             ->each(function (Invoice $invoice) use (&$owed) {
                 $balance = $invoice->balanceDueMinor();

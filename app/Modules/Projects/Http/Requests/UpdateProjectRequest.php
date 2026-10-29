@@ -23,6 +23,7 @@ final class UpdateProjectRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'timezone' => ['sometimes', 'nullable', 'string', 'timezone:all'],
         ];
     }
 

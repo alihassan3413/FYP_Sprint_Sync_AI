@@ -35,6 +35,8 @@
     .totals td { padding: 3pt 0; }
     .totals .grand td { border-top: 1pt solid #111827; padding-top: 7pt; font-size: 12pt; font-weight: bold; color: #111827; }
     .watermark { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 96pt; font-weight: bold; letter-spacing: 12pt; color: #111827; opacity: 0.05; transform: rotate(-30deg); }
+    .notes { margin-top: 18pt; font-size: 8.5pt; color: #4b5563; }
+    .notes-label { font-weight: bold; color: #1f2328; margin-bottom: 2pt; }
     .footer { position: fixed; bottom: -12mm; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #9ca3af; }
     .pre { white-space: pre-line; }
 </style>
@@ -66,7 +68,10 @@
         </td>
         <td style="width: 45%;" class="right">
             <div class="title">INVOICE</div>
-            @if ($isDraft)
+            @if ($isVoided)
+                <div class="draft-tag">VOID</div>
+                <div style="font-size: 11pt; font-weight: bold; margin-top: 2pt;">{{ $invoice->number }}</div>
+            @elseif ($isDraft)
                 <div class="draft-tag">DRAFT</div>
             @else
                 <div style="font-size: 11pt; font-weight: bold; margin-top: 2pt;">{{ $invoice->number }}</div>
@@ -78,7 +83,9 @@
                 @else
                     <tr><td class="key">Payment due</td><td class="right">{{ $invoice->due_in_days }} days after issue</td></tr>
                 @endif
-                <tr><td class="key">Period</td><td class="right">{{ $period }}</td></tr>
+                @if ($period)
+                    <tr><td class="key">Period</td><td class="right">{{ $period }}</td></tr>
+                @endif
             </table>
         </td>
     </tr>
@@ -137,6 +144,10 @@
     @endforeach
     <tr class="grand"><td>Total {{ $invoice->currency->value }}</td><td class="num">{{ $total }}</td></tr>
 </table>
+
+@if ($notes)
+    <div class="notes"><div class="notes-label">Notes</div>{!! nl2br(e($notes)) !!}</div>
+@endif
 
 <div class="footer">{{ $isDraft ? 'Draft — not a valid invoice until issued.' : ($from['business_name'] ?? '').' · '.$invoice->number }}</div>
 </body>

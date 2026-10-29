@@ -7,6 +7,7 @@
 export {}
 declare global {
   const DEFAULT_ATTACHMENT_LIMITS: typeof import('../lib/attachments').DEFAULT_ATTACHMENT_LIMITS
+  const DISPLAY_STATUS_STYLES: typeof import('../lib/billing').DISPLAY_STATUS_STYLES
   const EffectScope: typeof import('vue').EffectScope
   const Head: typeof import('@inertiajs/vue3').Head
   const INVOICE_STATUS_STYLES: typeof import('../lib/billing').INVOICE_STATUS_STYLES
@@ -172,6 +173,9 @@ declare global {
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
   const watchSyncEffect: typeof import('vue').watchSyncEffect
+  const zoneAbbreviation: typeof import('../lib/timezones').zoneAbbreviation
+  const zoneCity: typeof import('../lib/timezones').zoneCity
+  const zoneLabel: typeof import('../lib/timezones').zoneLabel
 }
 // for type re-export
 declare global {
@@ -212,7 +216,7 @@ declare global {
   export type { AuditLogEntry, AuditProjectOption, AuditActorOption, AuditFilters, AuditPage } from '../lib/audit'
   import('../lib/audit')
   // @ts-ignore
-  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus, DeliveryStatus } from '../lib/billing'
+  export type { PricingMode, AdjustmentKind, AdjustmentType, TeamMemberOption, PlanTotals, InvoiceStatus, PaymentStatus, DisplayStatus, DeliveryStatus } from '../lib/billing'
   import('../lib/billing')
   // @ts-ignore
   export type { Client, CurrencyOption } from '../lib/clients'
@@ -255,6 +259,7 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly DEFAULT_ATTACHMENT_LIMITS: UnwrapRef<typeof import('../lib/attachments')['DEFAULT_ATTACHMENT_LIMITS']>
+    readonly DISPLAY_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['DISPLAY_STATUS_STYLES']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly Head: UnwrapRef<typeof import('@inertiajs/vue3')['Head']>
     readonly INVOICE_STATUS_STYLES: UnwrapRef<typeof import('../lib/billing')['INVOICE_STATUS_STYLES']>
@@ -420,5 +425,8 @@ declare module 'vue' {
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>
     readonly watchSyncEffect: UnwrapRef<typeof import('vue')['watchSyncEffect']>
+    readonly zoneAbbreviation: UnwrapRef<typeof import('../lib/timezones')['zoneAbbreviation']>
+    readonly zoneCity: UnwrapRef<typeof import('../lib/timezones')['zoneCity']>
+    readonly zoneLabel: UnwrapRef<typeof import('../lib/timezones')['zoneLabel']>
   }
 }

@@ -46,6 +46,7 @@ final class FinanceOverview
             'invoiced' => Invoice::query()
                 ->where('workspace_id', $workspace->id)
                 ->where('status', InvoiceStatus::Issued)
+                ->whereNull('voided_at')
                 ->whereDate('issue_date', '>=', $from->toDateString())
                 ->whereDate('issue_date', '<=', $to->toDateString())
                 ->get(['id', 'total_minor', 'currency', 'issue_date'])
