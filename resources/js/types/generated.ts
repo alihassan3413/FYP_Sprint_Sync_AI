@@ -71,6 +71,7 @@ export enum AuditAction {
     INVITE_LINK_JOINED = 'invite_link.joined',
     PROJECT_CREATED = 'project.created',
     PROJECT_UPDATED = 'project.updated',
+    PROJECT_TIMEZONE_CHANGED = 'project.timezone_changed',
     PROJECT_DELETED = 'project.deleted',
     PROJECT_MEMBER_ADDED = 'project.member_added',
     PROJECT_MEMBER_REMOVED = 'project.member_removed',
@@ -134,6 +135,11 @@ export enum AuditAction {
     TIME_REVIEW_RESOLVED = 'time.review_resolved',
     INVOICE_HOURS_REFRESHED = 'invoice.hours_refreshed',
     INVOICE_HOURS_OVERRIDDEN = 'invoice.hours_overridden',
+    INVOICE_CREATED = 'invoice.created',
+    INVOICE_SEND_QUEUED = 'invoice.send_queued',
+    INVOICE_MARKED_PAID = 'invoice.marked_paid',
+    INVOICE_VOIDED = 'invoice.voided',
+    INVOICE_DOWNLOADED = 'invoice.downloaded',
     EXPENSE_RECORDED = 'expense.recorded',
     EXPENSE_VOIDED = 'expense.voided',
     EXPENSE_RECURRING_SAVED = 'expense.recurring_saved',
@@ -368,6 +374,9 @@ export type InvoiceData = {
         status_label: string;
         recipient: string;
         cc: string[];
+        recipients: string[];
+        bcc: string[];
+        message: string | null;
         attempts: number;
         last_attempted_at: string | null;
         sent_at: string | null;
@@ -378,7 +387,21 @@ export type InvoiceData = {
     tracked_at?: string;
     sends_automatically: boolean;
     automation_reasons: { code: AutomationReason; message: string }[];
+    notes?: string;
+    voided_at?: string;
+    void_reason?: string;
+    currency_code?: string;
 };
+export enum InvoiceDisplayStatus {
+    Draft = 'draft',
+    Sent = 'sent',
+    Paid = 'paid',
+    Void = 'void',
+}
+export enum InvoiceSource {
+    Plan = 'plan',
+    Manual = 'manual',
+}
 export enum InvoiceStatus {
     NeedsHours = 'needs_hours',
     ReadyToReview = 'ready_to_review',
@@ -413,6 +436,11 @@ export type InvoiceSummaryData = {
         reason: string;
         action: string;
     } | null;
+    source: 'plan' | 'manual';
+    display_status: 'draft' | 'sent' | 'paid' | 'void';
+    display_status_label: string;
+    issue_date?: string;
+    due_date?: string;
 };
 export enum LeaveType {
     Paid = 'paid',
@@ -527,6 +555,9 @@ export type ProjectData = {
     workspace_id: number;
     created_at: string;
     updated_at: string;
+    timezone?: string;
+    effective_timezone: string;
+    workspace_timezone: string;
 };
 export type ProjectHealthData = {
     project_id: number;
@@ -791,6 +822,7 @@ export type TimeEntryData = {
     adjusts_entry_public_id?: string;
     voided: boolean;
     void_reason?: string;
+    timezone: string;
 };
 export enum TimeEntrySource {
     Tracked = 'tracked',
@@ -815,6 +847,7 @@ export type TimerData = {
     note?: string;
     server_time: string;
     entry_public_id?: string;
+    timezone: string;
 };
 export enum TimerState {
     Running = 'running',

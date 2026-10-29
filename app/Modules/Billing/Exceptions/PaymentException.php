@@ -40,4 +40,9 @@ final class PaymentException extends AppException
             message: 'This payment form was already used for another invoice. Reload the page and try again.',
         );
     }
+
+    public static function invoiceVoided(): self
+    {
+        return new self(code: ErrorCode::INVOICE_VOIDED, status: 409, message: 'Payments cannot be recorded on a voided invoice.');
+    }
 }

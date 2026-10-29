@@ -14,6 +14,9 @@ export interface Project {
     created_at: string;
     /** ISO datetime */
     updated_at: string;
+    timezone?: string | null;
+    effective_timezone?: string;
+    workspace_timezone?: string;
 }
 
 export type ProjectRoleValue = 'manager' | 'member';

@@ -11,6 +11,7 @@ use App\Modules\Billing\Http\Controllers\InvoiceController;
 use App\Modules\Billing\Http\Controllers\InvoiceDeliveryController;
 use App\Modules\Billing\Http\Controllers\InvoicingSettingsController;
 use App\Modules\Billing\Http\Controllers\MailSettingsController;
+use App\Modules\Billing\Http\Controllers\ManualInvoiceController;
 use App\Modules\Billing\Http\Controllers\PaymentController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
@@ -37,7 +38,15 @@ TenantRoute::prefixed('clients', 'workspace.clients.', function () {
 
 TenantRoute::prefixed('invoices', 'workspace.invoices.', function () {
     Route::get('/', [InvoiceController::class, 'index'])->name('index');
+    Route::get('create', [ManualInvoiceController::class, 'create'])->name('create');
+    Route::post('/', [ManualInvoiceController::class, 'store'])->name('store');
     Route::get('{invoice}', [InvoiceController::class, 'show'])->name('show');
+    Route::get('{invoice}/edit', [ManualInvoiceController::class, 'edit'])->name('edit');
+    Route::put('{invoice}', [ManualInvoiceController::class, 'update'])->name('update');
+    Route::post('{invoice}/finalize', [ManualInvoiceController::class, 'finalize'])->name('finalize');
+    Route::post('{invoice}/send', [ManualInvoiceController::class, 'send'])->name('send');
+    Route::post('{invoice}/mark-paid', [ManualInvoiceController::class, 'markPaid'])->name('mark-paid');
+    Route::post('{invoice}/void', [ManualInvoiceController::class, 'void'])->name('void');
     Route::put('{invoice}/lines', [InvoiceController::class, 'updateLines'])->name('lines.update');
     Route::post('{invoice}/approve', [InvoiceController::class, 'approve'])->name('approve');
     Route::post('{invoice}/cancel-sending', [InvoiceController::class, 'cancelSending'])->name('cancel-sending');

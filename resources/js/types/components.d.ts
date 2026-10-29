@@ -231,6 +231,7 @@ declare module 'vue' {
     UpcomingMeetingsCard: typeof import('./../components/dashboard/UpcomingMeetingsCard.vue')['default']
     UserInfo: typeof import('./../components/UserInfo.vue')['default']
     UserMenuContent: typeof import('./../components/UserMenuContent.vue')['default']
+    WorkingClock: typeof import('./../components/WorkingClock.vue')['default']
     WorkspaceMemberPicker: typeof import('./../components/projects/WorkspaceMemberPicker.vue')['default']
     WorkspaceSwitcher: typeof import('./../components/workspace/WorkspaceSwitcher.vue')['default']
   }

@@ -57,4 +57,14 @@ final class InvoicePolicy
     {
         return $invoice->workspace->allowsFinance($user, FinancePermission::Approve);
     }
+
+    public function create(User $user, Workspace $workspace): bool
+    {
+        return $workspace->allowsFinance($user, FinancePermission::Manage);
+    }
+
+    public function void(User $user, Invoice $invoice): bool
+    {
+        return $invoice->workspace->allowsFinance($user, FinancePermission::Manage);
+    }
 }

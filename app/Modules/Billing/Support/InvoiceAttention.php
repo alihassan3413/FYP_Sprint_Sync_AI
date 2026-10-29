@@ -26,6 +26,10 @@ final class InvoiceAttention
      */
     public static function for(Invoice $invoice): ?array
     {
+        if ($invoice->isVoided() || ($invoice->isManual() && ! $invoice->isIssued())) {
+            return null;
+        }
+
         $hold = collect($invoice->automation_hold ?? []);
         $codes = $hold->pluck('code');
 

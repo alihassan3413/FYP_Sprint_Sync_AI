@@ -43,7 +43,9 @@ final class InvoicePdfRenderer
 
         return $invoice->isIssued() && $invoice->number !== null
             ? self::safe($invoice->number)."-{$client}.pdf"
-            : "Draft-{$client}-".$invoice->period_start->format('F-Y').'.pdf';
+            : ($invoice->isManual()
+                ? "Draft-{$client}-".($invoice->issue_date ?? $invoice->generated_on)->format('Y-m-d').'.pdf'
+                : "Draft-{$client}-".$invoice->period_start->format('F-Y').'.pdf');
     }
 
     /**
@@ -62,7 +64,9 @@ final class InvoicePdfRenderer
             'from' => $invoice->bill_from,
             'to' => $invoice->bill_to,
             'logo' => $this->logos->dataUri($invoice->bill_from['logo_path'] ?? null),
-            'period' => self::periodLabel($invoice),
+            'period' => $invoice->isManual() ? null : self::periodLabel($invoice),
+            'notes' => $invoice->notes,
+            'isVoided' => $invoice->isVoided(),
             'lines' => $invoice->lines->map(fn ($line) => [
                 'description' => $line->description,
                 'role' => $line->role_label,

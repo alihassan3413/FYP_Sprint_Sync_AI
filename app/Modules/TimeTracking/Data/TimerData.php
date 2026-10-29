@@ -39,6 +39,7 @@ final class TimerData extends Data
         public ?string $note,
         public string $server_time,
         public ?string $entry_public_id,
+        public string $timezone = 'UTC',
     ) {}
 
     public static function fromSession(TimeSession $session, CarbonInterface $now): self
@@ -61,6 +62,7 @@ final class TimerData extends Data
             note: $session->note,
             server_time: $now->toIso8601String(),
             entry_public_id: $session->relationLoaded('entry') ? $session->entry?->public_id : null,
+            timezone: $session->timezone,
         );
     }
 }

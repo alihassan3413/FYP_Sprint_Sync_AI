@@ -108,4 +108,15 @@ final class Client extends Model
     {
         return ClientFactory::new();
     }
+
+    public function billingSnapshot(): array
+    {
+        return [
+            'name' => $this->name,
+            'billing_email' => $this->billing_email,
+            'cc_emails' => $this->cc_emails ?? [],
+            'address' => $this->address,
+            'tax_id' => $this->tax_id,
+        ];
+    }
 }

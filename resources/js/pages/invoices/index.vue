@@ -8,10 +8,10 @@ if (typeof window !== 'undefined') {
 </script>
 
 <script setup lang="ts">
-import { AlertTriangle, ChevronRight, Clock, MailWarning, ReceiptText, Repeat, Send } from 'lucide-vue-next';
+import { AlertTriangle, ChevronRight, Clock, MailWarning, Plus, ReceiptText, Repeat, Send } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
-import { deliveryNote, formatMoney, periodLabel, rowStatus } from '@/lib/billing';
+import { deliveryNote, formatMoney, formatShortDate, periodLabel, rowStatus } from '@/lib/billing';
 import { type BreadcrumbItem } from '@/types';
 import type { InvoiceSummaryData } from '@/types/generated';
 
@@ -41,6 +41,9 @@ const ATTENTION: Record<AttentionKind, { icon: typeof Clock; tone: string; badge
     email_failed: { icon: MailWarning, tone: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-700 dark:text-red-400' },
 };
 
+const invoiceWhen = (invoice: InvoiceSummaryData) =>
+    invoice.source === 'manual' && invoice.issue_date ? formatShortDate(invoice.issue_date) : periodLabel(invoice.period_start);
+
 onMounted(() => {
     if (restoredFromHistory) {
         restoredFromHistory = false;
@@ -54,7 +57,13 @@ onMounted(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-8 p-4 md:p-6 lg:p-8">
-            <AppPageHeader eyebrow="Money" title="Invoices" description="What has been prepared, and what is waiting for you." />
+            <AppPageHeader eyebrow="Money" title="Invoices" description="What has been prepared, and what is waiting for you.">
+                <template #actions>
+                    <Button as-child size="sm" class="gap-1.5" data-testid="new-invoice">
+                        <Link :href="workspaceRoute('workspace.invoices.create')"><Plus class="size-3.5" /> New invoice</Link>
+                    </Button>
+                </template>
+            </AppPageHeader>
 
             <div class="grid gap-3 sm:grid-cols-2" data-testid="kpis">
                 <div
@@ -89,7 +98,7 @@ onMounted(() => {
                         </span>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-start justify-between gap-2">
-                                <p class="truncate font-semibold">{{ invoice.title }} · {{ periodLabel(invoice.period_start) }}</p>
+                                <p class="truncate font-semibold">{{ invoice.title }} · {{ invoiceWhen(invoice) }}</p>
                                 <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium" :class="ATTENTION[invoice.attention!.kind].badge">
                                     {{ invoice.attention!.label }}
                                 </span>
@@ -132,7 +141,7 @@ onMounted(() => {
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate font-medium">
                                         {{ invoice.title }}
-                                        <span class="text-muted-foreground font-normal">· {{ periodLabel(invoice.period_start) }}</span>
+                                        <span class="text-muted-foreground font-normal">· {{ invoiceWhen(invoice) }}</span>
                                     </p>
                                     <p class="text-muted-foreground truncate text-sm">
                                         {{ invoice.client_name }} ·

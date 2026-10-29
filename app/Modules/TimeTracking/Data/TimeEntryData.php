@@ -36,6 +36,7 @@ final class TimeEntryData extends Data
         public ?string $adjusts_entry_public_id,
         public bool $voided,
         public ?string $void_reason,
+        public string $timezone = 'UTC',
     ) {}
 
     public static function fromModel(TimeEntry $entry): self
@@ -58,6 +59,7 @@ final class TimeEntryData extends Data
             adjusts_entry_public_id: $entry->adjusts?->public_id,
             voided: $entry->isVoided(),
             void_reason: $entry->void_reason,
+            timezone: $entry->timezone,
         );
     }
 }

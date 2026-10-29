@@ -21,6 +21,7 @@ enum AuditAction: string
 
     case PROJECT_CREATED = 'project.created';
     case PROJECT_UPDATED = 'project.updated';
+    case PROJECT_TIMEZONE_CHANGED = 'project.timezone_changed';
     case PROJECT_DELETED = 'project.deleted';
     case PROJECT_MEMBER_ADDED = 'project.member_added';
     case PROJECT_MEMBER_REMOVED = 'project.member_removed';
@@ -89,6 +90,11 @@ enum AuditAction: string
     case TIME_REVIEW_RESOLVED = 'time.review_resolved';
     case INVOICE_HOURS_REFRESHED = 'invoice.hours_refreshed';
     case INVOICE_HOURS_OVERRIDDEN = 'invoice.hours_overridden';
+    case INVOICE_CREATED = 'invoice.created';
+    case INVOICE_SEND_QUEUED = 'invoice.send_queued';
+    case INVOICE_MARKED_PAID = 'invoice.marked_paid';
+    case INVOICE_VOIDED = 'invoice.voided';
+    case INVOICE_DOWNLOADED = 'invoice.downloaded';
     case EXPENSE_RECORDED = 'expense.recorded';
     case EXPENSE_VOIDED = 'expense.voided';
     case EXPENSE_RECURRING_SAVED = 'expense.recurring_saved';
@@ -181,6 +187,7 @@ enum AuditAction: string
             self::INVITE_LINK_JOINED => 'Joined via invite link',
             self::PROJECT_CREATED => 'Project created',
             self::PROJECT_UPDATED => 'Project updated',
+            self::PROJECT_TIMEZONE_CHANGED => 'Project timezone changed',
             self::PROJECT_DELETED => 'Project deleted',
             self::PROJECT_MEMBER_ADDED => 'Project member added',
             self::PROJECT_MEMBER_REMOVED => 'Project member removed',
@@ -216,6 +223,11 @@ enum AuditAction: string
             self::INVOICE_REAPPROVED => 'Invoice approved again',
             self::INVOICE_SEND_CANCELLED => 'Invoice sending cancelled',
             self::INVOICE_ISSUED => 'Invoice issued',
+            self::INVOICE_CREATED => 'Invoice created',
+            self::INVOICE_SEND_QUEUED => 'Invoice queued to send',
+            self::INVOICE_MARKED_PAID => 'Invoice marked paid',
+            self::INVOICE_VOIDED => 'Invoice voided',
+            self::INVOICE_DOWNLOADED => 'Invoice PDF downloaded',
             self::INVOICING_UPDATED => 'Invoicing details updated',
             self::PAYMENT_RECORDED => 'Payment recorded',
             self::PAYMENT_VOIDED => 'Payment voided',

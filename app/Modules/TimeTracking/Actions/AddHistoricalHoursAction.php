@@ -92,7 +92,7 @@ final class AddHistoricalHoursAction
                         'duration_seconds' => $seconds,
                         'period_start' => $periodStart->toDateString(),
                         'period_end' => $periodEnd->toDateString(),
-                        'timezone' => $workspace->timezone,
+                        'timezone' => $project->effectiveTimezone(),
                         'billable' => $billable,
                         'note' => $reason,
                         'created_by' => $actor->id,

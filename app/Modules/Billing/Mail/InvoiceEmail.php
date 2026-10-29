@@ -33,8 +33,9 @@ final class InvoiceEmail extends Mailable
     {
         return new Envelope(
             from: new Address($this->delivery->from_email, $this->delivery->from_name),
-            to: [$this->delivery->recipient],
+            to: $this->delivery->recipients ?: [$this->delivery->recipient],
             cc: $this->delivery->cc ?? [],
+            bcc: $this->delivery->bcc ?? [],
             replyTo: $this->delivery->reply_to_email ? [$this->delivery->reply_to_email] : [],
             subject: $this->delivery->subject,
             using: [fn (Email $message) => $message->getHeaders()->addIdHeader('Message-ID', $this->delivery->message_id)],
@@ -54,6 +55,7 @@ final class InvoiceEmail extends Mailable
                 'total' => MoneyFormatter::format($invoice->total_minor, $invoice->currency),
                 'dueDate' => $invoice->due_date?->format('F j, Y'),
                 'senderName' => $invoice->bill_from['business_name'] ?? $this->delivery->from_name,
+                'customMessage' => $this->delivery->message,
             ],
         );
     }

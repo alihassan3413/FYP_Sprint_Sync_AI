@@ -55,7 +55,7 @@ final class AddManualTimeAction
                 'duration_seconds' => $seconds,
                 'period_start' => $workDate->toDateString(),
                 'period_end' => $workDate->toDateString(),
-                'timezone' => $person->workspace->timezone,
+                'timezone' => $project->effectiveTimezone(),
                 'billable' => $billable,
                 'note' => $note,
                 'idempotency_key' => $idempotencyKey,

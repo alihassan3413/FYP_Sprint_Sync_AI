@@ -165,16 +165,32 @@ export const PAYMENT_STATUS_STYLES: Record<PaymentStatus, string> = {
     paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
 
+export type DisplayStatus = 'draft' | 'sent' | 'paid' | 'void';
+
+export const DISPLAY_STATUS_STYLES: Record<DisplayStatus, string> = {
+    draft: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    sent: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    void: 'bg-muted text-muted-foreground line-through',
+};
+
 /** The one status a list row should show: payment state once issued, otherwise the invoice state. */
 export function rowStatus(invoice: {
     status: InvoiceStatus;
     status_label: string;
     payment_status?: PaymentStatus | null;
     payment_status_label?: string;
+    source?: 'plan' | 'manual';
+    display_status?: DisplayStatus;
+    display_status_label?: string;
 }): {
     label: string;
     style: string;
 } {
+    if (invoice.display_status === 'void' || (invoice.source === 'manual' && invoice.display_status)) {
+        return { label: invoice.display_status_label ?? '', style: DISPLAY_STATUS_STYLES[invoice.display_status ?? 'draft'] };
+    }
+
     return invoice.status === 'issued' && invoice.payment_status
         ? { label: invoice.payment_status_label ?? '', style: PAYMENT_STATUS_STYLES[invoice.payment_status] }
         : { label: invoice.status_label, style: INVOICE_STATUS_STYLES[invoice.status] };

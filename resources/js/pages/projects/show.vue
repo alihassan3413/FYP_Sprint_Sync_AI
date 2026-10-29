@@ -166,6 +166,12 @@ function onDeleted() {
             <!-- Compact header -->
             <div class="border-b px-4 py-4 md:px-6 lg:px-8">
                 <AppPageHeader eyebrow="Project" :title="project.name" :description="shortDescription" />
+                <WorkingClock
+                    v-if="project.effective_timezone"
+                    class="mt-2"
+                    :timezone="project.effective_timezone"
+                    :caption="project.timezone ? 'Project time' : 'Workspace time'"
+                />
             </div>
 
             <!-- Tabs -->

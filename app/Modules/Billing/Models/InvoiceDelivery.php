@@ -47,6 +47,8 @@ final class InvoiceDelivery extends Model
         return [
             'status' => DeliveryStatus::class,
             'cc' => 'array',
+            'recipients' => 'array',
+            'bcc' => 'array',
             'attempts' => 'integer',
             'last_attempted_at' => 'datetime',
             'sent_at' => 'datetime',

@@ -89,4 +89,19 @@ final class InvoiceException extends AppException
             message: 'The discounts are larger than the subtotal. The invoice total cannot be negative.',
         );
     }
+
+    public static function notManual(): self
+    {
+        return new self(code: ErrorCode::INVOICE_NOT_MANUAL, status: 422, message: 'Only manual invoices can be changed this way.');
+    }
+
+    public static function voided(): self
+    {
+        return new self(code: ErrorCode::INVOICE_VOIDED, status: 409, message: 'This invoice has been voided.');
+    }
+
+    public static function hasPayments(): self
+    {
+        return new self(code: ErrorCode::INVOICE_HAS_PAYMENTS, status: 409, message: 'Void the recorded payments before voiding this invoice.');
+    }
 }

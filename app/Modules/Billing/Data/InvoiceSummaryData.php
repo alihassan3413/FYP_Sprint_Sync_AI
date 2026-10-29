@@ -47,6 +47,13 @@ final class InvoiceSummaryData extends Data
         /** What the owner needs to do with it and why (Needs you); null when nothing. */
         #[LiteralTypeScriptType("{ kind: 'needs_hours' | 'safety_review' | 'ready_to_send' | 'ready_to_review' | 'email_failed'; priority: number; label: string; reason: string; action: string } | null")]
         public ?array $attention,
+        #[LiteralTypeScriptType("'plan' | 'manual'")]
+        public string $source = 'plan',
+        #[LiteralTypeScriptType("'draft' | 'sent' | 'paid' | 'void'")]
+        public string $display_status = 'draft',
+        public string $display_status_label = 'Draft',
+        public ?string $issue_date = null,
+        public ?string $due_date = null,
     ) {}
 
     public static function fromModel(Invoice $invoice): self
@@ -73,6 +80,11 @@ final class InvoiceSummaryData extends Data
             delivery_status: $invoice->delivery?->status->value,
             sent_at: $invoice->delivery?->sent_at?->toIso8601String(),
             attention: InvoiceAttention::for($invoice),
+            source: $invoice->source->value,
+            display_status: $invoice->displayStatus()->value,
+            display_status_label: $invoice->displayStatus()->label(),
+            issue_date: $invoice->issue_date?->toDateString(),
+            due_date: $invoice->due_date?->toDateString(),
         );
     }
 }

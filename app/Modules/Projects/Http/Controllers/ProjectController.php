@@ -11,6 +11,7 @@ use App\Modules\Meetings\Models\Meeting;
 use App\Modules\Projects\Actions\BuildSprintReport;
 use App\Modules\Projects\Actions\CreateProjectAction;
 use App\Modules\Projects\Actions\DeleteProjectAction;
+use App\Modules\Projects\Actions\SetProjectTimezoneAction;
 use App\Modules\Projects\Actions\UpdateProjectAction;
 use App\Modules\Projects\Data\ProjectData;
 use App\Modules\Projects\Data\SprintData;
@@ -170,8 +171,13 @@ final class ProjectController
         Workspace $workspace,
         Project $project,
         UpdateProjectAction $action,
+        SetProjectTimezoneAction $timezone,
     ): RedirectResponse {
         $project = $action->handle($project, $request->toDTO(), $request->user());
+
+        if ($request->exists('timezone')) {
+            $project = $timezone->handle($project, $request->validated('timezone'), $request->user());
+        }
 
         return back()->with('success', "Project \"{$project->name}\" updated.");
     }

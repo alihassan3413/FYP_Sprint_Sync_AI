@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Http\Controllers;
 
+use App\Modules\Audit\Actions\RecordAuditLogAction;
+use App\Modules\Audit\Data\AuditAction;
 use App\Modules\Billing\Actions\ApproveInvoiceAction;
 use App\Modules\Billing\Actions\CancelInvoiceSendingAction;
 use App\Modules\Billing\Actions\RefreshInvoiceSenderAction;
@@ -57,9 +59,13 @@ final class InvoiceController
         ]);
     }
 
-    public function show(Request $request, Workspace $workspace, Invoice $invoice, TrackedHours $trackedHours): Response
+    public function show(Request $request, Workspace $workspace, Invoice $invoice, TrackedHours $trackedHours, ManualInvoiceController $manual): Response
     {
         abort_unless($request->user()->can('view', $invoice), 403);
+
+        if ($invoice->isManual()) {
+            return $manual->show($request, $workspace, $invoice);
+        }
 
         $invoice->load(['lines', 'adjustments', 'approver:id,name', 'client:id,public_id', 'delivery']);
 
@@ -149,24 +155,37 @@ final class InvoiceController
      * Once issued: the stored official document, written once and never
      * regenerated (OfficialInvoicePdf).
      */
-    public function pdf(Request $request, Workspace $workspace, Invoice $invoice, InvoicePdfRenderer $renderer, OfficialInvoicePdf $official): HttpResponse|StreamedResponse
+    public function pdf(Request $request, Workspace $workspace, Invoice $invoice, InvoicePdfRenderer $renderer, OfficialInvoicePdf $official, RecordAuditLogAction $auditLogger): HttpResponse|StreamedResponse
     {
         abort_unless($request->user()->can('view', $invoice), 403);
 
         $filename = $renderer->filename($invoice);
+        $disposition = $request->boolean('preview') ? HeaderUtils::DISPOSITION_INLINE : HeaderUtils::DISPOSITION_ATTACHMENT;
 
-        if (! $invoice->isIssued()) {
+        if (! $invoice->isIssued() || $invoice->isVoided()) {
             return response($renderer->pdf($invoice->load(['lines', 'adjustments'])), 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename),
+                'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename),
                 'Cache-Control' => 'private, no-store',
             ]);
         }
 
-        return Storage::disk(OfficialInvoicePdf::DISK)->download($official->ensure($invoice), $filename, [
+        if ($disposition === HeaderUtils::DISPOSITION_ATTACHMENT) {
+            $auditLogger->handle(
+                $workspace,
+                null,
+                $request->user(),
+                AuditAction::INVOICE_DOWNLOADED,
+                "{$request->user()->name} downloaded invoice {$invoice->number}.",
+                $invoice,
+                ['number' => $invoice->number],
+            );
+        }
+
+        return Storage::disk(OfficialInvoicePdf::DISK)->response($official->ensure($invoice), $filename, [
             'Content-Type' => 'application/pdf',
             'Cache-Control' => 'private, no-store',
-        ]);
+        ], $disposition);
     }
 
     /** The logo this invoice was prepared with (its own snapshot), for the invoice page. */

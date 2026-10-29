@@ -19,6 +19,17 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #58 added manual (one-off) invoices alongside tracked-hours and
+recurring ones: client or custom recipient, quantity × rate lines, tax/discount,
+notes, server-side totals, finalize with a server number, PDF preview/download
+without sending, email with multiple To/CC/BCC and a custom message, mark paid
+and void. **No FR status changes.**
+
+Entry #57 added project working timezones: a project may override the
+workspace timezone, timers follow the project's working day, and the dashboard,
+project and Time pages show a live, labelled working clock. **No FR status
+changes.**
+
 Entry #56 added bulk teammate import from XLSX/CSV on the Team page:
 upload, per-row validation and preview, confirm, chunked queued processing and
 a downloadable issue report. **No FR status changes** — it is admin tooling over
@@ -5675,6 +5686,135 @@ at processing time, cancel, expiry and orphan cleanup, the issue report and the
 accept-page timezone. Full suite: 1926 passed. Pint, ESLint and the production
 build pass; `vue-tsc` still reports only the two pre-existing tsconfig
 type-entry errors (TS2688).
+
+### 57. Workspace and project working timezones
+
+**Effective timezone = project → workspace → app.** `projects.timezone` is a
+new nullable IANA column; `Project::effectiveTimezone()` returns it, else the
+workspace timezone, else `config('app.timezone')`. The workspace timezone was
+already editable (Settings → Edit workspace); projects get a **Working
+timezone** select in Edit project with "Workspace default (…)" as the first
+option. The change goes through its own `SetProjectTimezoneAction`, so it is
+audited as `project.timezone_changed` and editing a project's name or
+description never clears an override. Validation is `timezone:all`.
+
+**Where the project timezone applies, and where it deliberately does not.**
+Before changing anything, the day-attribution paths were traced:
+`StartTimerAction`, `Schedules::workday()`/`workdayOf()`, `LunchBreaks`,
+`StopTimerAction`, `DecideIdleTimeAction`, manual/historical/adjustment entries,
+`EntryTimeTotals` and the invoice tracked-hours query.
+
+- A timer session now starts in the **project's** effective timezone and stores
+  it on the session. Everything that already derived the workday from the
+  session (`workdayOf` fallback, lunch, kept idle, the stop entry) follows it
+  unchanged, so a 22:00 New York session belongs to New York's day even when
+  the workspace is in Karachi.
+- A person's **schedule** still decides overnight shifts: schedules carry their
+  own timezone and immutable versions, and `Schedules::workday()` is untouched,
+  so the existing overnight and DST workday rules hold.
+- Manual time and previous hours record the project's timezone; a correction
+  keeps the timezone of the entry it corrects.
+- Person- and workspace-level calendars stay on the workspace timezone: Today /
+  week / month totals, schedules, holidays, leave, lunch allowance per day,
+  billing periods and Finance. Invoices aggregate by each entry's stored
+  business day, so they need no change.
+
+**History is never reclassified.** Sessions and entries persist their own
+`timezone` and `period_start` when created. Changing a project or workspace
+timezone affects only sessions started afterwards; a timer already running
+keeps the timezone it started with.
+
+**UI.** `WorkingClock` shows a live time and a zone label such as
+"New York · EDT", "Karachi · UTC+5" or "London · GMT" (`zoneLabel()` in
+`lib/timezones.ts`, refreshed every 15 seconds) on the dashboard (workspace
+time), the project page (project or workspace time) and the Time page. Timer
+and entry times are shown in their own recorded timezone, with the zone named
+when it differs from the workspace. `TimerData`, `TimeEntryData` and
+`ProjectData` expose `timezone` (and `effective_timezone` /
+`workspace_timezone` for projects).
+
+Tests: `tests/Feature/TimeTracking/WorkingTimezoneTest.php` (13) covers
+inheritance, the app-timezone fallback, override validation/audit/omission,
+permissions, timers on the project's day, no-override behaviour, an overnight
+session across the New York DST change, a Karachi overnight schedule still
+winning over a New York project, a running timer keeping its timezone, timezone
+changes never reclassifying recorded time, manual time and corrections, invoice
+hours by project day, and the page props. Full suite: 1938 passed, plus one
+pre-existing flaky test (`AssistantFindTasksToolTest::nothing found…`, random
+factory text occasionally matches the search; passes on re-run and is unrelated
+to this change). Pint, ESLint, the production build and the desktop tests pass;
+`vue-tsc` still shows only the two pre-existing TS2688 tsconfig errors.
+
+### 58. Manual invoices
+
+Owners can now create an invoice that is not tied to a recurring plan or to
+tracked time: **Invoices → New invoice**. It reuses the existing invoice domain
+(`invoices`, `invoice_lines`, `invoice_adjustments`, `InvoiceCalculator`,
+`InvoiceNumberAllocator`, `InvoicePdfRenderer`, `OfficialInvoicePdf`,
+`SendInvoiceEmailJob`, payments) and follows `FINANCE_RULES.md`.
+
+**Model.** `invoices.source` (`plan` default, `manual`), nullable `client_id`
+(custom recipients have none), `notes`, `voided_at/voided_by/void_reason` and a
+unique `(workspace_id, idempotency_key)` for draft creation. Deliveries gain
+`recipients` (list of To), `bcc` and `message`. All additive; existing plan
+invoices keep `source = plan` and behave exactly as before.
+
+**Statuses.** Shown as `InvoiceDisplayStatus` Draft / Sent / Paid / Void,
+derived from the stored state rather than a new state machine: Draft = not
+issued; Sent = issued (the page says "Finalized · not emailed yet" when no email
+went out); Paid = issued with the payment status `paid`; Void = `voided_at` set.
+
+**Flow.**
+- `SaveManualInvoiceAction::create/update`: drafts only, idempotency key on
+  create, version check on update; lines are `quantity × rate` in hundredths and
+  minor units (`DecimalAmount`, no floats), tax/discount/fee as percentage (basis
+  points, ≤ 100%) or fixed; totals come only from `InvoiceRecalculator` and a
+  negative total is refused.
+- `FinalizeManualInvoiceAction`: conditional `ready_to_review → issued` inside a
+  retried transaction, number from the existing allocator, keeps the chosen
+  issue/due dates, snapshots `bill_from` and re-snapshots `bill_to` from the
+  client (`Client::billingSnapshot()`, now shared with plan generation), writes
+  the official PDF. Later client edits never change it.
+- `SendManualInvoiceAction`: finalizes if needed, then creates the single email
+  delivery with the given To/CC/BCC/message (stored on the delivery only, never on
+  the client) and queues the existing `SendInvoiceEmailJob`, so the atomic
+  `pending → sending` claim and "no automatic resend" rules still apply.
+  `SendInvoiceDeliveryAction` now refuses to email a voided invoice.
+- `MarkInvoicePaidAction` records the balance through `RecordPaymentAction`
+  (idempotent key); `VoidInvoiceAction` is a conditional update, refused while
+  active payments exist, keeps the number, and excludes the invoice from
+  "waiting to be paid", finance revenue and "Needs you". Payments cannot be
+  recorded on a voided invoice.
+- PDF: `?preview=1` streams inline; downloads never send. Manual invoices print
+  issue/due dates, no "Period" row, notes, and a VOID mark when voided.
+
+**Access and audit.** Owner-only through `Workspace::allowsFinance()` (v1, per
+`FINANCE_RULES.md`; admins get nothing on their own). New audit actions:
+`invoice.created`, `invoice.send_queued`, `invoice.marked_paid`,
+`invoice.voided`, `invoice.downloaded` (official PDF downloads); finalizing logs
+the existing `invoice.issued`, and the actual email the existing
+`invoice.delivery_sent/failed`.
+
+**UI.** `invoices/manual-form.vue` (create/edit draft, client or "someone
+else", lines, tax/discount, notes, live preview of the server's integer
+arithmetic), `invoices/manual.vue` (document, Edit/Preview/Download/Finalize/
+Send/Mark paid/Void, send dialog with To/Cc/Bcc/message, delivery panel,
+existing payments panel). The invoice list gets **New invoice** and shows
+manual rows with their issue date and display status; plan invoices keep their
+own page.
+
+Tests: `tests/Feature/Billing/ManualInvoiceTest.php` (30 incl. data providers):
+creation and totals, double submit, validation, negative totals, custom
+recipient without touching clients, draft edits and version conflicts, finalize
+(number, dates, snapshots, frozen, no email), snapshot taken at finalize,
+incomplete sender, preview/download without sending, PDF content, sending to the
+client email once, multiple To + CC + BCC + message, send validation and
+disconnected email, mark paid / void transitions, voiding drafts, a queued email
+for a voided invoice not sent, plan invoices refusing manual actions, page props,
+owner-only access and cross-workspace 404. All 400 Billing tests pass. Full
+suite: 1968 passed plus the pre-existing flaky `AssistantFindTasksToolTest`
+(random factory text; unrelated). Pint, ESLint, vue-tsc (only the two
+pre-existing TS2688 tsconfig errors) and the production build pass.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

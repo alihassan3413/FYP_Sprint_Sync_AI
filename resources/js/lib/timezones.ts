@@ -111,3 +111,21 @@ export function timezoneOptions(): TimezoneOption[] {
         }))
         .sort((a, b) => a.value.localeCompare(b.value));
 }
+
+export function zoneCity(timeZone: string): string {
+    if (timeZone === 'UTC' || timeZone === 'Etc/UTC') return 'UTC';
+    return (timeZone.split('/').pop() ?? timeZone).replace(/_/g, ' ');
+}
+
+export function zoneAbbreviation(timeZone: string, at: Date = new Date()): string {
+    const name =
+        new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' }).formatToParts(at).find((part) => part.type === 'timeZoneName')?.value ??
+        '';
+    return name.replace(/^GMT(?=[+-])/, 'UTC');
+}
+
+export function zoneLabel(timeZone: string, at: Date = new Date()): string {
+    const city = zoneCity(timeZone);
+    const abbreviation = zoneAbbreviation(timeZone, at);
+    return city === abbreviation || abbreviation === '' ? city : `${city} · ${abbreviation}`;
+}
