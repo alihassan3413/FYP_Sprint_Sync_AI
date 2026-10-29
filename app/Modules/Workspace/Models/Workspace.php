@@ -13,6 +13,7 @@ use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\RecurringExpense;
 use App\Modules\People\Models\Department;
 use App\Modules\People\Models\Person;
+use App\Modules\People\Models\TeamImport;
 use App\Modules\Projects\Models\Project;
 use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\Workspace\Data\ClientPermission;
@@ -158,6 +159,11 @@ final class Workspace extends Model
     public function people(): HasMany
     {
         return $this->hasMany(Person::class)->chaperone();
+    }
+
+    public function teamImports(): HasMany
+    {
+        return $this->hasMany(TeamImport::class)->chaperone();
     }
 
     public function departments(): HasMany

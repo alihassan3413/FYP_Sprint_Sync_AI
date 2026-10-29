@@ -41,8 +41,10 @@ use Illuminate\Support\Facades\DB;
  * much of the work fell outside the person's expected schedule, judged by the
  * schedule in force when the timer started.
  *
- * The entry belongs to the business day the timer started on, in the
- * workspace's timezone, so 18:05 → 02:03 is one session on the 12th.
+ * The entry belongs to the session's workday (Schedules::workday): the day
+ * the timer started on in the workspace's timezone, or the day an overnight
+ * scheduled shift began (a timer restarted at 00:40 in an 18:00–03:00 shift
+ * stays on the evening's day). 18:05 → 02:03 is one session on the 12th.
  */
 final class StopTimerAction
 {
@@ -108,7 +110,7 @@ final class StopTimerAction
 
                 $schedule = $this->schedules->for($session->person, $session->started_at);
 
-                $workDate = $session->started_at->copy()->setTimezone($session->timezone)->toDateString();
+                $workDate = $this->schedules->workdayOf($session);
                 $entry = TimeEntry::query()->forceCreate([
                     'workspace_id' => $session->workspace_id,
                     'person_id' => $session->person_id,

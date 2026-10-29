@@ -16,13 +16,20 @@ use Carbon\CarbonImmutable;
  *
  * Paid lunch is paid AND billable time (when the timer was billable), but not
  * worked time: it stays its own category. The allowance (the policy in force
- * when lunch started) is per business day: the first allowance-worth of
- * lunch that day is paid and billable; anything beyond is recorded as excess
- * and sent to the owner to decide. It is neither counted nor dropped silently.
+ * when lunch started) is per workday: the first allowance-worth of lunch in
+ * a workday is paid and billable; anything beyond is recorded as excess and
+ * sent to the owner to decide. It is neither counted nor dropped silently.
+ *
+ * The workday is the session's (Schedules::workdayOf), not the calendar
+ * date lunch started: on an 18:00–03:00 shift a 00:30 lunch uses that
+ * evening's allowance, and the next evening's lunch gets a fresh one.
  */
 final class LunchBreaks
 {
-    public function __construct(private readonly TimePolicies $policies) {}
+    public function __construct(
+        private readonly TimePolicies $policies,
+        private readonly Schedules $schedules,
+    ) {}
 
     public function close(TimeSession $session, CarbonImmutable $at): ?TimeEntry
     {
@@ -32,7 +39,7 @@ final class LunchBreaks
 
         $started = CarbonImmutable::instance($session->lunch_started_at);
         $seconds = max(0, $at->getTimestamp() - $started->getTimestamp());
-        $workDate = $started->setTimezone($session->timezone)->toDateString();
+        $workDate = $this->schedules->workdayOf($session);
         $allowance = (int) $this->policies->at($session->workspace_id, $started)->lunchAllowanceSeconds;
 
         $paidSoFar = (int) TimeEntry::query()

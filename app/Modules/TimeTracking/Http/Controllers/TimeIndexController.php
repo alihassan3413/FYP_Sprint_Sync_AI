@@ -14,8 +14,10 @@ use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\TimeTracking\Models\TimeIdlePeriod;
 use App\Modules\TimeTracking\Models\TimeReview;
 use App\Modules\TimeTracking\Models\TimeSession;
+use App\Modules\TimeTracking\Support\Schedules;
 use App\Modules\TimeTracking\Support\TimeAccess;
 use App\Modules\TimeTracking\Support\TimePolicies;
+use App\Modules\TimeTracking\Support\Timezones;
 use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -28,11 +30,12 @@ use Inertia\Response;
  * The Time page: your timer, today / this week / this month and your recent
  * entries. The owner can switch to anyone on the team (?person=), add time
  * for them, correct entries and add previous hours. Days, weeks and months
- * follow the workspace's calendar.
+ * follow the workspace's calendar. While a timer runs past midnight, "today"
+ * is that timer's workday (an 18:00–03:00 shift stays on the day it began).
  */
 final class TimeIndexController
 {
-    public function __invoke(Request $request, Workspace $workspace, TimeAccess $access, TimeTotals $totals, TimePolicies $policies): Response
+    public function __invoke(Request $request, Workspace $workspace, TimeAccess $access, TimeTotals $totals, TimePolicies $policies, Schedules $schedules): Response
     {
         $user = $request->user();
         abort_unless($user->can('track', [TimeEntry::class, $workspace]), 403);
@@ -48,7 +51,11 @@ final class TimeIndexController
 
         $today = CarbonImmutable::now($workspace->timezone)->startOfDay();
         $session = $viewing === null ? null : TimeSession::query()->where('active_person_id', $viewing->id)->first();
-        $total = fn (CarbonImmutable $from) => $viewing === null ? 0 : $totals->seconds(new TimeQuery($workspace->id, personId: $viewing->id, from: $from, to: $today));
+        $total = fn (CarbonImmutable $from, ?CarbonImmutable $to = null) => $viewing === null ? 0 : $totals->seconds(new TimeQuery($workspace->id, personId: $viewing->id, from: $from, to: $to ?? $today));
+        /* The running timer's workday: yesterday's date at 01:00 during an overnight shift. */
+        $workday = $session === null ? $today : CarbonImmutable::parse($schedules->workdayOf($session), $workspace->timezone);
+        $schedule = $viewing === null ? null : $schedules->for($viewing);
+        $overnightShift = $schedule !== null && $schedule->end_time <= $schedule->start_time ? ['start' => $schedule->start_time, 'end' => $schedule->end_time] : null;
 
         return Inertia::render('time/index', [
             'canManageTeam' => $canManage,
@@ -59,7 +66,7 @@ final class TimeIndexController
             'timer' => $session === null ? null : TimerData::fromSession($session, now()),
             'projects' => self::projectOptions($access->projects($user, $workspace)),
             'totals' => [
-                'today' => $total($today),
+                'today' => $total($workday, $workday),
                 'week' => $total($today->startOfWeek(CarbonInterface::MONDAY)),
                 'month' => $total($today->startOfMonth()),
             ],
@@ -75,9 +82,15 @@ final class TimeIndexController
                 ->values(),
             'today' => $today->toDateString(),
             'timezone' => $workspace->timezone,
+            'workday' => [
+                'date' => $workday->toDateString(),
+                'is_today' => $workday->equalTo($today),
+                'timezone_label' => Timezones::label($workspace->timezone),
+                'overnight_shift' => $overnightShift,
+            ],
             'policy' => $policies->at($workspace->id)->toArray(),
             'breakdown' => $viewing === null ? null : [
-                'today' => $totals->breakdown($viewing, $today, $today)->toArray(),
+                'today' => $totals->breakdown($viewing, $workday, $workday)->toArray(),
                 'week' => $totals->week($viewing, $today)->toArray(),
             ],
             'idlePeriods' => $viewing === null ? [] : self::idlePeriods($viewing->id),

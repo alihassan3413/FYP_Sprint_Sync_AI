@@ -144,6 +144,8 @@ export enum AuditAction {
     PERSON_UPDATED = 'person.updated',
     PERSON_USER_LINKED = 'person.user_linked',
     PERSON_USER_UNLINKED = 'person.user_unlinked',
+    PERSON_IMPORT_CONFIRMED = 'person.import_confirmed',
+    PERSON_IMPORT_COMPLETED = 'person.import_completed',
     DEPARTMENT_CREATED = 'department.created',
     ACCOUNT_PROFILE_UPDATED = 'account.profile_updated',
     ACCOUNT_PASSWORD_CHANGED = 'account.password_changed',
@@ -751,6 +753,26 @@ export type TaskData = {
         is_image: boolean;
     }>;
 };
+export enum TeamImportOutcome {
+    Invited = 'invited',
+    Linked = 'linked',
+    Skipped = 'skipped',
+    Failed = 'failed',
+}
+export enum TeamImportRowStatus {
+    Ready = 'ready',
+    Warning = 'warning',
+    Skipped = 'skipped',
+    Error = 'error',
+}
+export enum TeamImportStatus {
+    Validated = 'validated',
+    Queued = 'queued',
+    Processing = 'processing',
+    Completed = 'completed',
+    Cancelled = 'cancelled',
+    Expired = 'expired',
+}
 export type TimeEntryData = {
     public_id: string;
     source: 'tracked' | 'manual' | 'adjustment' | 'idle_kept' | 'lunch';
@@ -848,6 +870,7 @@ export type WorkspaceInvitationData = {
     email: string;
     role: string;
     workspace_role_id?: number;
+    timezone?: string;
 };
 export enum WorkspacePermission {
     ProjectsView = 'projects.view',

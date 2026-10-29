@@ -37,6 +37,7 @@ declare global {
   const formatBusinessDate: typeof import('../lib/time').formatBusinessDate
   const formatBytes: typeof import('../lib/desktop').formatBytes
   const formatClock: typeof import('../lib/time').formatClock
+  const formatClockTime: typeof import('../lib/time').formatClockTime
   const formatDateEyebrow: typeof import('../lib/activity').formatDateEyebrow
   const formatDueDate: typeof import('../lib/tasks').formatDueDate
   const formatDuration: typeof import('../lib/time').formatDuration
@@ -284,6 +285,7 @@ declare module 'vue' {
     readonly formatBusinessDate: UnwrapRef<typeof import('../lib/time')['formatBusinessDate']>
     readonly formatBytes: UnwrapRef<typeof import('../lib/desktop')['formatBytes']>
     readonly formatClock: UnwrapRef<typeof import('../lib/time')['formatClock']>
+    readonly formatClockTime: UnwrapRef<typeof import('../lib/time')['formatClockTime']>
     readonly formatDateEyebrow: UnwrapRef<typeof import('../lib/activity')['formatDateEyebrow']>
     readonly formatDueDate: UnwrapRef<typeof import('../lib/tasks')['formatDueDate']>
     readonly formatDuration: UnwrapRef<typeof import('../lib/time')['formatDuration']>

@@ -3,7 +3,7 @@ import { CalendarPlus, Clock, Coffee, History, Loader2, Pause, Play, Plus, Setti
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { formatClock, formatDuration, formatPeriod, formatTimeOfDay, requestKey } from '@/lib/time';
+import { formatBusinessDate, formatClock, formatClockTime, formatDuration, formatPeriod, formatTimeOfDay, requestKey } from '@/lib/time';
 import { type BreadcrumbItem } from '@/types';
 import type { TimeEntryData, TimerData } from '@/types/generated';
 
@@ -25,6 +25,8 @@ const props = defineProps<{
     entries: TimeEntryData[];
     today: string;
     timezone: string;
+    /** The business day "Today" refers to: the running timer's workday during an overnight shift. */
+    workday: { date: string; is_today: boolean; timezone_label: string; overnight_shift: { start: string; end: string } | null };
     /** The workspace's time rules that apply to everyone (shown so nothing is hidden). */
     policy: {
         idle_enabled: boolean;
@@ -278,6 +280,16 @@ function origin(entry: TimeEntryData): string {
 
     return `Added manually${entry.created_by ? ` by ${entry.created_by}` : ''}`;
 }
+
+/* "Today · Oct 9 · Asia/Karachi (UTC+5)", or "Oct 8 workday · 6:00 PM–3:00 AM · …" during an overnight shift. */
+const workdayLabel = computed(() => (props.workday.is_today ? 'Today' : `${formatBusinessDate(props.workday.date)} workday`));
+const workdayContext = computed(() => {
+    const shift = props.workday.overnight_shift;
+    const parts = [props.workday.is_today ? `Today · ${formatBusinessDate(props.workday.date)}` : workdayLabel.value];
+    if (shift && !props.workday.is_today) parts.push(`${formatClockTime(shift.start)}–${formatClockTime(shift.end)}`);
+    parts.push(props.workday.timezone_label);
+    return parts.join(' · ');
+});
 </script>
 
 <template>
@@ -286,6 +298,7 @@ function origin(entry: TimeEntryData): string {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
             <AppPageHeader eyebrow="Work" title="Time" description="Track time on your projects, or add time you worked without a timer." />
+            <p class="text-muted-foreground -mt-4 text-xs" data-testid="workday-context">{{ workdayContext }}</p>
 
             <!-- Owner: whose time, and previous hours -->
             <div v-if="canManageTeam" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -565,7 +578,7 @@ function origin(entry: TimeEntryData): string {
                 <div class="grid grid-cols-3 gap-3" data-testid="totals">
                     <div
                         v-for="tile in [
-                            { key: 'today', label: 'Today', value: totals.today },
+                            { key: 'today', label: workdayLabel, value: totals.today },
                             { key: 'week', label: 'This week', value: totals.week },
                             { key: 'month', label: 'This month', value: totals.month },
                         ]"
@@ -581,7 +594,7 @@ function origin(entry: TimeEntryData): string {
                 <!-- Worked vs paid, never one blended number -->
                 <section v-if="breakdown" class="grid gap-3 sm:grid-cols-2" data-testid="breakdown">
                     <div class="bg-card rounded-2xl border p-4 text-sm">
-                        <p class="mb-2 font-semibold">Today</p>
+                        <p class="mb-2 font-semibold">{{ workdayLabel }}</p>
                         <dl class="space-y-1 tabular-nums">
                             <div class="flex justify-between">
                                 <dt class="text-muted-foreground">Worked</dt>

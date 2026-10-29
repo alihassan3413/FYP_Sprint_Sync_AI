@@ -33,6 +33,7 @@ final class CreateWorkspaceInvitationAction
                 'token' => Str::random(64),
                 'role' => $data->role,
                 'workspace_role_id' => $customRoleId,
+                'timezone' => $data->timezone,
                 'accepted_at' => null,
                 'expires_at' => now()->addDays(config('workspace.invitation_ttl_days')),
             ]

@@ -16,6 +16,7 @@ use App\Modules\TimeTracking\Models\TimeIdlePeriod;
 use App\Modules\TimeTracking\Models\TimeReview;
 use App\Modules\TimeTracking\Models\TimeSession;
 use App\Modules\TimeTracking\Support\Durations;
+use App\Modules\TimeTracking\Support\Schedules;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -36,6 +37,7 @@ final class DecideIdleTimeAction
     public function __construct(
         private readonly ResumeTimerAction $resume,
         private readonly RecordAuditLogAction $auditLogger,
+        private readonly Schedules $schedules,
     ) {}
 
     public function keep(Person $person, TimeIdlePeriod $period, string $reason, User $actor): TimeIdlePeriod
@@ -57,7 +59,8 @@ final class DecideIdleTimeAction
             /** @var TimeSession $session */
             $session = $period->session;
             $seconds = $period->seconds();
-            $workDate = $period->started_at->copy()->setTimezone($session->timezone)->toDateString();
+            /* Idle kept as work belongs to the session's workday, like the rest of the shift. */
+            $workDate = $this->schedules->workdayOf($session);
 
             $entry = TimeEntry::query()->forceCreate([
                 'workspace_id' => $person->workspace_id,

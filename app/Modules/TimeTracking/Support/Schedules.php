@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\TimeTracking\Support;
 
 use App\Modules\People\Models\Person;
+use App\Modules\TimeTracking\Models\TimeSession;
 use App\Modules\TimeTracking\Models\WorkSchedule;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -36,6 +37,44 @@ final class Schedules
         $schedule = ($own !== null && ! $own->isEmpty()) ? $own : $latest(null);
 
         return $schedule === null || $schedule->isEmpty() ? null : $schedule;
+    }
+
+    /**
+     * The business day ("workday") a moment belongs to for this person.
+     *
+     * If the previous day's scheduled shift (an overnight one, e.g. 18:00–03:00)
+     * contains the moment, it is that shift's day: a timer started at 00:40
+     * belongs to the shift that began the evening before. Otherwise it is the
+     * moment's own date in the workspace's timezone.
+     *
+     * Deterministic: the schedule is the version in force at that moment, and
+     * schedule versions are never edited, so a later schedule change never
+     * reclassifies earlier time.
+     */
+    public function workday(Person $person, CarbonInterface $at, string $timezone): string
+    {
+        $at = CarbonImmutable::instance($at)->utc();
+        $schedule = $this->for($person, $at);
+
+        if ($schedule !== null) {
+            $previousDay = $at->setTimezone($schedule->timezone)->startOfDay()->subDay();
+
+            if (in_array($previousDay->dayOfWeekIso, $schedule->days ?? [], true)) {
+                [$start, $end] = $this->window($schedule, $previousDay);
+
+                if ($at->greaterThanOrEqualTo($start) && $at->lessThan($end)) {
+                    return $previousDay->toDateString();
+                }
+            }
+        }
+
+        return $at->setTimezone($timezone)->toDateString();
+    }
+
+    /** The workday a timer session belongs to: resolved from when it started, so everything in it (work, lunch, idle kept) shares one day. */
+    public function workdayOf(TimeSession $session): string
+    {
+        return $this->workday($session->person, $session->started_at, $session->timezone);
     }
 
     /**

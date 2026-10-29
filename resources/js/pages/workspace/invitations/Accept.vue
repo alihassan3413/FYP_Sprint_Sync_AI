@@ -11,6 +11,7 @@ const props = withDefaults(
             email: string;
             role: string;
             custom_role?: string | null;
+            timezone?: string | null;
             workspace: {
                 name: string;
             };
@@ -19,7 +20,7 @@ const props = withDefaults(
     { requiresRegistration: true },
 );
 
-const detectedTimezone = detectTimezone();
+const detectedTimezone = props.invitation.timezone || detectTimezone();
 
 const form = useForm({
     name: '',

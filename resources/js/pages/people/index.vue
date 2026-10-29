@@ -12,7 +12,7 @@ if (typeof window !== 'undefined') {
 
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { ChevronRight, Plus, Send, Users } from 'lucide-vue-next';
+import { ChevronRight, Plus, Send, Upload, Users } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type Member, type WorkspaceRoleOption } from '@/lib/members';
@@ -26,6 +26,7 @@ const props = defineProps<{
     canManagePeople: boolean;
     canManageMembers: boolean;
     canInviteMembers: boolean;
+    canImport?: boolean;
     workspaceRoles: WorkspaceRoleOption[];
     departments?: Department[];
     linkableUsers?: LinkableUser[];
@@ -205,6 +206,12 @@ onMounted(() => {
                             <Link :href="workspaceRoute('workspace.invitations.create')">
                                 <Send class="size-3.5" />
                                 {{ canManagePeople ? 'Invite link' : 'Invite' }}
+                            </Link>
+                        </Button>
+                        <Button v-if="canImport" variant="outline" as-child size="sm" class="gap-1.5">
+                            <Link :href="workspaceRoute('workspace.people.imports.create')" data-testid="import-teammates">
+                                <Upload class="size-3.5" />
+                                Import teammates
                             </Link>
                         </Button>
                         <Button v-if="canManagePeople" size="sm" class="gap-1.5" @click="addTeamMember">
