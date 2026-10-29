@@ -2,7 +2,7 @@ import { DEFAULT_ATTACHMENT_LIMITS, validateAttachment, type AttachmentLimits } 
 import { getCsrfToken } from '@/lib/csrf';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 export interface UploadedAttachment {
     id: number;
@@ -56,7 +56,7 @@ export function useAttachmentUploads(maxFiles: number) {
     async function upload(file: File): Promise<void> {
         const isImage = file.type.startsWith('image/');
 
-        const entry: PendingUpload = {
+        const entry = reactive<PendingUpload>({
             key: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
             name: file.name,
             size: file.size,
@@ -65,7 +65,7 @@ export function useAttachmentUploads(maxFiles: number) {
             uploading: true,
             error: null,
             attachment: null,
-        };
+        });
 
         pending.value.push(entry);
 
