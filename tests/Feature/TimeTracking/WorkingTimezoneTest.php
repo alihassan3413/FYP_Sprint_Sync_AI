@@ -100,6 +100,17 @@ final class WorkingTimezoneTest extends TestCase
         $this->assertSame(1, AuditLog::query()->where('action', AuditAction::PROJECT_TIMEZONE_CHANGED->value)->count(), 'no change, no entry');
     }
 
+    public function test_choosing_workspace_default_in_the_edit_form_clears_the_override(): void
+    {
+        $this->setProjectTimezone('America/New_York');
+
+        $this->setProjectTimezone('')->assertSessionHasNoErrors();
+
+        $project = $this->project->fresh();
+        $this->assertNull($project->timezone);
+        $this->assertSame($this->workspace->timezone, $project->effectiveTimezone());
+    }
+
     public function test_only_people_who_manage_the_project_can_change_its_timezone(): void
     {
         $this->actingAs($this->member)->put(route('workspace.projects.update', [$this->workspace, $this->project->id]), ['name' => $this->project->name, 'timezone' => 'America/New_York'])->assertForbidden();

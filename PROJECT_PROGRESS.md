@@ -19,6 +19,11 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #60 added the missing **Working timezone** select to Edit project (the
+server side shipped in #57 but the field was never in the form) and fixed
+attachment uploads staying on "Uploading…" after the server had replied.
+**No FR status changes.**
+
 Entry #59 added a workspace-level **My Work** view: one list of the user's
 tasks across every project they can see, with project, assignee (owners and
 admins), status, due-date and search filters. It also fixed editing a task into
@@ -5866,6 +5871,19 @@ workspace isolation, navigation flag and pagination. `SprintLifecycleTest`
 gains two regression tests (move an existing task into a later sprint; refuse
 another project's sprint). Full suite: 1982 passed. Pint, ESLint, vue-tsc (only
 the two pre-existing TS2688 tsconfig errors) and the build pass.
+
+### 60. Project timezone field and the stuck upload fix
+
+- **Working timezone in Edit project.** Entry #57 described this select but it
+  never reached `EditProjectModal.vue`; only the server side shipped. The form
+  now sends `timezone` with "Workspace default (…)" as an empty first option,
+  which `ConvertEmptyStringsToNull` turns into `null` and clears the override
+  through `SetProjectTimezoneAction`. Used from both the projects list and the
+  project page. Test: `test_choosing_workspace_default_in_the_edit_form_clears_the_override`.
+- **Uploads stuck on "Uploading…".** `useAttachmentUploads` mutated the plain
+  `entry` object after pushing it into the ref array, so Vue never saw
+  `uploading = false` until something else re-rendered. The entry is now
+  `reactive()`. Covers the New task modal and the comment composer.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

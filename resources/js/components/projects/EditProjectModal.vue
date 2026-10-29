@@ -2,6 +2,7 @@
 import { Loader2 } from 'lucide-vue-next';
 
 import type { Project } from '@/lib/projects';
+import { timezoneOptions, zoneLabel } from '@/lib/timezones';
 
 const props = defineProps<{
     open: boolean;
@@ -18,7 +19,10 @@ const { workspaceRoute } = useCurrentWorkspace();
 const form = useForm({
     name: '',
     description: '',
+    timezone: '',
 });
+
+const timezoneChoices = timezoneOptions();
 
 watch(
     () => props.project,
@@ -26,6 +30,7 @@ watch(
         form.clearErrors();
         form.name = project?.name ?? '';
         form.description = project?.description ?? '';
+        form.timezone = project?.timezone ?? '';
     },
     { immediate: true },
 );
@@ -73,6 +78,25 @@ function handleClose(value: boolean) {
                     :aria-invalid="!!form.errors.description"
                 />
                 <InputError :message="form.errors.description" />
+            </div>
+
+            <div class="grid gap-1.5">
+                <Label for="edit-project-timezone" class="text-sm font-medium">Working timezone</Label>
+                <select
+                    id="edit-project-timezone"
+                    v-model="form.timezone"
+                    class="border-input bg-muted/40 focus:bg-background focus:ring-ring/40 h-9 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+                    :aria-invalid="!!form.errors.timezone"
+                    :class="form.errors.timezone && 'border-destructive focus-visible:ring-destructive'"
+                    data-testid="project-timezone"
+                >
+                    <option value="">Workspace default ({{ zoneLabel(project.workspace_timezone ?? 'UTC') }})</option>
+                    <option v-for="option in timezoneChoices" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
+                <p class="text-muted-foreground text-xs">New timers and manual time on this project follow this timezone. Past time keeps its own.</p>
+                <InputError :message="form.errors.timezone" />
             </div>
         </form>
 
