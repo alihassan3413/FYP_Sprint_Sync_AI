@@ -46,3 +46,10 @@ export function formatPeriod(start: string, end: string): string {
 
     return startMonth === endMonth ? `${formatBusinessDate(start)}–${Number(endDay)}` : `${formatBusinessDate(start)} – ${formatBusinessDate(end)}`;
 }
+
+/** "18:00" → "6:00 PM" (a wall-clock time, no timezone maths). */
+export function formatClockTime(time: string): string {
+    const [hour, minute] = time.split(':').map(Number);
+
+    return new Date(2000, 0, 1, hour, minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}

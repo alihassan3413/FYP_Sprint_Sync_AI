@@ -19,6 +19,7 @@ use App\Modules\TimeTracking\Models\TimePolicy;
 use App\Modules\TimeTracking\Models\WorkSchedule;
 use App\Modules\TimeTracking\Support\HoursInput;
 use App\Modules\TimeTracking\Support\TimePolicies;
+use App\Modules\TimeTracking\Support\Timezones;
 use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -81,6 +82,7 @@ final class TimeSettingsController
                 ])->values(),
             'timezone' => $workspace->timezone,
             'today' => CarbonImmutable::now($workspace->timezone)->toDateString(),
+            'workspaceTimezone' => Timezones::label($workspace->timezone),
         ]);
     }
 

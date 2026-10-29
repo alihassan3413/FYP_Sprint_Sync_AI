@@ -33,6 +33,8 @@ const props = defineProps<{
     }[];
     timezone: string;
     today: string;
+    /** "Asia/Karachi (UTC+5)" */
+    workspaceTimezone: string;
 }>();
 
 const { workspaceRoute } = useCurrentWorkspace();
@@ -165,6 +167,15 @@ const formatWhen = (iso: string) => new Date(iso).toLocaleString(undefined, { mo
                 title="Time settings"
                 description="Everything here is optional. Turned off, time tracking works exactly as before."
             />
+
+            <p class="bg-muted/60 text-muted-foreground rounded-xl px-4 py-3 text-xs" data-testid="workspace-timezone">
+                Workspace time zone: <span class="text-foreground font-medium">{{ workspaceTimezone }}</span
+                >. Days, schedules, holidays, leave, paid lunch and time totals all use it. A shift that runs past midnight counts on the day it
+                started.
+                <Link :href="workspaceRoute('workspace.settings')" class="text-foreground font-medium underline underline-offset-2"
+                    >Change it in Settings</Link
+                >
+            </p>
 
             <!-- Policy -->
             <form class="bg-card space-y-6 rounded-3xl border p-5 sm:p-6" data-testid="policy-form" @submit.prevent="savePolicy">
