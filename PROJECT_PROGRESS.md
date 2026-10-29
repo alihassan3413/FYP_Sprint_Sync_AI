@@ -19,6 +19,11 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #59 added a workspace-level **My Work** view: one list of the user's
+tasks across every project they can see, with project, assignee (owners and
+admins), status, due-date and search filters. It also fixed editing a task into
+a sprint (a server error). **No FR status changes.**
+
 Entry #58 added manual (one-off) invoices alongside tracked-hours and
 recurring ones: client or custom recipient, quantity × rate lines, tax/discount,
 notes, server-side totals, finalize with a server number, PDF preview/download
@@ -5815,6 +5820,52 @@ owner-only access and cross-workspace 404. All 400 Billing tests pass. Full
 suite: 1968 passed plus the pre-existing flaky `AssistantFindTasksToolTest`
 (random factory text; unrelated). Pint, ESLint, vue-tsc (only the two
 pre-existing TS2688 tsconfig errors) and the production build pass.
+
+### 59. My Work (cross-project tasks) and the task-into-sprint fix
+
+**My Work** (`GET {workspace}/my-work`, `MyWorkController` in the Tasks module,
+sidebar item when `navigation.myWork`) lists tasks from every project the user
+can see, so people on several projects don't open each board.
+
+- **Which projects.** `Workspace::accessibleProjectsFor($user)`, then filtered
+  by the existing `TaskPolicy::viewAny` — the same rule the project boards use.
+  That matters: a member with the custom "View projects" permission can see all
+  projects, but only boards they are a member of; guests also need the board
+  permission. Tasks are queried by `workspace_id` and the visible project ids
+  only, so another workspace's or another project's tasks cannot appear, even
+  when asked for with `?project=`.
+- **Scope.** Default is tasks assigned to the current user. Owners and admins
+  can switch to all visible tasks and filter by assignee (or unassigned); for
+  anyone else `scope=all` is ignored.
+- **Filters.** Project, search (title, wildcards literal), status (open / done /
+  any, from each column's existing `is_done` flag) and due date (overdue,
+  today, next 7 days, none; "today" is the workspace's calendar day). Tasks
+  have no priority field, so there is no priority filter.
+- **No merged workflows.** Project columns are not mapped onto each other: the
+  view is a list grouped by project, each task shows its own project and its own
+  column name, and "done" uses each column's own flag. Project Kanban boards and
+  drag-and-drop are unchanged.
+- **Opening a task** links to `projects/{project}?task={id}`, which the project
+  page already opens in the existing task detail modal.
+- Paginated, 50 per page, ordered by due date.
+
+**Fix: editing a task into a sprint crashed.** `UpdateTaskRequest` used
+`Sprint::query()` without importing `Sprint` and called a `project()` method it
+did not define. Both only ran when a sprint was chosen, so creating tasks and
+editing them without a sprint worked, but moving an existing task into a sprint
+created later returned a server error (shown as the red error screen). Fixed by
+importing `Sprint` and adding `project()` like `StoreTaskRequest`; a scan of
+`app/` found no other class used without an import.
+
+Tests: `tests/Feature/Tasks/MyWorkTest.php` (11): an employee in two of three
+projects, assigned-only default, inaccessible projects excluded (also via the
+project filter), members cannot switch to all, owner/admin all-tasks with
+assignee and unassigned filters, status/due/project/search filters, workspace
+calendar for "today", columns never merged, guest board permission, cross-
+workspace isolation, navigation flag and pagination. `SprintLifecycleTest`
+gains two regression tests (move an existing task into a later sprint; refuse
+another project's sprint). Full suite: 1982 passed. Pint, ESLint, vue-tsc (only
+the two pre-existing TS2688 tsconfig errors) and the build pass.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 
