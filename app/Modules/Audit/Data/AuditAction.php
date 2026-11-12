@@ -75,6 +75,7 @@ enum AuditAction: string
     case INVOICE_AUTOMATION_HELD = 'invoice.automation_held';
     case TIME_TIMER_STARTED = 'time.timer_started';
     case TIME_TIMER_STOPPED = 'time.timer_stopped';
+    case TIME_TIMER_AUTO_STOPPED = 'time.timer_auto_stopped';
     case TIME_MANUAL_ADDED = 'time.manual_added';
     case TIME_ADJUSTMENT_ADDED = 'time.adjustment_added';
     case TIME_HISTORICAL_ADDED = 'time.historical_added';
@@ -241,6 +242,7 @@ enum AuditAction: string
             self::INVOICE_AUTOMATION_HELD => 'Automatic sending paused for review',
             self::TIME_TIMER_STARTED => 'Timer started',
             self::TIME_TIMER_STOPPED => 'Timer stopped',
+            self::TIME_TIMER_AUTO_STOPPED => 'Timer stopped automatically',
             self::TIME_MANUAL_ADDED => 'Time added',
             self::TIME_ADJUSTMENT_ADDED => 'Time adjusted',
             self::TIME_HISTORICAL_ADDED => 'Previous hours added',

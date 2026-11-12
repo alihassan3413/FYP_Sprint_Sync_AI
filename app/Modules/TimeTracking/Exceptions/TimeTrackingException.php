@@ -45,6 +45,11 @@ final class TimeTrackingException extends AppException
         return new self(code: ErrorCode::TIME_OPERATION_CONFLICT, status: 409, message: 'That request id was already used for a different timer action.');
     }
 
+    public static function desktopRequired(): self
+    {
+        return new self(code: ErrorCode::TIME_DESKTOP_REQUIRED, status: 403, message: 'SprintSync Desktop required. This workspace pauses timers after inactivity, which only the desktop app can detect. Start your timer from SprintSync Desktop.');
+    }
+
     public static function invalid(string $message): self
     {
         return new self(code: ErrorCode::TIME_INVALID, status: 422, message: $message);

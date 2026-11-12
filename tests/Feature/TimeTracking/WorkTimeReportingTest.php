@@ -312,15 +312,137 @@ final class WorkTimeReportingTest extends TestCase
 
         $this->actingAs($this->owner)->get(route('workspace.time.index', $this->workspace))
             ->assertInertia(fn (Assert $page) => $page
+                ->where('scope', 'team')
                 ->has('team', 6)
-                ->where('team.5.name', 'Muhammad Usman Ghani')
-                ->where('team.5.worked', 7200)
-                ->where('team.5.over_target', 3600)
+                ->where('team.0.name', 'Muhammad Usman Ghani')
+                ->where('team.0.worked', 7200)
+                ->where('team.0.over_target', 3600)
+                ->where('team.0.open_reviews', 1)
+                ->where('team.1.name', 'Abdul Rehman')
+                ->where('team.1.open_reviews', 0)
+                ->where('team.5.name', 'Muhammad Faizan')
+                ->where('reviews', []));
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $this->usman()->public_id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('scope', 'person')
+                ->where('team', [])
                 ->where('reviews.0.kind', 'activity')
-                ->where('reviews.0.decisions', ['no_concern', 'follow_up']));
+                ->where('reviews.0.decisions', ['no_concern', 'follow_up'])
+                ->where('reviews.0.evidence.resets', 40)
+                ->where('reviews.0.evidence.confidence', 'high')
+                ->has('reviews.0.evidence', 6)
+                ->has('reviews.0.evidence.window_start')
+                ->has('reviews.0.evidence.mean_gap_seconds')
+                ->has('reviews.0.evidence.variation_percent'));
 
         $this->actingAs($this->member)->get(route('workspace.time.index', $this->workspace))
-            ->assertInertia(fn (Assert $page) => $page->where('team', [])->where('reviews', [])->where('breakdown.week.over_target', 3600));
+            ->assertInertia(fn (Assert $page) => $page->where('scope', 'person')->where('team', [])->where('reviews', [])->where('breakdown.week.over_target', 3600));
+    }
+
+    public function test_the_team_lists_people_with_the_most_open_reviews_first(): void
+    {
+        $open = fn (string $name, int $count) => collect(range(1, $count))->each(fn (int $i) => TimeReview::query()->forceCreate([
+            'workspace_id' => $this->workspace->id,
+            'person_id' => $this->team[$name]->id,
+            'kind' => ReviewKind::Activity,
+            'severity' => 'review',
+            'work_date' => '2026-10-05',
+            'subject_key' => "test:{$name}:{$i}",
+            'summary' => 'Activity appears unusually repetitive. Review recommended.',
+            'status' => 'open',
+        ]));
+        $open('Faheem', 1);
+        $open('Muhammad Faizan', 3);
+        $open('Abdul Wahab', 1);
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', $this->workspace))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('team.0.name', 'Muhammad Faizan')
+                ->where('team.1.name', 'Abdul Wahab')
+                ->where('team.2.name', 'Faheem')
+                ->where('team.3.name', 'Abdul Rehman')
+                ->where('team.4.name', 'Ali Hassan')
+                ->where('team.5.name', 'Muhammad Usman Ghani'));
+    }
+
+    public function test_a_person_view_only_shows_that_persons_reviews(): void
+    {
+        $this->policy(['lunch_enabled' => true, 'lunch_allowance_seconds' => 3600]);
+        $this->travelTo('2026-10-05 09:00:00');
+        $this->startTimer();
+        $this->travelTo('2026-10-05 12:00:00');
+        $this->timer('lunch-start');
+        $this->travelTo('2026-10-05 13:30:00');
+        $this->timer('lunch-end');
+        $this->timer('stop');
+        $lunch = TimeReview::query()->sole();
+        $wahab = $this->team['Abdul Wahab'];
+        $resolved = TimeReview::query()->forceCreate([
+            'workspace_id' => $this->workspace->id,
+            'person_id' => $wahab->id,
+            'kind' => ReviewKind::Activity,
+            'severity' => 'review',
+            'work_date' => '2026-10-05',
+            'summary' => 'Activity appears unusually repetitive. Review recommended.',
+            'status' => 'resolved',
+            'decision' => 'no_concern',
+        ]);
+        TimeReview::query()->forceCreate([
+            'workspace_id' => $this->workspace->id,
+            'person_id' => $wahab->id,
+            'kind' => ReviewKind::Activity,
+            'severity' => 'review',
+            'work_date' => '2026-10-05',
+            'subject_key' => 'test:wahab-open',
+            'summary' => 'Activity appears unusually repetitive. Review recommended.',
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $this->usman()->public_id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('reviews', 1)
+                ->where('reviews.0.public_id', $lunch->public_id)
+                ->where('reviews.0.kind', 'lunch_excess')
+                ->where('reviews.0.seconds', 1800)
+                ->where('reviews.0.entry', $lunch->details['entry'])
+                ->where('reviews.0.evidence', ['lunch_seconds' => 5400, 'allowance_seconds' => 3600])
+                ->where('nextNeedingReview', ['public_id' => $wahab->public_id, 'name' => 'Abdul Wahab', 'open_reviews' => 1]));
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $wahab->public_id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('reviews', 1)
+                ->where('reviews.0.kind', 'activity')
+                ->whereNot('reviews.0.public_id', $resolved->public_id)
+                ->where('nextNeedingReview.name', 'Muhammad Usman Ghani'));
+
+        app(ResolveTimeReviewAction::class)->handle($lunch, 'not_counted', null, $this->owner);
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $this->usman()->public_id]))
+            ->assertInertia(function (Assert $page) {
+                $entries = collect($page->toArray()['props']['entries']);
+                $this->assertSame(['lunch' => 3600, 'tracked' => null], $entries->mapWithKeys(fn (array $entry) => [$entry['source'] => $entry['paid_seconds']])->sortKeys()->all());
+                $this->assertSame(5400, $entries->firstWhere('source', 'lunch')['duration_seconds']);
+            });
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $wahab->public_id]))
+            ->assertInertia(fn (Assert $page) => $page->where('nextNeedingReview', null));
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', [$this->workspace, 'person' => $this->team['Ali Hassan']->public_id]))
+            ->assertInertia(fn (Assert $page) => $page->where('scope', 'person')->where('isSelf', true)->where('reviews', [])->where('nextNeedingReview.name', 'Abdul Wahab'));
+
+        $this->actingAs($this->owner)->get(route('workspace.time.index', $this->workspace))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('reviews', [])
+                ->where('nextNeedingReview', null)
+                ->where('team.0.name', 'Abdul Wahab')
+                ->where('team.0.open_reviews', 1)
+                ->where('team.1.name', 'Abdul Rehman')
+                ->where('team.5.name', 'Muhammad Usman Ghani')
+                ->where('team.5.open_reviews', 0));
+
+        $this->actingAs($this->member)->get(route('workspace.time.index', $this->workspace))
+            ->assertInertia(fn (Assert $page) => $page->where('nextNeedingReview', null));
     }
 
     public function test_totals_never_mix_categories(): void

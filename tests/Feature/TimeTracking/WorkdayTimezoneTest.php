@@ -169,7 +169,7 @@ final class WorkdayTimezoneTest extends TestCase
         $this->team();
         $this->policy(['lunch_enabled' => true, 'lunch_allowance_seconds' => 3600, 'idle_enabled' => true, 'idle_seconds' => 300]);
         $this->at('2026-10-08 18:00');
-        $session = $this->startTimer()->json('timer.public_id');
+        $session = $this->startDesktopTimer()->json('timer.public_id');
         $this->at('2026-10-09 00:35');
         $this->timer('idle-pause', [
             'session' => $session,

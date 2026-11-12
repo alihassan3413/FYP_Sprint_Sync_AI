@@ -120,6 +120,7 @@ export enum AuditAction {
     INVOICE_AUTOMATION_HELD = 'invoice.automation_held',
     TIME_TIMER_STARTED = 'time.timer_started',
     TIME_TIMER_STOPPED = 'time.timer_stopped',
+    TIME_TIMER_AUTO_STOPPED = 'time.timer_auto_stopped',
     TIME_MANUAL_ADDED = 'time.manual_added',
     TIME_ADJUSTMENT_ADDED = 'time.adjustment_added',
     TIME_HISTORICAL_ADDED = 'time.historical_added',
@@ -602,6 +603,7 @@ export enum ReviewKind {
     LunchExcess = 'lunch_excess',
     IdleKept = 'idle_kept',
     Activity = 'activity',
+    AutoStopped = 'auto_stopped',
 }
 export type SignupPointData = {
     date: string;
@@ -823,6 +825,8 @@ export type TimeEntryData = {
     voided: boolean;
     void_reason?: string;
     timezone: string;
+    stop_reason_label?: string;
+    paid_seconds?: number;
 };
 export enum TimeEntrySource {
     Tracked = 'tracked',
@@ -854,6 +858,10 @@ export enum TimerState {
     Paused = 'paused',
     Lunch = 'lunch',
     Stopped = 'stopped',
+}
+export enum TimerStopReason {
+    ShiftEnded = 'shift_ended',
+    MaxDuration = 'max_duration',
 }
 export type TopAssistantUserData = {
     id: number;

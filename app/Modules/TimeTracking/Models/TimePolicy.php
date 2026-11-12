@@ -48,6 +48,8 @@ final class TimePolicy extends Model
             'lunch_allowance_seconds' => 'integer',
             'overtime_mode' => OvertimeMode::class,
             'integrity_enabled' => 'boolean',
+            'auto_stop_after_shift_seconds' => 'integer',
+            'max_timer_seconds' => 'integer',
         ];
     }
 

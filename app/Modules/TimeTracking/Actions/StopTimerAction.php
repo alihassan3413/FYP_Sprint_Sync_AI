@@ -7,12 +7,16 @@ namespace App\Modules\TimeTracking\Actions;
 use App\Models\User;
 use App\Modules\Audit\Actions\RecordAuditLogAction;
 use App\Modules\Audit\Data\AuditAction;
+use App\Modules\Audit\Data\SystemActor;
 use App\Modules\People\Models\Person;
+use App\Modules\TimeTracking\Data\ReviewKind;
 use App\Modules\TimeTracking\Data\TimeEntrySource;
 use App\Modules\TimeTracking\Data\TimerState;
+use App\Modules\TimeTracking\Data\TimerStopReason;
 use App\Modules\TimeTracking\Exceptions\TimeTrackingException;
 use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\TimeTracking\Models\TimeIdlePeriod;
+use App\Modules\TimeTracking\Models\TimeReview;
 use App\Modules\TimeTracking\Models\TimeSession;
 use App\Modules\TimeTracking\Support\ActiveTimer;
 use App\Modules\TimeTracking\Support\LunchBreaks;
@@ -55,7 +59,7 @@ final class StopTimerAction
         private readonly Schedules $schedules,
     ) {}
 
-    public function handle(Person $person, string $operationKey, User $actor, ?string $sessionPublicId = null, ?CarbonImmutable $occurredAt = null): TimeSession
+    public function handle(Person $person, string $operationKey, User|SystemActor $actor, ?string $sessionPublicId = null, ?CarbonImmutable $occurredAt = null, ?TimerStopReason $reason = null): TimeSession
     {
         if ($replayed = $this->operations->replay($person, $operationKey, 'stop')) {
             return $replayed->load('entry');
@@ -74,7 +78,7 @@ final class StopTimerAction
         }
 
         try {
-            [$session, $entry] = DB::transaction(function () use ($person, $operationKey, $sessionPublicId, $occurredAt) {
+            [$session, $entry] = DB::transaction(function () use ($person, $operationKey, $sessionPublicId, $occurredAt, $reason) {
                 $session = ActiveTimer::for($person, $sessionPublicId);
                 $now = ActiveTimer::moment($session, $occurredAt);
                 $stretch = $session->runningSeconds($now);
@@ -93,6 +97,7 @@ final class StopTimerAction
                         'lunch_started_at' => null,
                         'pause_reason' => null,
                         'stopped_at' => $now,
+                        'stop_reason' => $reason?->value,
                         'state_changed_at' => $now,
                         'updated_at' => now(),
                     ]);
@@ -133,6 +138,20 @@ final class StopTimerAction
                     'created_by' => $session->started_by,
                 ]);
 
+                if ($reason !== null) {
+                    TimeReview::query()->forceCreate([
+                        'workspace_id' => $session->workspace_id,
+                        'person_id' => $session->person_id,
+                        'kind' => ReviewKind::AutoStopped,
+                        'severity' => 'info',
+                        'work_date' => $workDate,
+                        'subject_key' => "auto_stop:{$session->id}",
+                        'seconds' => $seconds,
+                        'summary' => "{$reason->label()} at {$now->setTimezone($session->timezone)->format('M j, g:i A T')} ({$this->hours($seconds)} recorded). Correct the hours if needed.",
+                        'details' => ['reason' => $reason->value, 'stopped_at' => $now->toIso8601String(), 'entry' => $entry->public_id],
+                    ]);
+                }
+
                 $this->operations->record($person, $operationKey, 'stop', $session);
 
                 return [$session->refresh(), $entry];
@@ -145,15 +164,18 @@ final class StopTimerAction
             $person->workspace,
             null,
             $actor,
-            AuditAction::TIME_TIMER_STOPPED,
-            "{$actor->name} stopped {$person->name}'s timer on {$session->project_name} ({$this->hours($entry->duration_seconds)}).",
+            $reason === null ? AuditAction::TIME_TIMER_STOPPED : AuditAction::TIME_TIMER_AUTO_STOPPED,
+            $reason === null
+                ? "{$actor->name} stopped {$person->name}'s timer on {$session->project_name} ({$this->hours($entry->duration_seconds)})."
+                : "{$reason->label()}: {$person->name}'s timer on {$session->project_name} ({$this->hours($entry->duration_seconds)}).",
             $entry,
             [
                 'person' => $person->name,
                 'project' => $session->project_name,
                 'duration_seconds' => $entry->duration_seconds,
+                'stop_reason' => $reason?->value,
                 /* Synced from the desktop app after being offline: stopped earlier than it arrived. */
-                'synced_late' => $occurredAt !== null && $entry->ended_at->diffInSeconds(now()) > 60,
+                'synced_late' => $reason === null && $occurredAt !== null && $entry->ended_at->diffInSeconds(now()) > 60,
             ],
         );
 

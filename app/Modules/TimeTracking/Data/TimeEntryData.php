@@ -37,6 +37,8 @@ final class TimeEntryData extends Data
         public bool $voided,
         public ?string $void_reason,
         public string $timezone = 'UTC',
+        public ?string $stop_reason_label = null,
+        public ?int $paid_seconds = null,
     ) {}
 
     public static function fromModel(TimeEntry $entry): self
@@ -60,6 +62,8 @@ final class TimeEntryData extends Data
             voided: $entry->isVoided(),
             void_reason: $entry->void_reason,
             timezone: $entry->timezone,
+            stop_reason_label: $entry->relationLoaded('session') ? $entry->session?->stop_reason?->label() : null,
+            paid_seconds: $entry->source === TimeEntrySource::Lunch ? $entry->paid_seconds : null,
         );
     }
 }

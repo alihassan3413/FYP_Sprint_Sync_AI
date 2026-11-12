@@ -8,6 +8,7 @@ use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\TimeTracking\Data\TimerState;
+use App\Modules\TimeTracking\Data\TimerStopReason;
 use App\Modules\Workspace\Models\Workspace;
 use App\Support\Models\HasPublicId;
 use Carbon\CarbonInterface;
@@ -62,6 +63,7 @@ final class TimeSession extends Model
             'accumulated_seconds' => 'integer',
             'longest_segment_seconds' => 'integer',
             'billable' => 'boolean',
+            'stop_reason' => TimerStopReason::class,
         ];
     }
 

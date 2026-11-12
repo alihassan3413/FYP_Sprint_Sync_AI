@@ -54,7 +54,7 @@ final class LunchAndIdleTest extends TestCase
     private function begin(string $time = '09:00:00'): void
     {
         $this->at($time);
-        $this->session = $this->startTimer()->json('timer.public_id');
+        $this->session = $this->startDesktopTimer()->json('timer.public_id');
     }
 
     private function idle(string $since, string $detected, ?string $key = null): TestResponse

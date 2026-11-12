@@ -21,6 +21,7 @@ enum ReviewKind: string
     case LunchExcess = 'lunch_excess';
     case IdleKept = 'idle_kept';
     case Activity = 'activity';
+    case AutoStopped = 'auto_stopped';
 
     /** The decisions the owner can make for this kind. */
     public function decisions(): array
@@ -29,6 +30,7 @@ enum ReviewKind: string
             self::LunchExcess => ['counted', 'not_counted'],
             self::IdleKept => ['accepted', 'rejected'],
             self::Activity => ['no_concern', 'follow_up'],
+            self::AutoStopped => ['no_concern', 'follow_up'],
         };
     }
 }

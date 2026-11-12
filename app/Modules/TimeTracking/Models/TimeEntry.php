@@ -124,6 +124,11 @@ final class TimeEntry extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(TimeSession::class, 'time_session_id');
+    }
+
     public function adjusts(): BelongsTo
     {
         return $this->belongsTo(self::class, 'adjusts_entry_id');

@@ -30,6 +30,10 @@ final class TimePolicyRequest extends TimeRequest
             'lunch_minutes' => ['nullable', 'required_if:lunch_enabled,true', 'integer', 'between:5,180'],
             'overtime_mode' => ['required', Rule::enum(OvertimeMode::class)],
             'integrity_enabled' => ['required', 'boolean'],
+            'shift_stop_enabled' => ['sometimes', 'boolean'],
+            'shift_stop_hours' => ['nullable', 'required_if:shift_stop_enabled,true', 'integer', 'between:1,12'],
+            'max_timer_enabled' => ['sometimes', 'boolean'],
+            'max_timer_hours' => ['nullable', 'required_if:max_timer_enabled,true', 'integer', 'between:2,24'],
         ];
     }
 
@@ -43,11 +47,15 @@ final class TimePolicyRequest extends TimeRequest
             'idle_minutes.between' => 'Use between 2 and 120 minutes.',
             'lunch_minutes.required_if' => 'Choose how long the paid lunch is.',
             'lunch_minutes.between' => 'Use between 5 and 180 minutes.',
+            'shift_stop_hours.required_if' => 'Choose how long after the shift ends to stop the timer.',
+            'shift_stop_hours.between' => 'Use between 1 and 12 hours.',
+            'max_timer_hours.required_if' => 'Choose the longest a timer may run.',
+            'max_timer_hours.between' => 'Use between 2 and 24 hours.',
         ];
     }
 
     /**
-     * @return array{idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: OvertimeMode, integrity_enabled: bool}
+     * @return array{idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: OvertimeMode, integrity_enabled: bool, auto_stop_after_shift_seconds: int|null, max_timer_seconds: int|null}
      */
     public function policy(): array
     {
@@ -62,6 +70,8 @@ final class TimePolicyRequest extends TimeRequest
             'lunch_allowance_seconds' => $this->boolean('lunch_enabled') ? (int) $this->validated('lunch_minutes') * 60 : null,
             'overtime_mode' => OvertimeMode::from((string) $this->validated('overtime_mode')),
             'integrity_enabled' => $this->boolean('integrity_enabled'),
+            'auto_stop_after_shift_seconds' => $this->boolean('shift_stop_enabled') ? (int) $this->validated('shift_stop_hours') * 3600 : null,
+            'max_timer_seconds' => $this->boolean('max_timer_enabled') ? (int) $this->validated('max_timer_hours') * 3600 : null,
         ];
     }
 }

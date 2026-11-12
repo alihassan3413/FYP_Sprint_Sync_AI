@@ -22,6 +22,7 @@ use App\Modules\Workspace\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -35,6 +36,12 @@ use Inertia\Response;
  */
 final class TimeIndexController
 {
+    private const array EVIDENCE = [
+        'lunch_excess' => ['lunch_seconds', 'allowance_seconds'],
+        'auto_stopped' => ['reason', 'stopped_at'],
+        'activity' => ['window_start', 'window_end', 'resets', 'mean_gap_seconds', 'variation_percent', 'confidence'],
+    ];
+
     public function __invoke(Request $request, Workspace $workspace, TimeAccess $access, TimeTotals $totals, TimePolicies $policies, Schedules $schedules): Response
     {
         $user = $request->user();
@@ -56,9 +63,11 @@ final class TimeIndexController
         $workday = $session === null ? $today : CarbonImmutable::parse($schedules->workdayOf($session), $workspace->timezone);
         $schedule = $viewing === null ? null : $schedules->for($viewing);
         $overnightShift = $schedule !== null && $schedule->end_time <= $schedule->start_time ? ['start' => $schedule->start_time, 'end' => $schedule->end_time] : null;
+        $teamScope = $canManage && ! $request->filled('person');
 
         return Inertia::render('time/index', [
             'canManageTeam' => $canManage,
+            'scope' => $teamScope ? 'team' : 'person',
             'me' => $me?->only(['public_id', 'name']),
             'viewing' => $viewing?->only(['public_id', 'name']),
             'isSelf' => $viewing !== null && $viewing->is($me),
@@ -73,7 +82,7 @@ final class TimeIndexController
             'entries' => $viewing === null ? [] : TimeEntry::query()
                 ->where('workspace_id', $workspace->id)
                 ->where('person_id', $viewing->id)
-                ->with(['person:id,name,user_id', 'creator:id,name', 'adjusts:id,public_id'])
+                ->with(['person:id,name,user_id', 'creator:id,name', 'adjusts:id,public_id', 'session:id,stop_reason'])
                 ->orderByDesc('period_start')
                 ->orderByDesc('id')
                 ->limit(50)
@@ -94,10 +103,9 @@ final class TimeIndexController
                 'week' => $totals->week($viewing, $today)->toArray(),
             ],
             'idlePeriods' => $viewing === null ? [] : self::idlePeriods($viewing->id),
-            'reviews' => $canManage ? self::openReviews($workspace) : [],
-            'team' => $canManage && ! $request->filled('person') ? $workspace->people()->orderBy('name')->get()
-                ->map(fn (Person $person) => ['public_id' => $person->public_id, 'name' => $person->name, ...$totals->week($person, $today)->toArray()])
-                ->values() : [],
+            'reviews' => $canManage && ! $teamScope && $viewing !== null ? self::openReviews($workspace, $viewing) : [],
+            'team' => $teamScope ? self::team($workspace, $totals, $today) : [],
+            'nextNeedingReview' => $canManage && ! $teamScope && $viewing !== null ? self::nextNeedingReview($workspace, $viewing) : null,
         ]);
     }
 
@@ -123,9 +131,40 @@ final class TimeIndexController
     /**
      * @return list<array<string, mixed>>
      */
-    private static function openReviews(Workspace $workspace): array
+    private static function team(Workspace $workspace, TimeTotals $totals, CarbonImmutable $today): array
     {
-        return TimeReview::query()->open()->where('workspace_id', $workspace->id)->with('person:id,name')->orderByDesc('work_date')->limit(50)->get()
+        $openReviews = TimeReview::query()->open()->where('workspace_id', $workspace->id)
+            ->selectRaw('person_id, count(*) as open_reviews')->groupBy('person_id')->pluck('open_reviews', 'person_id');
+
+        return $workspace->people()->orderBy('name')->get()
+            ->map(fn (Person $person) => [
+                'public_id' => $person->public_id,
+                'name' => $person->name,
+                'open_reviews' => (int) ($openReviews[$person->id] ?? 0),
+                ...$totals->week($person, $today)->toArray(),
+            ])
+            ->sortBy([['open_reviews', 'desc'], ['name', 'asc']])
+            ->values()->all();
+    }
+
+    /**
+     * @return array{public_id: string, name: string, open_reviews: int}|null
+     */
+    private static function nextNeedingReview(Workspace $workspace, Person $viewing): ?array
+    {
+        $next = TimeReview::query()->open()->where('workspace_id', $workspace->id)->where('person_id', '!=', $viewing->id)
+            ->selectRaw('person_id, count(*) as open_reviews')->groupBy('person_id')
+            ->orderByDesc('open_reviews')->orderBy('person_id')->with('person:id,public_id,name')->first();
+
+        return $next === null ? null : ['public_id' => $next->person->public_id, 'name' => $next->person->name, 'open_reviews' => (int) $next->open_reviews];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function openReviews(Workspace $workspace, Person $person): array
+    {
+        return TimeReview::query()->open()->where('workspace_id', $workspace->id)->where('person_id', $person->id)->with('person:id,name')->orderByDesc('work_date')->limit(50)->get()
             ->map(fn (TimeReview $review) => [
                 'public_id' => $review->public_id,
                 'kind' => $review->kind->value,
@@ -134,6 +173,8 @@ final class TimeIndexController
                 'work_date' => $review->work_date->toDateString(),
                 'seconds' => $review->seconds,
                 'decisions' => $review->kind->decisions(),
+                'entry' => $review->details['entry'] ?? null,
+                'evidence' => Arr::only($review->details ?? [], self::EVIDENCE[$review->kind->value] ?? []),
             ])->values()->all();
     }
 

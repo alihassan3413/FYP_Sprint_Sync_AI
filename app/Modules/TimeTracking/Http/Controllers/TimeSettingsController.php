@@ -52,6 +52,10 @@ final class TimeSettingsController
                 'idle_minutes' => $policy->idleSeconds === null ? 5 : intdiv($policy->idleSeconds, 60),
                 'lunch_minutes' => $policy->lunchAllowanceSeconds === null ? 60 : intdiv($policy->lunchAllowanceSeconds, 60),
                 'weekly_target_hours' => $policy->weeklyTargetSeconds === null ? '' : rtrim(rtrim(sprintf('%d.%02d', intdiv($policy->weeklyTargetSeconds, 3600), intdiv($policy->weeklyTargetSeconds % 3600, 36)), '0'), '.'),
+                'shift_stop_enabled' => $policy->autoStopAfterShiftSeconds !== null,
+                'shift_stop_hours' => $policy->autoStopAfterShiftSeconds === null ? 2 : intdiv($policy->autoStopAfterShiftSeconds, 3600),
+                'max_timer_enabled' => $policy->maxTimerSeconds !== null,
+                'max_timer_hours' => $policy->maxTimerSeconds === null ? 12 : intdiv($policy->maxTimerSeconds, 3600),
                 'effective_from' => $policy->effectiveFrom?->toIso8601String(),
             ],
             'history' => TimePolicy::query()->where('workspace_id', $workspace->id)->with('creator:id,name')->orderByDesc('effective_from')->orderByDesc('id')->limit(6)->get()

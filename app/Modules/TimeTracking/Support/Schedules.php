@@ -12,8 +12,8 @@ use Carbon\CarbonInterface;
 
 /**
  * Expected schedules. They never create hours: they are only compared with
- * real timer times ("1h 20m outside scheduled hours"), and nobody's timer is
- * stopped at the end of a shift.
+ * real timer times ("1h 20m outside scheduled hours"). A timer is only
+ * stopped after its shift when the owner turns that on (StopAbandonedTimerAction).
  *
  * A person's own schedule wins over the workspace's; a version with no days
  * means "no schedule". Shifts that end at or before they start finish the
@@ -75,6 +75,33 @@ final class Schedules
     public function workdayOf(TimeSession $session): string
     {
         return $this->workday($session->person, $session->started_at, $session->timezone);
+    }
+
+    public function shiftEnd(TimeSession $session): ?CarbonImmutable
+    {
+        $schedule = $this->for($session->person, $session->started_at);
+
+        if ($schedule === null) {
+            return null;
+        }
+
+        $start = CarbonImmutable::instance($session->started_at)->utc();
+        $startDay = $start->setTimezone($schedule->timezone)->startOfDay();
+
+        foreach ([$startDay->subDay(), $startDay] as $day) {
+            if (! in_array($day->dayOfWeekIso, $schedule->days ?? [], true)) {
+                continue;
+            }
+
+            [$windowStart, $windowEnd] = $this->window($schedule, $day);
+            $belongs = $day->equalTo($startDay) ? $start->lessThan($windowEnd) : $start->greaterThanOrEqualTo($windowStart) && $start->lessThan($windowEnd);
+
+            if ($belongs) {
+                return $windowEnd->utc();
+            }
+        }
+
+        return null;
     }
 
     /**

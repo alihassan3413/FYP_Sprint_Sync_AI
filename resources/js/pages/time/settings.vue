@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarHeart, ChevronLeft, Clock, Coffee, Loader2, ShieldCheck, Trash2, UserMinus } from 'lucide-vue-next';
+import { CalendarHeart, ChevronLeft, Clock, Coffee, Loader2, ShieldCheck, TimerOff, Trash2, UserMinus } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatDuration, formatPeriod, requestKey } from '@/lib/time';
@@ -16,6 +16,10 @@ const props = defineProps<{
         lunch_minutes: number;
         overtime_mode: 'track_only' | 'review';
         integrity_enabled: boolean;
+        shift_stop_enabled: boolean;
+        shift_stop_hours: number;
+        max_timer_enabled: boolean;
+        max_timer_hours: number;
         effective_from: string | null;
     };
     history: { effective_from: string; by: string | null }[];
@@ -45,6 +49,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const IDLE_CHOICES = [2, 5, 10, 15, 30];
+const SHIFT_STOP_CHOICES = [1, 2, 3, 4, 6, 8, 12];
+const MAX_TIMER_CHOICES = [8, 10, 12, 16, 24];
 const DAYS = [
     { value: 1, label: 'Mon' },
     { value: 2, label: 'Tue' },
@@ -65,6 +71,10 @@ const policyForm = useForm({
     lunch_minutes: props.policy.lunch_minutes,
     overtime_mode: props.policy.overtime_mode,
     integrity_enabled: props.policy.integrity_enabled,
+    shift_stop_enabled: props.policy.shift_stop_enabled,
+    shift_stop_hours: props.policy.shift_stop_hours,
+    max_timer_enabled: props.policy.max_timer_enabled,
+    max_timer_hours: props.policy.max_timer_hours,
 });
 
 function savePolicy() {
@@ -198,7 +208,8 @@ const formatWhen = (iso: string) => new Date(iso).toLocaleString(undefined, { mo
                     <InputError :message="policyForm.errors.idle_minutes" />
                     <p class="text-muted-foreground text-xs">
                         SprintSync Desktop pauses the timer when the computer hasn't been used for this long. People can keep idle time as work with a
-                        reason. Web timers can't see whether the computer is in use, so this only applies on desktop.
+                        reason. A website can't tell whether the computer is in use, so while this is on, timers can only be started from SprintSync
+                        Desktop.
                     </p>
                 </section>
 
@@ -270,6 +281,49 @@ const formatWhen = (iso: string) => new Date(iso).toLocaleString(undefined, { mo
                     <p class="text-muted-foreground text-xs">
                         SprintSync Desktop looks only at when the computer's idle clock resets, to spot keep-awake tools. It never records keys, mouse
                         positions, apps, websites or screenshots. A flag is a suggestion to look, never an accusation, and your team is told it's on.
+                    </p>
+                </section>
+
+                <section class="space-y-3 border-t pt-5" data-testid="abandoned-timers">
+                    <h2 class="flex items-center gap-2 text-sm font-semibold"><TimerOff class="size-4" /> Forgotten timers</h2>
+                    <label class="flex items-center gap-2 text-sm">
+                        <AppSwitch id="shift-stop-enabled" v-model="policyForm.shift_stop_enabled" label="Stop after the shift" />
+                        Stop timers still running after a shift ends
+                    </label>
+                    <div v-if="policyForm.shift_stop_enabled" class="flex flex-wrap items-center gap-2 text-sm">
+                        Stop
+                        <select
+                            v-model.number="policyForm.shift_stop_hours"
+                            class="bg-background h-9 rounded-md border px-2"
+                            data-testid="shift-stop-hours"
+                        >
+                            <option v-for="hours in SHIFT_STOP_CHOICES" :key="hours" :value="hours">
+                                {{ hours }} {{ hours === 1 ? 'hour' : 'hours' }}
+                            </option>
+                        </select>
+                        after the person's scheduled shift ends
+                    </div>
+                    <InputError :message="policyForm.errors.shift_stop_hours" />
+                    <label class="flex items-center gap-2 text-sm">
+                        <AppSwitch id="max-timer-enabled" v-model="policyForm.max_timer_enabled" label="Longest timer" />
+                        Stop any timer left untouched for too long
+                    </label>
+                    <div v-if="policyForm.max_timer_enabled" class="flex flex-wrap items-center gap-2 text-sm">
+                        Stop after
+                        <select
+                            v-model.number="policyForm.max_timer_hours"
+                            class="bg-background h-9 rounded-md border px-2"
+                            data-testid="max-timer-hours"
+                        >
+                            <option v-for="hours in MAX_TIMER_CHOICES" :key="hours" :value="hours">{{ hours }} hours</option>
+                        </select>
+                        without a pause, resume or stop
+                    </div>
+                    <InputError :message="policyForm.errors.max_timer_hours" />
+                    <p class="text-muted-foreground text-xs">
+                        For timers someone forgot to stop. The time is saved up to the moment it was stopped, the person and you can see why, and it
+                        appears in your review list so you can correct the hours. Pausing or resuming counts as activity, so real overtime keeps
+                        running. People without a schedule are only covered by the second rule.
                     </p>
                 </section>
 

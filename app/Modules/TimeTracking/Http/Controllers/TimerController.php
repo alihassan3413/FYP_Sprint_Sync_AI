@@ -20,6 +20,7 @@ use App\Modules\TimeTracking\Http\Requests\TimerOperationRequest;
 use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\TimeTracking\Models\TimeSession;
 use App\Modules\TimeTracking\Support\TimeAccess;
+use App\Modules\TimeTracking\Support\TimePolicies;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -48,8 +49,12 @@ final class TimerController
         ]);
     }
 
-    public function start(StartTimerRequest $request, Workspace $workspace, StartTimerAction $action): JsonResponse|RedirectResponse
+    public function start(StartTimerRequest $request, Workspace $workspace, StartTimerAction $action, TimePolicies $policies): JsonResponse|RedirectResponse
     {
+        if (! $request->routeIs('desktop.*') && $policies->at($workspace->id)->idleEnabled) {
+            throw TimeTrackingException::desktopRequired();
+        }
+
         $session = $action->handle(
             $this->me($request, $workspace),
             $request->project(),

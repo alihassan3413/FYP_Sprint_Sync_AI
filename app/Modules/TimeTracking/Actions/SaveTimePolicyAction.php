@@ -26,7 +26,7 @@ final class SaveTimePolicyAction
     ) {}
 
     /**
-     * @param  array{idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: OvertimeMode, integrity_enabled: bool}  $rules
+     * @param  array{idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: OvertimeMode, integrity_enabled: bool, auto_stop_after_shift_seconds?: int|null, max_timer_seconds?: int|null}  $rules
      */
     public function handle(Workspace $workspace, array $rules, User $actor): PolicySnapshot
     {
@@ -39,6 +39,8 @@ final class SaveTimePolicyAction
             'lunch_allowance_seconds' => $rules['lunch_enabled'] ? $rules['lunch_allowance_seconds'] : null,
             'overtime_mode' => $rules['overtime_mode']->value,
             'integrity_enabled' => $rules['integrity_enabled'],
+            'auto_stop_after_shift_seconds' => $rules['auto_stop_after_shift_seconds'] ?? null,
+            'max_timer_seconds' => $rules['max_timer_seconds'] ?? null,
         ];
 
         $changed = array_keys(array_filter($next, fn ($value, $key) => ($current[$key] ?? null) !== $value, ARRAY_FILTER_USE_BOTH));

@@ -19,6 +19,11 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #61 made SprintSync Desktop required for starting timers while idle
+detection is on (the web can't see whether the computer is in use) and added an
+optional server-side safeguard that stops timers left running past the shift
+end or past a maximum untouched run. **No FR status changes.**
+
 Entry #60 added the missing **Working timezone** select to Edit project (the
 server side shipped in #57 but the field was never in the form) and fixed
 attachment uploads staying on "Uploading…" after the server had replied.
@@ -5884,6 +5889,282 @@ the two pre-existing TS2688 tsconfig errors) and the build pass.
   `entry` object after pushing it into the ref array, so Vue never saw
   `uploading = false` until something else re-rendered. The entry is now
   `reactive()`. Covers the New task modal and the comment composer.
+
+### 61. Desktop-required timers and the forgotten-timer safeguard
+
+**Why.** Idle detection only ever worked in SprintSync Desktop: it reads the
+OS idle clock and calls `timer/idle-pause`. A timer started on the website had
+nothing watching it and ran until someone pressed Stop.
+
+**Desktop required while idle detection is on.**
+- `TimerController::start` refuses web starts (any route outside `desktop.*`)
+  when the policy in force now has idle detection on. It throws
+  `TimeTrackingException::desktopRequired()` (403, `TIME.DESKTOP_REQUIRED`).
+- Desktop starts, and web pause / resume / stop / lunch on an existing timer,
+  are unchanged.
+- The Time page shows a "SprintSync Desktop required" card with "Get SprintSync
+  Desktop" in place of the start form. Manual "Add time" still works.
+- The idle setting's help text says so.
+- No browser tab activity or Chrome Idle Detection is used.
+
+**Forgotten timers (`time:stop-abandoned-timers`, every five minutes, `withoutOverlapping`).**
+- Two new nullable policy fields (versioned like the rest of the policy), both
+  off by default:
+  - `auto_stop_after_shift_seconds`, 1–12 h after the shift ends;
+  - `max_timer_seconds`, 2–24 h untouched.
+- Time settings has a "Forgotten timers" section for them.
+- **Cutoff (`StopAbandonedTimerAction::cutoff`).** The last real interaction
+  is `state_changed_at` (start, pause, resume, lunch, desktop idle pause).
+  - Shift rule: `max(shift end, last interaction) + grace`.
+  - Max rule: `last interaction + max`.
+  - The earlier rule wins.
+  - The cutoff is never earlier than the policy's `effective_from`, so turning
+    the rule on never stops a timer in the past.
+  - Pausing or resuming after the shift counts as presence, so real overtime
+    keeps running. No idle time is inferred on the server.
+- **Which shift (`Schedules::shiftEnd`).** It uses the schedule version in
+  force when the timer started:
+  - the previous day's window when it contains the start (overnight shifts:
+    00:40 inside 18:00–03:00 belongs to the evening's shift);
+  - otherwise the same day's window if the start is before its end.
+  - Work started after the day's shift has ended has no shift, so only the
+    max rule applies.
+  - Windows are built in the schedule's timezone; daylight-saving changes use
+    wall-clock times. The project timezone only affects how the time is
+    displayed.
+- **Stopping.** It goes through `StopTimerAction` with the cutoff as
+  `occurredAt`, so the time is saved up to the cutoff, not up to when the
+  scheduler ran.
+  - The entry keeps the session's workday.
+  - Lunch and idle periods are closed as with a normal stop.
+  - A new optional `TimerStopReason` (`shift_ended` / `max_duration`) is
+    written to `time_sessions.stop_reason` in the same conditional update.
+  - In the same transaction, an `auto_stopped` `TimeReview` is created for
+    the owner's "To review" list (unique `auto_stop:{session}`).
+  - It is audited as `time.timer_auto_stopped` by the system actor.
+- **Idempotent and scheduler-safe.**
+  - The operation key is deterministic (`auto-stop:{session public id}`) and
+    the stop is a conditional update.
+  - A second run finds nothing to do.
+  - A timer the person stopped meanwhile is left alone, and a new timer gets
+    its own cutoff.
+- **Visibility.** The person sees "Stopped automatically after the shift
+  ended / after running too long" on the entry (`TimeEntryData::stop_reason_label`).
+
+**Migration.** `2026_11_11_210634_add_abandoned_timer_safeguard` is additive
+only: two nullable `time_policies` columns and `time_sessions.stop_reason`.
+
+**Tests.** `AbandonedTimerTest` (19) covers:
+- web refused while idle detection is on (JSON and Inertia), desktop allowed,
+  and web allowed when it is off;
+- the shift-end cutoff and the grace period;
+- interaction after the shift moving the cutoff;
+- overnight shifts, including a restart after midnight;
+- the max-duration fallback, evening work, and the earlier rule winning;
+- repeated scheduler runs, and a timer stopped meanwhile;
+- paused timers;
+- no stop in the past when the rule is turned on;
+- schedule timezone versus project timezone, and the US daylight-saving change;
+- settings save and validation, and the stop reason shown on the entry.
+
+`LunchAndIdleTest` and `WorkdayTimezoneTest` now start their idle-detection
+timers through the desktop API (`startDesktopTimer`).
+
+### 62. Time page: Team and Person scopes (UX Direction B, pass 1)
+
+**Why.** "To review" listed every open review in the workspace, so viewing
+one person still showed other people's lunch overruns above their timer. Team
+overview and person detail were one stacked page, separated only by a
+dropdown. A manager couldn't tell at a glance what needed attention, whose
+time was on screen, or what to do.
+
+**Two scopes, same route.**
+- `TimeIndexController` sends `scope`:
+  - `team` for an owner with no `?person=`;
+  - `person` otherwise. That covers the owner opening anyone (themselves
+    included) and every member, who only ever sees their own time.
+- **Team scope.**
+  - An attention line with the open-review total and number of people, and a
+    "Start with …" link to the person with the most open items.
+  - "Nothing is waiting for your decision" when there are none.
+  - A compact bar for the owner's own timer (pause / resume / stop / end
+    lunch) with a "Your time" link.
+  - The week table with a new "Needs you" column. `team.*.open_reviews` comes
+    from one grouped count query.
+  - Time settings and Add previous hours sit in the header.
+- **Person scope (owner).**
+  - "← Team" back link, then an avatar and name heading ("Your time" for
+    yourself) with the person's own timer status.
+  - The switcher now lists people only. "Team" is the back link.
+  - That person's reviews are pinned above their totals and entries.
+  - Entries linked to an open review are tinted and marked "In review".
+
+**P0 fix.** `reviews` is now only that person's open reviews, sent only in
+the person scope. It is empty in the team scope, so the team scope shows
+counts and never rows.
+
+**Review rows** (existing components only):
+- each row has a kind icon and label, the date, the summary and the amount;
+- labels are per kind, e.g. "Hours look right" for an auto-stopped timer;
+- every decision is an equal-weight button, so no money decision looks like
+  the default;
+- `aria-label`s name the person and day;
+- buttons are disabled while a decision is saving;
+- an optional note uses the existing `note` field;
+- auto-stopped rows have "Correct hours…", which opens the existing
+  correction modal. It finds the entry through the new `reviews.*.entry`,
+  read from the review's details.
+
+**Totals.** The Today / This week / This month tiles and the two breakdown
+cards were merged into three cards: the worked figure, then what it's made of.
+
+**Copy.** Idle periods seen by the owner say they are waiting for the person
+to decide, rather than addressing the owner as "you". The empty entries state
+names the person.
+
+**Unchanged.** Permissions, timer, lunch, idle, review resolution, totals and
+billing logic.
+
+**Review flow and feedback** (after the first re-critique, 19 → 25/40):
+- **Next person.** `nextNeedingReview` is sent in the owner's person scope:
+  the other person with the most open reviews, ties broken by person id, or
+  null. When the person shown has nothing open, an all-clear line replaces
+  the reviews section. It offers "Next: Name (n) →", or "Back to Team" when
+  nobody else is waiting.
+- **While saving.** Only the clicked decision shows a spinner. Every decision
+  stays disabled while one is saving.
+- **Errors.** A failed decision shows its error on its own row
+  (`role="alert"`).
+- **After saving.** "Decision saved." is announced in a polite live region,
+  and focus moves to the reviews heading, or to the all-clear line once the
+  last review is gone. Without this, focus fell back to the top of the page.
+
+**Evidence, decision meaning, team order** (after the second re-critique,
+27/40). All display-only; review logic is unchanged.
+- **Evidence.** `reviews.*.evidence` sends a whitelist of each review's
+  stored `details` (`TimeIndexController::EVIDENCE`):
+  - lunch: `lunch_seconds` and `allowance_seconds`;
+  - auto-stopped: `stopped_at`;
+  - activity: the stored summary metrics (window, resets, mean gap,
+    variation, confidence).
+  Nothing new is recorded.
+- **Evidence line on each review.** Examples:
+  - "Lunch took 1h 47m against a 1h 00m allowance · Nov 9 · 1:00–2:47 PM";
+  - "Recorded Nov 10 · 6:00–11:00 PM";
+  - "Between 10:40 and 11:00 AM, input came about every 30s, 40 times, with
+    only 0.5% variation in timing. Confidence: high."
+- **View entry.** Shown when the review's entry is in the list. It scrolls to
+  the entry (no smooth scroll under reduced motion), focuses it, and outlines
+  it for 2.5s.
+- **What each decision changes.** One plain line per decision, linked to the
+  buttons with `aria-describedby`.
+  - "Follow up" says "kept on record only".
+  - Activity reviews add "Either choice releases the hold on automatic
+    invoices for this period". That is true today:
+    `InvoiceAutomationSafety` holds automatic invoices while an activity
+    review is open.
+  - For auto-stopped timers, "Follow up" adds "Nothing else happens".
+- **Visible confirmation.** After a decision saves, a green line stays where
+  the review was, e.g. "Long lunch, Nov 9: not counted." The "Decision saved."
+  screen-reader announcement is kept.
+  - The resolve request now uses `preserveState: true`. Without it, Inertia
+    remounted the page and dropped the announcement, the confirmation and the
+    focus move set in `onSuccess`.
+- **Team order.** People with open reviews come first (most open first), then
+  everyone else by name.
+- **Columns.** Paid lunch, Leave and Holiday are hidden when they are zero for
+  the whole team. Over target is hidden when nobody has a weekly target.
+  Numbers no longer wrap.
+
+**Review card layout** (after the third re-critique, 27/40). Frontend only;
+review logic is unchanged.
+- **Title.** The title is now an `<h3>` (kind · date). The evidence line
+  sits directly under it, with the server summary in muted text below.
+- **Impact.** The amount is larger, top right, with a short caption: over
+  allowance, recorded, flagged window, or kept as work.
+- **Decisions.** The two decisions are full-size outline buttons in a
+  labelled group.
+- **Secondary actions.** Correct hours…, View entry and Add a note are quiet
+  text buttons with icons. They sit to the right on desktop and on their own
+  row on mobile, so a card no longer has a row of 4–5 equal-weight buttons.
+- **Note.** When opened, the note sits above the decision buttons with a
+  visible label, and focus moves into it. The toggle reads "Remove note".
+- **Unchanged.** The decision explanations, the visible saved line, row-level
+  errors, the focus move and the aria-live announcement.
+- **Screenshots.** Before/after pairs of the same states (desktop, 390px
+  mobile, dark, note open, idle-kept) were checked against the scratch DB.
+
+**P2 polish** (after the fourth re-critique, 28/40). Review logic is
+unchanged. Unusual-activity reviews stay record-only (product decision: the
+flag never changes pay).
+- **No repeated line.** The server summary shows only when there is no
+  evidence line. Idle-kept reviews always show it, because it holds the
+  person's own reason.
+- **Auto-stopped evidence.** It now names the stop reason, e.g. "Stopped
+  after the shift ended. Recorded …", using the stored `reason` (added to the
+  evidence whitelist).
+- **One confirmation wording.**
+  - The visible line and the aria-live announcement say the same thing,
+    plus what's left: "Long lunch, Nov 9: not counted. 2 left for Name."
+  - The server flash now says "Decision saved." instead of "Review saved.".
+- **Per-decision descriptions.** Each decision button's `aria-describedby`
+  points only at its own effect line, plus the invoice-hold note for
+  activity reviews.
+- **Errors.** A row-level error now sits directly under the decision row.
+- **Tests.** `AbandonedTimerTest::test_the_person_sees_why_their_timer_stopped`
+  also checks the auto-stopped review's evidence (`reason`, `stopped_at`) and
+  its entry link.
+
+**Card meaning** (after the fifth re-critique, 28/40). Review and pay logic
+are unchanged. Activity flags stay in the same list (product decision).
+
+**Activity cards**
+- They show "No pay change" with the caption "automatic invoices held",
+  instead of a duration that read like time at stake.
+- The evidence is plainer and neutral: "…almost perfectly evenly. A strong
+  pattern: worth a look, not proof of a problem."
+- The invoice note now ends "Pay never changes".
+- "No concern" reads "closes the review with nothing noted". "Follow up"
+  reads "marked for follow-up, on record only", plus "Nothing else happens"
+  on auto-stopped cards.
+
+**Lunch and idle cards** get the line "Pay decisions are final; they can't be
+changed later". "Count as paid + billable" now says the client is charged.
+
+**Entry outcome**
+- `TimeEntryData` gains `paid_seconds`, set for lunch entries only;
+  `generated.ts` matches `typescript:transform` output.
+- Once a lunch entry's review is decided, the entry reads "Lunch · 1h 00m
+  paid · 47m past the allowance not counted", or "counted by the owner" when
+  a counted adjustment exists.
+
+**Smaller changes**
+- Card durations under an hour drop the leading "0h", e.g. "47m"
+  (`formatShort` on this page only; `formatDuration` is unchanged).
+- The aria-live announcement is now exactly the visible confirmation line.
+- The idle card caption is "counted if accepted".
+- On mobile, the impact column is capped so evidence text keeps its width.
+
+**Tests.** The person-view test checks `paid_seconds` (3600 on the lunch
+entry, null on tracked entries).
+
+**Not done yet (pass 2):** undo/reopen of decisions, live presence for
+everyone, bulk actions, week navigation.
+
+**Tests.** In `WorkTimeReportingTest`:
+- the owner-view test now checks `scope`, `open_reviews` and person-scoped
+  reviews;
+- new `test_a_person_view_only_shows_that_persons_reviews`:
+  - another person's open review and a resolved review never show;
+  - `entry` and `seconds` are sent;
+  - the owner's own view is the person scope;
+  - the team scope has counts and no rows;
+  - `nextNeedingReview` for each viewer, null once nobody else is waiting,
+    and null for the team scope and for members;
+  - the `evidence` whitelist for lunch and activity reviews.
+- New `test_the_team_lists_people_with_the_most_open_reviews_first`.
+
+All 201 TimeTracking tests pass.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

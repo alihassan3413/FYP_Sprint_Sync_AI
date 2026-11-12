@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\TimeTracking\Concerns;
 
 use App\Models\User;
+use App\Modules\Desktop\Support\DesktopTokens;
 use App\Modules\People\Models\Person;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Tasks\Models\Task;
@@ -68,6 +69,23 @@ trait BuildsTimeTeam
     {
         return $this->actingAs($as ?? $this->member)
             ->postJson(route("workspace.time.timer.{$action}", $this->workspace), ['operation_key' => $this->key(), ...$data]);
+    }
+
+    protected function startDesktopTimer(array $data = [], ?User $as = null): TestResponse
+    {
+        [, $token] = app(DesktopTokens::class)->issue($as ?? $this->member, 'Mac', 'macos');
+        $this->app['auth']->forgetGuards();
+
+        $response = $this->withToken($token)->postJson(route('desktop.time.timer.start', $this->workspace), [
+            'operation_key' => $this->key(),
+            'project' => $this->project->public_id,
+            ...$data,
+        ]);
+
+        $this->flushHeaders();
+        $this->app['auth']->forgetGuards();
+
+        return $response;
     }
 
     protected function startTimer(array $data = [], ?User $as = null): TestResponse

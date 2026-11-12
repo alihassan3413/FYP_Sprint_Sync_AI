@@ -23,6 +23,8 @@ final readonly class PolicySnapshot
         public ?int $lunchAllowanceSeconds = null,
         public OvertimeMode $overtimeMode = OvertimeMode::TrackOnly,
         public bool $integrityEnabled = false,
+        public ?int $autoStopAfterShiftSeconds = null,
+        public ?int $maxTimerSeconds = null,
     ) {}
 
     public static function fromModel(?TimePolicy $policy): self
@@ -41,13 +43,15 @@ final readonly class PolicySnapshot
             lunchAllowanceSeconds: $policy->lunch_allowance_seconds,
             overtimeMode: $policy->overtime_mode,
             integrityEnabled: $policy->integrity_enabled,
+            autoStopAfterShiftSeconds: $policy->auto_stop_after_shift_seconds,
+            maxTimerSeconds: $policy->max_timer_seconds,
         );
     }
 
     /**
      * For clients (the time page, SprintSync Desktop): what applies, nothing more.
      *
-     * @return array{version: string|null, idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: string, integrity_enabled: bool}
+     * @return array{version: string|null, idle_enabled: bool, idle_seconds: int|null, weekly_target_seconds: int|null, lunch_enabled: bool, lunch_allowance_seconds: int|null, overtime_mode: string, integrity_enabled: bool, auto_stop_after_shift_seconds: int|null, max_timer_seconds: int|null}
      */
     public function toArray(): array
     {
@@ -60,6 +64,8 @@ final readonly class PolicySnapshot
             'lunch_allowance_seconds' => $this->lunchEnabled ? $this->lunchAllowanceSeconds : null,
             'overtime_mode' => $this->overtimeMode->value,
             'integrity_enabled' => $this->integrityEnabled,
+            'auto_stop_after_shift_seconds' => $this->autoStopAfterShiftSeconds,
+            'max_timer_seconds' => $this->maxTimerSeconds,
         ];
     }
 }

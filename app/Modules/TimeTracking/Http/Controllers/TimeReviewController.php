@@ -55,7 +55,7 @@ final class TimeReviewController
 
         $action->handle($model, $validated['decision'], $validated['note'] ?? null, $request->user());
 
-        return back()->with('success', 'Review saved.');
+        return back()->with('success', 'Decision saved.');
     }
 
     public function activity(ActivitySignalRequest $request, Workspace $workspace, RecordActivitySignalAction $action): JsonResponse
