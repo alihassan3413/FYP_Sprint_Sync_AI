@@ -295,6 +295,7 @@ abstract class BillingPlanRequest extends FormRequest
         return Person::query()
             ->where('workspace_id', $this->workspace()->id)
             ->whereIn('public_id', $publicIds)
+            ->whereNull('removed_at')
             ->pluck('id', 'public_id');
     }
 

@@ -159,6 +159,7 @@ final class TimeIndexController
     private static function nextNeedingReview(Workspace $workspace, Person $viewing): ?array
     {
         $next = TimeReview::query()->open()->where('workspace_id', $workspace->id)->where('person_id', '!=', $viewing->id)
+            ->whereHas('person', fn ($query) => $query->whereNull('removed_at'))
             ->selectRaw('person_id, count(*) as open_reviews')->groupBy('person_id')
             ->orderByDesc('open_reviews')->orderBy('person_id')->with('person:id,public_id,name')->first();
 

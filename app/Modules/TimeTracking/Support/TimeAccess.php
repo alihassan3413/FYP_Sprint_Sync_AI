@@ -27,7 +27,7 @@ final class TimeAccess
 
     public function person(Workspace $workspace, ?string $publicId): ?Person
     {
-        return $publicId === null ? null : Person::query()->where('workspace_id', $workspace->id)->where('public_id', $publicId)->first();
+        return $publicId === null ? null : Person::query()->where('workspace_id', $workspace->id)->where('public_id', $publicId)->whereNull('removed_at')->first();
     }
 
     /**

@@ -89,6 +89,7 @@ export enum AuditAction {
     BOARD_COLUMN_CREATED = 'board_column.created',
     BOARD_COLUMN_DELETED = 'board_column.deleted',
     BOARD_COLUMN_REORDERED = 'board_column.reordered',
+    BOARD_COLUMN_UPDATED = 'board_column.updated',
     MEETING_SCHEDULED = 'meeting.scheduled',
     MEETING_UPDATED = 'meeting.updated',
     MEETING_CANCELLED = 'meeting.cancelled',

@@ -30,6 +30,12 @@ final class BoardColumnPolicy
         return $project->userHasAtLeast($user, ProjectRole::MANAGER);
     }
 
+    /** Only custom lists change: the default To Do / In Progress / Done stay as they are. */
+    public function update(User $user, BoardColumn $column): bool
+    {
+        return ! $column->is_default && $this->delete($user, $column);
+    }
+
     public function delete(User $user, BoardColumn $column): bool
     {
         if ($column->project->workspace->userHasAtLeast($user, UserRole::ADMIN)) {

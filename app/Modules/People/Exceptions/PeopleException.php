@@ -18,6 +18,42 @@ final class PeopleException extends AppException
         );
     }
 
+    public static function stillHasAccess(string $name): self
+    {
+        return new self(
+            code: ErrorCode::PEOPLE_STILL_HAS_ACCESS,
+            status: 422,
+            message: "{$name} still has SprintSync access to this workspace. Remove their access first, then delete them from the team.",
+        );
+    }
+
+    public static function invitationPending(string $name): self
+    {
+        return new self(
+            code: ErrorCode::PEOPLE_INVITATION_PENDING,
+            status: 422,
+            message: "{$name} has a pending invitation to this workspace. Cancel the invitation first, then delete them from the team.",
+        );
+    }
+
+    public static function onRecurringInvoice(string $name, string $plan, string $client): self
+    {
+        return new self(
+            code: ErrorCode::PEOPLE_ON_RECURRING_INVOICE,
+            status: 422,
+            message: "{$name} is on the \"{$plan}\" recurring invoice for {$client}. Take them off it or pause it first, then delete them from the team.",
+        );
+    }
+
+    public static function cannotRemoveSelf(): self
+    {
+        return new self(
+            code: ErrorCode::PEOPLE_CANNOT_REMOVE_SELF,
+            status: 422,
+            message: 'You can\'t delete your own team profile.',
+        );
+    }
+
     public static function userAlreadyLinked(string $userName): self
     {
         return new self(

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\People\Actions\BuildPeopleDirectoryAction;
 use App\Modules\People\Actions\CreatePersonAction;
 use App\Modules\People\Actions\GivePersonAccessAction;
+use App\Modules\People\Actions\RemovePersonFromTeamAction;
 use App\Modules\People\Actions\SetPersonUserAction;
 use App\Modules\People\Actions\UpdatePersonAction;
 use App\Modules\People\Data\DepartmentData;
@@ -90,6 +91,15 @@ final class PersonController
         return back()->with('success', $outcome === 'linked'
             ? "{$person->name} already had SprintSync access, so their profile is now linked."
             : "Invitation sent to {$person->email}.");
+    }
+
+    public function destroy(Request $request, Workspace $workspace, Person $person, RemovePersonFromTeamAction $action): RedirectResponse
+    {
+        abort_unless($request->user()->can('delete', $person), 403);
+
+        $action->handle($person, $request->user());
+
+        return to_route('workspace.people.index', ['workspace' => $workspace->slug])->with('success', "{$person->name} was deleted from the team.");
     }
 
     public function unlinkUser(Request $request, Workspace $workspace, Person $person, SetPersonUserAction $action): RedirectResponse

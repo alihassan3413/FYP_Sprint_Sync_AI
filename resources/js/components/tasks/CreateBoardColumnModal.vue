@@ -13,7 +13,7 @@ const emit = defineEmits<{
 
 const { workspaceRoute } = useCurrentWorkspace();
 
-const form = useForm<{ name: string }>({ name: '' });
+const form = useForm<{ name: string; is_done: boolean }>({ name: '', is_done: false });
 
 function submit() {
     form.post(workspaceRoute('workspace.projects.board-columns.store', { project: props.projectId }), {
@@ -44,7 +44,7 @@ function handleClose(value: boolean) {
 
 <template>
     <AppModal :open="open" title="Add list" description="Add a new stage to this project's board." size="sm" @update:open="handleClose">
-        <form id="create-board-column-form" class="pt-2" @submit.prevent="submit">
+        <form id="create-board-column-form" class="grid gap-4 pt-2" @submit.prevent="submit">
             <AppFormInput
                 id="board-column-name"
                 v-model="form.name"
@@ -55,6 +55,15 @@ function handleClose(value: boolean) {
                 autofocus
                 autocomplete="off"
             />
+            <div class="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">
+                <label for="board-column-done" class="grid gap-0.5">
+                    <span class="text-sm font-medium">Tasks here count as done</span>
+                    <span class="text-muted-foreground text-xs"
+                        >For lists like Archive or Shipped: no overdue warnings, and they count as completed.</span
+                    >
+                </label>
+                <AppSwitch id="board-column-done" v-model="form.is_done" label="Tasks here count as done" />
+            </div>
         </form>
 
         <template #footer>

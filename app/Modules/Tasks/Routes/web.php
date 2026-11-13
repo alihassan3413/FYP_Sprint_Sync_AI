@@ -24,6 +24,7 @@ TenantRoute::prefixed('projects/{project}/tasks/{task}/comments', 'workspace.pro
 TenantRoute::prefixed('projects/{project}/board-columns', 'workspace.projects.board-columns.', function () {
     Route::post('/', [BoardColumnController::class, 'store'])->name('store');
     Route::patch('reorder', [BoardColumnController::class, 'reorder'])->name('reorder');
+    Route::patch('{boardColumn}', [BoardColumnController::class, 'update'])->name('update');
     Route::delete('{boardColumn}', [BoardColumnController::class, 'destroy'])->name('destroy');
 });
 

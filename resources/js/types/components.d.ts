@@ -96,6 +96,7 @@ declare module 'vue' {
     CreateWorkspaceRoleModal: typeof import('./../components/workspace/popups/CreateWorkspaceRoleModal.vue')['default']
     DeleteBoardColumnDialog: typeof import('./../components/tasks/DeleteBoardColumnDialog.vue')['default']
     DeleteMeetingDialog: typeof import('./../components/meetings/DeleteMeetingDialog.vue')['default']
+    DeletePersonDialog: typeof import('./../components/team/DeletePersonDialog.vue')['default']
     DeleteProjectDialog: typeof import('./../components/projects/DeleteProjectDialog.vue')['default']
     DeleteTaskDialog: typeof import('./../components/tasks/DeleteTaskDialog.vue')['default']
     DeleteUser: typeof import('./../components/DeleteUser.vue')['default']

@@ -22,6 +22,7 @@ final class StoreBoardColumnRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'min:1', 'max:50'],
+            'is_done' => ['sometimes', 'boolean'],
         ];
     }
 

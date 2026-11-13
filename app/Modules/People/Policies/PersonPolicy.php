@@ -35,4 +35,9 @@ final class PersonPolicy
     {
         return $person->workspace->allowsFinance($user, FinancePermission::PeopleManage);
     }
+
+    public function delete(User $user, Person $person): bool
+    {
+        return $person->workspace->allowsFinance($user, FinancePermission::PeopleManage);
+    }
 }

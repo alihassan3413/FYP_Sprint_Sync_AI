@@ -74,7 +74,7 @@ final class TimeSettingsController
                     'credit_seconds' => $holiday->credit_seconds,
                     'people' => $holiday->people->pluck('name')->values(),
                 ])->values(),
-            'leaves' => TimeLeave::query()->active()->where('workspace_id', $workspace->id)->with('person:id,name')->orderByDesc('start_date')->limit(30)->get()
+            'leaves' => TimeLeave::query()->active()->where('workspace_id', $workspace->id)->whereHas('person', fn ($query) => $query->whereNull('removed_at'))->with('person:id,name')->orderByDesc('start_date')->limit(30)->get()
                 ->map(fn (TimeLeave $leave) => [
                     'public_id' => $leave->public_id,
                     'person' => $leave->person->name,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
+import { CircleCheck, CircleDashed, GripVertical, Inbox, Plus, Trash2 } from 'lucide-vue-next';
 
 import type { BoardColumn, Task } from '@/lib/tasks';
 
@@ -233,43 +233,81 @@ function reorderColumns(fromIndex: number, toIndex: number) {
         },
     );
 }
+
+/** Done lists are green, the first list grey, every other stage blue. */
+function columnDot(column: BoardColumn): string {
+    if (column.is_done) return 'bg-emerald-500';
+    return localColumnOrder.value[0]?.id === column.id ? 'bg-slate-400' : 'bg-sky-500';
+}
+
+function setColumnDone(column: BoardColumn, isDone: boolean) {
+    router.patch(
+        workspaceRoute('workspace.projects.board-columns.update', { project: column.project_id, boardColumn: column.id }),
+        { is_done: isDone },
+        {
+            preserveScroll: true,
+            onError: () => notify.error(`Couldn't update "${column.name}". Please try again.`),
+        },
+    );
+}
+
+function columnActions(column: BoardColumn): DropdownEntry[] {
+    return [
+        column.is_done
+            ? { label: 'Stop counting as done', icon: CircleDashed, onSelect: () => setColumnDone(column, false) }
+            : { label: 'Mark as done list', icon: CircleCheck, onSelect: () => setColumnDone(column, true) },
+        null,
+        { label: 'Delete list', icon: Trash2, destructive: true, onSelect: () => emit('delete-column', column) },
+    ];
+}
 </script>
 
 <template>
-    <div class="flex items-stretch gap-4 overflow-x-auto pb-2">
-        <div v-for="column in columns" :key="column.id" class="flex w-72 shrink-0 flex-col gap-3">
-            <div
-                class="flex items-center justify-between gap-1 rounded-md px-0.5 transition-colors"
-                :class="[canManageBoardColumns && 'cursor-grab active:cursor-grabbing', dragOverColumnHeaderId === column.id && 'bg-muted/60']"
+    <div class="flex items-start gap-3 overflow-x-auto pb-3 [scrollbar-width:thin]">
+        <section
+            v-for="column in columns"
+            :key="column.id"
+            class="bg-muted/40 dark:bg-muted/20 flex max-h-[calc(100dvh-15rem)] min-h-56 w-[19rem] shrink-0 flex-col rounded-2xl border transition-colors"
+            :class="[
+                dragOverColumnId === column.id && 'border-primary/40 bg-primary/5 ring-primary/15 ring-2',
+                dragOverColumnHeaderId === column.id && 'ring-foreground/15 ring-2',
+            ]"
+            :aria-label="`${column.name} list`"
+            @dragover.prevent="onDragOverColumn(column.id)"
+            @drop.prevent="onDrop(column.id)"
+        >
+            <header
+                class="flex items-center justify-between gap-2 px-3 pt-3 pb-2"
+                :class="canManageBoardColumns && 'cursor-grab active:cursor-grabbing'"
                 :draggable="canManageBoardColumns && !columnsPending"
                 @dragstart="(event) => onColumnDragStart(column, event)"
                 @dragend="onColumnDragEnd"
                 @dragover.prevent="onColumnDragOver(column)"
                 @drop.prevent="onColumnDrop(column)"
             >
-                <div class="flex min-w-0 items-center gap-1">
-                    <GripVertical v-if="canManageBoardColumns" class="text-muted-foreground/50 size-3.5 shrink-0" />
+                <div class="flex min-w-0 items-center gap-2">
+                    <GripVertical v-if="canManageBoardColumns" class="text-muted-foreground/40 -mr-1 size-3.5 shrink-0" />
+                    <span class="size-2 shrink-0 rounded-full" :class="columnDot(column)" aria-hidden="true" />
                     <h3 class="text-foreground truncate text-[13px] font-semibold">{{ column.name }}</h3>
-                    <span class="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[11px] tabular-nums">{{ column.tasks.length }}</span>
+                    <span class="bg-background text-muted-foreground rounded-full border px-1.5 text-[11px] leading-5 font-medium tabular-nums">
+                        {{ column.tasks.length }}
+                    </span>
+                    <span
+                        v-if="column.is_done && !column.is_default"
+                        class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                        title="Tasks in this list count as done"
+                    >
+                        <CircleCheck class="size-3" />
+                        Done
+                    </span>
                 </div>
 
-                <button
-                    v-if="canManageBoardColumns && !column.is_default"
-                    type="button"
-                    class="text-muted-foreground hover:text-destructive shrink-0 rounded p-1 transition-colors"
-                    aria-label="Delete list"
-                    @click.stop="emit('delete-column', column)"
-                >
-                    <Trash2 class="size-3.5" />
-                </button>
-            </div>
+                <div v-if="canManageBoardColumns && !column.is_default" draggable="false" @click.stop @dragstart.stop.prevent>
+                    <AppDropDown :items="columnActions(column)" :heading="column.name" align="end" width="w-56" trigger-label="List actions" />
+                </div>
+            </header>
 
-            <div
-                class="flex min-h-32 flex-1 flex-col gap-2.5 rounded-xl border border-dashed p-2.5 transition-colors"
-                :class="dragOverColumnId === column.id ? 'border-foreground/25 bg-muted/50' : 'border-border/70 bg-muted/10'"
-                @dragover.prevent="onDragOverColumn(column.id)"
-                @drop.prevent="onDrop(column.id)"
-            >
+            <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]">
                 <TaskCard
                     v-for="task in column.tasks"
                     :key="task.id"
@@ -289,19 +327,23 @@ function reorderColumns(fromIndex: number, toIndex: number) {
                     @drag-end="onDragEnd"
                 />
 
-                <p v-if="column.tasks.length === 0" class="text-muted-foreground px-1 py-6 text-center text-xs">
+                <div
+                    v-if="column.tasks.length === 0"
+                    class="text-muted-foreground border-border/80 flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-3 py-8 text-center text-xs"
+                >
+                    <Inbox class="size-4 opacity-50" />
                     <template v-if="dragOverColumnId === column.id">Drop here</template>
                     <template v-else-if="scope === 'mine'">Nothing assigned to you.</template>
                     <template v-else-if="sprintFilter !== 'all'">Nothing here in this sprint.</template>
                     <template v-else>No tasks here.</template>
-                </p>
+                </div>
             </div>
-        </div>
+        </section>
 
         <button
             v-if="canManageBoardColumns"
             type="button"
-            class="text-muted-foreground hover:border-foreground/25 hover:text-foreground hover:bg-muted/40 flex w-72 shrink-0 items-center justify-center gap-1.5 self-start rounded-xl border border-dashed p-3 text-xs font-medium transition-colors"
+            class="text-muted-foreground hover:border-foreground/25 hover:text-foreground hover:bg-muted/40 flex h-12 w-[19rem] shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed text-xs font-medium transition-colors"
             @click="emit('create-column')"
         >
             <Plus class="size-3.5" />

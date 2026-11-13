@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, ArrowRightLeft, CalendarClock, CalendarRange, Loader2 } from 'lucide-vue-next';
+import { AlertCircle, ArrowRightLeft, CalendarClock, CalendarRange, CircleCheck, Loader2 } from 'lucide-vue-next';
 
 import { formatDueDate, isOverdue, type BoardColumn, type Task } from '@/lib/tasks';
 
@@ -39,9 +39,9 @@ const moveItems = computed<DropdownEntry[]>(() =>
 <template>
     <div
         :draggable="draggable && !pending"
-        class="bg-card rounded-lg border p-3 shadow-sm transition-all"
+        class="group bg-card shrink-0 rounded-xl border p-3 shadow-xs transition-all duration-150"
         :class="[
-            hasError ? 'border-destructive ring-destructive/30 ring-1' : 'hover:border-foreground/15',
+            hasError ? 'border-destructive ring-destructive/30 ring-1' : 'hover:border-foreground/15 hover:-translate-y-px hover:shadow-md',
             pending && 'opacity-60',
             draggable && !pending ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         ]"
@@ -50,7 +50,7 @@ const moveItems = computed<DropdownEntry[]>(() =>
         @dragend="emit('drag-end')"
     >
         <div class="flex items-start justify-between gap-2">
-            <p class="text-sm leading-snug font-medium">{{ task.title }}</p>
+            <p class="text-sm leading-snug font-medium text-pretty" :class="isDone && 'text-muted-foreground'">{{ task.title }}</p>
 
             <div class="flex shrink-0 items-center gap-1">
                 <Loader2 v-if="pending" class="text-muted-foreground size-3.5 animate-spin" />
@@ -72,14 +72,20 @@ const moveItems = computed<DropdownEntry[]>(() =>
             {{ sprintName }}
         </span>
 
-        <div class="mt-3 flex items-center justify-between gap-2">
+        <div class="border-border/60 mt-3 flex items-center justify-between gap-2 border-t pt-2.5">
             <div class="flex min-w-0 items-center gap-1.5">
                 <AppAvatar v-if="task.assignee_name" :name="task.assignee_name" size="xs" />
                 <span class="text-muted-foreground truncate text-[11px]">{{ task.assignee_name ?? 'Unassigned' }}</span>
             </div>
 
             <div class="flex shrink-0 items-center gap-1">
-                <AppBadge v-if="task.due_date" :variant="overdue ? 'danger' : 'neutral'" size="sm">
+                <AppBadge v-if="isDone" variant="success" size="sm">
+                    <template #icon>
+                        <CircleCheck class="size-3" />
+                    </template>
+                    Done
+                </AppBadge>
+                <AppBadge v-else-if="task.due_date" :variant="overdue ? 'danger' : 'neutral'" size="sm">
                     <template #icon>
                         <AlertCircle v-if="overdue" class="size-3" />
                         <CalendarClock v-else class="size-3" />

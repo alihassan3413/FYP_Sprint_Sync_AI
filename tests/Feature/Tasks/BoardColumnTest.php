@@ -295,4 +295,60 @@ final class BoardColumnTest extends TestCase
             ])
             ->assertSessionHasErrors();
     }
+
+    public function test_a_new_list_can_count_as_done(): void
+    {
+        $this->actingAs($this->owner)
+            ->post($this->columnRoute('workspace.projects.board-columns.store'), ['name' => 'Archive', 'is_done' => true])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('board_columns', ['project_id' => $this->project->id, 'name' => 'Archive', 'is_done' => true, 'is_default' => false]);
+    }
+
+    public function test_marking_a_list_as_done_completes_its_tasks_and_unmarking_reopens_them(): void
+    {
+        $column = $this->project->boardColumns()->create(['name' => 'Archieve', 'position' => 3]);
+        $open = Task::factory()->forProject($this->project)->forColumn($column)->create(['due_date' => now()->subWeek(), 'completed_at' => null]);
+        $earlier = Task::factory()->forProject($this->project)->forColumn($column)->create(['completed_at' => now()->subMonth()]);
+
+        $this->actingAs($this->owner)
+            ->patch($this->columnRoute('workspace.projects.board-columns.update', $column), ['is_done' => true])
+            ->assertSessionHas('success');
+
+        $this->assertTrue($column->fresh()->is_done);
+        $this->assertNotNull($open->fresh()->completed_at);
+        $this->assertTrue($earlier->fresh()->completed_at->isSameDay(now()->subMonth()));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'board_column.updated']);
+
+        $this->actingAs($this->owner)
+            ->patch($this->columnRoute('workspace.projects.board-columns.update', $column), ['is_done' => false])
+            ->assertSessionHas('success');
+
+        $this->assertFalse($column->fresh()->is_done);
+        $this->assertNull($open->fresh()->completed_at);
+        $this->assertNull($earlier->fresh()->completed_at);
+    }
+
+    public function test_default_lists_keep_their_done_flag(): void
+    {
+        $done = $this->project->boardColumns()->where('is_done', true)->firstOrFail();
+
+        $this->actingAs($this->owner)
+            ->patch($this->columnRoute('workspace.projects.board-columns.update', $done), ['is_done' => false])
+            ->assertForbidden();
+
+        $this->assertTrue($done->fresh()->is_done);
+    }
+
+    public function test_a_project_member_cannot_mark_a_list_as_done(): void
+    {
+        $this->project->members()->attach($this->member->id, ['role' => ProjectRole::MEMBER->value]);
+        $column = $this->project->boardColumns()->create(['name' => 'QA', 'position' => 3]);
+
+        $this->actingAs($this->member)
+            ->patch($this->columnRoute('workspace.projects.board-columns.update', $column), ['is_done' => true])
+            ->assertForbidden();
+
+        $this->assertFalse($column->fresh()->is_done);
+    }
 }

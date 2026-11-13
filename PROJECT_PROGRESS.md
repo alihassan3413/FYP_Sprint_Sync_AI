@@ -19,6 +19,10 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #64 added **Delete from team**: the owner can remove a team profile so the
+person disappears from Team, Time and every person picker, without touching
+anyone's SprintSync login. **No FR status changes.**
+
 Entry #63 added **AppSelect v2**: one shared select component with automatic
 search above 8 options. The Time page is the reference use; no other dropdown is
 migrated yet. **No FR status changes.**
@@ -6467,6 +6471,55 @@ are unchanged.
 holidays and leave, plus the unsaved-changes bar, the add-holiday form, the
 remove confirmation, a filled schedule and the mobile add-leave form.
 ESLint, vue-tsc, the build and the TimeTracking tests are clean.
+
+### 64. Delete from team (removed team profiles)
+
+**What it does.** A new "Delete from team" item in the Team row menu, with a
+`DeletePersonDialog` confirmation, calls `DELETE team/{person}`.
+`RemovePersonFromTeamAction` soft-removes the profile: it sets
+`people.removed_at` / `removed_by`, clears `user_id`, and writes the
+`person.removed` audit entry. Only the owner can do it (`PersonPolicy::delete`,
+which is People manage). The migration
+`2026_11_13_120743_add_removed_at_to_people_table` only adds columns.
+
+**Hidden everywhere.**
+- `Workspace::people()` now excludes removed profiles. That one relation feeds:
+  - the Team page and person page (route binding → 404);
+  - the Time team table and pickers, Time settings, previous hours and holidays;
+  - the import duplicate check, email uniqueness and login linking;
+  - billing person pickers.
+- `TimeAccess::person` (`?person=` → 404) and `BillingPlanRequest` exclude them
+  directly.
+- Their leave rows and the "next person to review" link are filtered out.
+- Past invoices keep their snapshot names, so issued history is unchanged.
+
+**Logins are never touched.**
+- Deletion is refused while the person still has access to this workspace
+  ("Remove their access first"), while they have a pending invitation, or for
+  the owner's own profile.
+- The user account and any other workspaces are untouched.
+- The same email can be added again later as a new profile.
+
+**Finance.**
+- Deletion is refused while the person is a line on an active, unpaused
+  recurring invoice; the message names the plan and the client.
+- Time entries are kept, so past totals, payroll figures and invoices do not
+  change.
+- A running timer (for example, left running after their access was removed)
+  is stopped first through `StopTimerAction`.
+
+**Tests.** `RemovePersonFromTeamTest` (7) covers:
+- hidden from Team, Time, Time settings and person pages, with the audit entry
+  written;
+- refused while they have access; works after access is removed, and their
+  other workspace is untouched;
+- refused while an invitation is pending;
+- refused while on an active recurring invoice, allowed once it is paused;
+- a running timer is stopped;
+- owner-only, and never your own profile;
+- the same email can be added again.
+
+The full suite passes (2019).
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

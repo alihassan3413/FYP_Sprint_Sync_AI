@@ -14,7 +14,7 @@ final class CreateBoardColumnAction
 {
     public function __construct(private readonly RecordAuditLogAction $auditLogger) {}
 
-    public function handle(Project $project, string $name, User $actor): BoardColumn
+    public function handle(Project $project, string $name, User $actor, bool $isDone = false): BoardColumn
     {
         $position = (int) $project->boardColumns()->max('position') + 1;
 
@@ -22,7 +22,7 @@ final class CreateBoardColumnAction
             'name' => $name,
             'position' => $position,
             'is_default' => false,
-            'is_done' => false,
+            'is_done' => $isDone,
         ]);
 
         $this->auditLogger->handle(

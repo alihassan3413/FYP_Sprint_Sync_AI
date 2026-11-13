@@ -41,6 +41,11 @@ final class Person extends Model
 
     protected $fillable = ['name', 'email', 'title'];
 
+    protected function casts(): array
+    {
+        return ['removed_at' => 'datetime'];
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

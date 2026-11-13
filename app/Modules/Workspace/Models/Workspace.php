@@ -159,7 +159,7 @@ final class Workspace extends Model
 
     public function people(): HasMany
     {
-        return $this->hasMany(Person::class)->chaperone();
+        return $this->hasMany(Person::class)->chaperone()->whereNull('people.removed_at');
     }
 
     public function teamImports(): HasMany

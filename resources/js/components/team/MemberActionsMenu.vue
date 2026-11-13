@@ -8,7 +8,7 @@
  * Emits semantic events. The page performs the mutations.
  */
 
-import { Copy, Link2, Send, Trash2, UserCog, UserPen, UserPlus } from 'lucide-vue-next';
+import { Copy, Link2, Send, Trash2, UserCog, UserMinus, UserPen, UserPlus } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 import type { Member } from '@/lib/members';
@@ -34,6 +34,7 @@ const emit = defineEmits<{
     (e: 'give-access', member: Member): void;
     (e: 'connect', member: Member): void;
     (e: 'add-details', member: Member): void;
+    (e: 'delete-person', member: Member): void;
 }>();
 
 const items = computed<DropdownEntry[]>(() => {
@@ -64,6 +65,10 @@ const items = computed<DropdownEntry[]>(() => {
             main.push({ label: 'Change access role', icon: UserCog, onSelect: () => emit('change-role', m) });
             destructive.push({ label: 'Remove SprintSync access', icon: Trash2, destructive: true, onSelect: () => emit('remove', m) });
         }
+    }
+
+    if (m.person && props.canManagePeople && m.role !== 'owner' && !m.is_self) {
+        destructive.push({ label: 'Delete from team', icon: UserMinus, destructive: true, onSelect: () => emit('delete-person', m) });
     }
 
     return destructive.length && main.length ? [...main, null, ...destructive] : [...main, ...destructive];

@@ -42,6 +42,7 @@ enum AuditAction: string
     case BOARD_COLUMN_CREATED = 'board_column.created';
     case BOARD_COLUMN_DELETED = 'board_column.deleted';
     case BOARD_COLUMN_REORDERED = 'board_column.reordered';
+    case BOARD_COLUMN_UPDATED = 'board_column.updated';
 
     case MEETING_SCHEDULED = 'meeting.scheduled';
     case MEETING_UPDATED = 'meeting.updated';
@@ -105,6 +106,7 @@ enum AuditAction: string
 
     case PERSON_CREATED = 'person.created';
     case PERSON_UPDATED = 'person.updated';
+    case PERSON_REMOVED = 'person.removed';
     case PERSON_USER_LINKED = 'person.user_linked';
     case PERSON_USER_UNLINKED = 'person.user_unlinked';
     case PERSON_IMPORT_CONFIRMED = 'person.import_confirmed';
@@ -206,6 +208,7 @@ enum AuditAction: string
             self::BOARD_COLUMN_CREATED => 'Board column created',
             self::BOARD_COLUMN_DELETED => 'Board column deleted',
             self::BOARD_COLUMN_REORDERED => 'Board columns reordered',
+            self::BOARD_COLUMN_UPDATED => 'Board column updated',
             self::MEETING_SCHEDULED => 'Meeting scheduled',
             self::MEETING_UPDATED => 'Meeting updated',
             self::MEETING_CANCELLED => 'Meeting cancelled',
@@ -265,6 +268,7 @@ enum AuditAction: string
             self::FX_RATE_ENTERED => 'Exchange rate entered',
             self::FINANCE_REPORTING_CURRENCY_CHANGED => 'Reporting currency changed',
             self::PERSON_CREATED => 'Person added',
+            self::PERSON_REMOVED => 'Removed from team',
             self::PERSON_UPDATED => 'Person updated',
             self::PERSON_USER_LINKED => 'Person linked to user',
             self::PERSON_USER_UNLINKED => 'Person unlinked from user',

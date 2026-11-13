@@ -111,6 +111,7 @@ function addDetails(m: Member) {
 const accessTarget = ref<{ public_id: string; name: string; email: string | null } | null>(null);
 const roleTarget = ref<Member | null>(null);
 const removeTarget = ref<Member | null>(null);
+const deleteTarget = ref<Member | null>(null);
 const busy = ref(false);
 
 function run(method: 'post' | 'delete', url: string, data: Record<string, string>, failure: string) {
@@ -269,6 +270,7 @@ onMounted(() => {
                                 @give-access="giveAccess"
                                 @connect="connect"
                                 @add-details="addDetails"
+                                @delete-person="(member: Member) => (deleteTarget = member)"
                             />
                         </div>
                     </li>
@@ -326,4 +328,6 @@ onMounted(() => {
     />
 
     <RemoveMemberDialog :open="removeTarget !== null" :member="removeTarget" @update:open="(value) => !value && (removeTarget = null)" />
+
+    <DeletePersonDialog :open="deleteTarget !== null" :member="deleteTarget" @update:open="(value) => !value && (deleteTarget = null)" />
 </template>

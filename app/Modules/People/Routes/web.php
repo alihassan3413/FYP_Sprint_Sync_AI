@@ -23,6 +23,7 @@ TenantRoute::prefixed('team', 'workspace.people.', function () {
     Route::get('imports/{teamImport}/issues', [TeamImportController::class, 'errors'])->name('imports.errors');
     Route::get('{person}', [PersonController::class, 'show'])->name('show');
     Route::put('{person}', [PersonController::class, 'update'])->name('update');
+    Route::delete('{person}', [PersonController::class, 'destroy'])->name('destroy');
     Route::post('{person}/access', [PersonController::class, 'giveAccess'])
         ->middleware('throttle:invitation-send')
         ->name('access.store');
