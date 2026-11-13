@@ -6564,6 +6564,70 @@ The full suite passes (2019).
 The full suite passes, apart from the known flaky `AssistantClientTaskAccessTest`,
 which passes on rerun.
 
+### 65. Analytics page: production-grade redesign
+
+**Why.**
+- The AI health cards filled about 1,800px above the filters, one large
+  card per project.
+- Six equal KPI tiles competed for attention.
+- The project list appeared twice: health cards and "Project performance".
+- The date range sat in the global filter bar but only affected meetings.
+
+**Page order** (`resources/js/pages/analytics/index.vue`, rewritten). The
+order follows the research brief: verdict first, then numbers, then detail.
+1. **Header and filters.** One filter row: Project and Sprint as AppSelect,
+   with Clear. The scope label reads "Whole team" or "Your work only".
+2. **Attention banner.**
+   - Lists up to 3 critical or at-risk projects, each with its status pill
+     and top finding, plus "See all N" when there are more. Each opens its
+     row in the table.
+   - When nothing is wrong, a calm line instead. A skeleton shows while
+     health loads.
+3. **Four KPIs:** Completion (meter), Open tasks, Overdue (rose only when
+   above 0, with its share of open work), and Projects (how many need
+   attention).
+   - With one project selected, the context lines say "In <project>" and the
+     fourth tile shows that project's status.
+   - No fake deltas; the page has no history to compare against.
+4. **Sprint progress and "Where tasks are".**
+   - Sprint: done/total, a day-N-of-M line, and a "today" pace marker on the
+     bar with a "Behind pace" warning when completion trails it by more than
+     10 points. Then labelled per-column rows.
+   - Workflow: labelled rows with count and share.
+5. **One Projects table**, worst first.
+   - Columns: status pill (icon, label and colour; never colour alone), top
+     finding with "+N more", progress, and open, overdue and unowned counts.
+   - Expanding a row shows every finding with its suggestion, and open work
+     by person.
+   - Projects with no tasks collapse into one line under the table.
+   - Mobile shows stacked rows with inline labels.
+6. **Tasks assigned** (team scope) and **Meetings**.
+   - Tasks assigned is honestly labelled "All statuses".
+   - Meetings carries its own date range, so it no longer looks like a page
+     filter.
+
+**Colour.** One data hue (indigo-600, or indigo-500 in dark) and done in
+emerald-600. Both pass the dataviz palette validator in light and dark: CVD,
+normal-vision separation and contrast. Status colours are reserved for
+verdicts and always come with an icon. `ProjectHealthCard` and
+`lib/health` are unchanged, because the project page still uses them.
+
+**Backend.** Health is still capped at 8 projects, but it now covers the
+projects with the most tasks first (`loadCount('tasks')` then
+`sortByDesc`). Before, it took the first 8 alphabetically, so empty
+projects could crowd out the busiest one. New test:
+`ProjectHealthUiTest::test_project_health_covers_the_busiest_projects_first`.
+
+**Checked.** Before/after screenshots on a seeded scratch database (126
+tasks across 6 projects, an overloaded owner, 2 active sprints, past and
+upcoming meetings):
+- desktop, 390px mobile and dark;
+- the first-screen viewport;
+- an expanded row, on desktop and mobile;
+- a single-project filter.
+
+ESLint, vue-tsc, the build and the analytics tests are clean.
+
 ## Next recommended task (updated 2026-08-20, after entry #55)
 
 **`update_project` — close the last create-only loop.**

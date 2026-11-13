@@ -54,6 +54,9 @@ const sprintOptions = computed<AppSelectOption<string>[]>(() => [
 ]);
 
 const selectedProjectName = computed(() => props.projects.find((project) => String(project.id) === projectId.value)?.name ?? null);
+const selectedHealth = computed(() =>
+    projectId.value ? (props.health ?? []).find((item) => String(item.project_id) === projectId.value) : undefined,
+);
 const meetingRangeActive = computed(() => from.value !== '' || to.value !== '');
 
 function clearMeetingRange() {
@@ -281,7 +284,11 @@ const formatCount = (value: number) => value.toLocaleString();
                     <p class="text-muted-foreground text-sm">Open tasks</p>
                     <p class="mt-1 text-3xl font-semibold tracking-tight">{{ formatCount(analytics.open_tasks) }}</p>
                     <p class="text-muted-foreground mt-2 text-xs">
-                        Across {{ analytics.total_projects }} {{ analytics.total_projects === 1 ? 'project' : 'projects' }}
+                        {{
+                            selectedProjectName
+                                ? `In ${selectedProjectName}`
+                                : `Across ${analytics.total_projects} ${analytics.total_projects === 1 ? 'project' : 'projects'}`
+                        }}
                     </p>
                 </div>
                 <div class="bg-card p-4 sm:p-5">
@@ -296,7 +303,26 @@ const formatCount = (value: number) => value.toLocaleString();
                         {{ analytics.overdue_tasks ? `${overdueShare}% of open work is past its date` : 'Nothing is past its date' }}
                     </p>
                 </div>
-                <div class="bg-card p-4 sm:p-5">
+                <div v-if="selectedProjectName" class="bg-card p-4 sm:p-5">
+                    <p class="text-muted-foreground text-sm">Project status</p>
+                    <template v-if="selectedHealth">
+                        <p class="mt-2">
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium ring-1 ring-inset"
+                                :class="VERDICTS[selectedHealth.verdict].pill"
+                            >
+                                <component :is="VERDICTS[selectedHealth.verdict].icon" class="size-4" aria-hidden="true" />
+                                {{ selectedHealth.verdict_label }}
+                            </span>
+                        </p>
+                        <p class="text-muted-foreground mt-2 truncate text-xs">
+                            {{ rankFindings(selectedHealth.signals)[0]?.headline ?? 'No problems found' }}
+                        </p>
+                    </template>
+                    <span v-else-if="!healthLoaded" class="bg-muted mt-2 block h-7 w-32 animate-pulse rounded-md motion-reduce:animate-none" />
+                    <p v-else class="text-muted-foreground mt-2 text-sm">Not assessed</p>
+                </div>
+                <div v-else class="bg-card p-4 sm:p-5">
                     <p class="text-muted-foreground text-sm">Projects</p>
                     <p class="mt-1 text-3xl font-semibold tracking-tight">{{ formatCount(analytics.total_projects) }}</p>
                     <p class="mt-2 text-xs">
