@@ -3,21 +3,38 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Archive, BarChart3, Building2, FolderKanban, LayoutGrid, ListChecks, PieChart, ReceiptText, ShieldCheck, Timer, Users2, Wallet } from 'lucide-vue-next';
+import {
+    Archive,
+    BarChart3,
+    Building2,
+    FolderKanban,
+    LayoutGrid,
+    ListChecks,
+    PieChart,
+    ReceiptText,
+    ShieldCheck,
+    Timer,
+    Users2,
+    Wallet,
+} from 'lucide-vue-next';
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
 
 const navigation = computed(() => page.props.navigation);
 
+const hasWorkspace = computed(() => Boolean(page.props.workspace?.current));
+
 const mainNavItems = computed<NavItem[]>(() => {
-    const items: NavItem[] = [
-        {
-            title: 'Dashboard',
-            href: workspaceRoute('dashboard'),
-            icon: LayoutGrid,
-        },
-    ];
+    const items: NavItem[] = hasWorkspace.value
+        ? [
+              {
+                  title: 'Dashboard',
+                  href: workspaceRoute('dashboard'),
+                  icon: LayoutGrid,
+              },
+          ]
+        : [];
 
     if (navigation.value?.projects) {
         items.push({

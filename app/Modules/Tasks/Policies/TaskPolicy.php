@@ -39,6 +39,11 @@ final class TaskPolicy
             return true;
         }
 
+        /* Granted per board by the share link or an approved access request. */
+        if ($project->memberCanAddTasks($user)) {
+            return true;
+        }
+
         if ($project->workspace->isClient($user)) {
             return $project->hasMember($user)
                 && $project->workspace->allowsClient($user, ClientPermission::TasksRequest);

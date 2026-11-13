@@ -64,6 +64,7 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return to_route('dashboard', ['workspace' => $user->activeWorkspaceOrFail()->slug]);
+        /* Back to where they were sent from, such as a shared board's "Sign in to add tasks". */
+        return redirect()->intended(route('dashboard', ['workspace' => $user->activeWorkspaceOrFail()->slug], false));
     }
 }

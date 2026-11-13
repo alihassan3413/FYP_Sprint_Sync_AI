@@ -125,16 +125,16 @@ function openCreateWorkspaceModal() {
         </DropdownMenuContent>
     </DropdownMenu>
 
-    <SidebarMenuButton v-else size="lg" as-child>
-        <Link :href="workspaceRoute('workspace.invitations.create')" class="gap-3">
-            <div class="flex aspect-square size-8 shrink-0 items-center justify-center border-2 border-black bg-white">
-                <Plus class="size-4" />
-            </div>
-            <div v-if="!isCollapsed" class="grid flex-1 text-left text-sm leading-tight">
-                <span class="font-semibold">Create workspace</span>
-                <span class="text-muted-foreground text-xs">Get started</span>
-            </div>
-        </Link>
+    <SidebarMenuButton v-else size="lg" class="cursor-pointer gap-3" data-testid="create-workspace" @click="openCreateWorkspaceModal">
+        <div
+            class="border-sidebar-foreground/30 text-sidebar-foreground flex aspect-square size-8 shrink-0 items-center justify-center rounded-sm border border-dashed"
+        >
+            <Plus class="size-4" />
+        </div>
+        <div v-if="!isCollapsed" class="grid flex-1 text-left text-sm leading-tight">
+            <span class="font-semibold">Create workspace</span>
+            <span class="text-sidebar-foreground/60 text-xs">Get started</span>
+        </div>
     </SidebarMenuButton>
 
     <CreateWorkspaceModal v-model:open="isCreateWorkspaceOpen" />

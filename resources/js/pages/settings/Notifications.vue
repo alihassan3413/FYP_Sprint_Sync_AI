@@ -57,6 +57,7 @@ const itemDescriptions: Record<string, string> = {
     task_assigned: 'A task is handed over to you.',
     task_moved: 'One of your tasks moves to another column.',
     task_comment: 'Someone comments on a task you are involved in.',
+    board_access_requested: 'Someone with a share link asks to add tasks to a board you manage.',
 };
 
 const form = useForm({

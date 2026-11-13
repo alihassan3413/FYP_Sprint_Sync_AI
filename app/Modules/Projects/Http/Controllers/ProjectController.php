@@ -152,6 +152,7 @@ final class ProjectController
                     ])
                     ->values()
                 : collect(),
+            'sharing' => $user->can('update', $project) ? BoardSharingController::settings($project) : null,
         ]);
     }
 

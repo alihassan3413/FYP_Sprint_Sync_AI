@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Deferred } from '@inertiajs/vue3';
-import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Sparkles, Trash2, Users } from 'lucide-vue-next';
+import { Activity, CalendarClock, FolderKanban, Pencil, Plus, Settings, Share2, Sparkles, Trash2, Users } from 'lucide-vue-next';
 
 import ProjectHealthCard from '@/components/analytics/ProjectHealthCard.vue';
+import ShareBoardModal, { type BoardSharing } from '@/components/projects/ShareBoardModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { ProjectHealth } from '@/lib/health';
 import type { Meeting } from '@/lib/meetings';
@@ -33,7 +34,11 @@ const props = defineProps<{
     members: TaskMember[];
     projectMembers: ProjectMember[];
     workspaceMembers: TaskMember[];
+    /** Share link settings; null unless you can manage the project. */
+    sharing: BoardSharing | null;
 }>();
+
+const isShareModalOpen = ref(false);
 
 const { workspaceRoute } = useCurrentWorkspace();
 const page = usePage<SharedData>();
@@ -141,6 +146,17 @@ onMounted(() => {
     const taskId = params.get('task');
     const meetingId = params.get('meeting');
 
+    /* Arriving from a notification about an access request, or from a share link. */
+    if (params.has('share') && props.sharing) {
+        isShareModalOpen.value = true;
+        return;
+    }
+
+    if (params.has('new_task') && props.canManageTasks) {
+        isCreateTaskModalOpen.value = true;
+        return;
+    }
+
     if (taskId !== null) {
         const task = props.tasks.find((t) => t.id === Number(taskId));
         if (task) openTaskDetails(task);
@@ -165,7 +181,21 @@ function onDeleted() {
         <div class="flex h-full flex-1 flex-col">
             <!-- Compact header -->
             <div class="border-b px-4 py-4 md:px-6 lg:px-8">
-                <AppPageHeader eyebrow="Project" :title="project.name" :description="shortDescription" />
+                <AppPageHeader eyebrow="Project" :title="project.name" :description="shortDescription">
+                    <template v-if="sharing" #actions>
+                        <Button variant="outline" size="sm" class="gap-1.5" data-testid="share-board" @click="isShareModalOpen = true">
+                            <Share2 class="size-3.5" />
+                            Share
+                            <span
+                                v-if="sharing.requests.length"
+                                class="rounded-full bg-amber-500 px-1.5 text-[10px] leading-4 font-semibold text-white tabular-nums"
+                                :aria-label="`${sharing.requests.length} waiting`"
+                            >
+                                {{ sharing.requests.length }}
+                            </span>
+                        </Button>
+                    </template>
+                </AppPageHeader>
                 <WorkingClock
                     v-if="project.effective_timezone"
                     class="mt-2"
@@ -461,6 +491,8 @@ function onDeleted() {
         :task="deleteTaskTarget"
         @update:open="(value) => !value && (deleteTaskTarget = null)"
     />
+
+    <ShareBoardModal v-if="sharing" v-model:open="isShareModalOpen" :project-id="project.id" :project-name="project.name" :sharing="sharing" />
 
     <CreateBoardColumnModal
         v-if="canManageBoardColumns"

@@ -17,6 +17,7 @@ withDefaults(defineProps<Props>(), {
     <AppShell class="flex-col">
         <AppHeader :breadcrumbs="breadcrumbs" />
         <AppContent>
+            <ImpersonationBanner />
             <slot />
         </AppContent>
     </AppShell>

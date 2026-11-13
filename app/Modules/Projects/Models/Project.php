@@ -6,6 +6,7 @@ namespace App\Modules\Projects\Models;
 
 use App\Models\User;
 use App\Modules\Meetings\Models\Meeting;
+use App\Modules\Projects\Data\BoardShareAccess;
 use App\Modules\Projects\Database\Factories\ProjectFactory;
 use App\Modules\Tasks\Models\BoardColumn;
 use App\Modules\Tasks\Models\Task;
@@ -24,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $description
  * @property int $workspace_id
+ * @property string|null $share_token secret part of the board's share link
+ * @property BoardShareAccess|null $share_access null when the board isn't shared
  */
 final class Project extends Model
 {
@@ -47,6 +50,14 @@ final class Project extends Model
         'timezone',
         'workspace_id',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['share_access' => BoardShareAccess::class];
+    }
 
     public function effectiveTimezone(): string
     {
@@ -86,13 +97,24 @@ final class Project extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_users')
-            ->withPivot(['role'])
+            ->withPivot(['role', 'can_add_tasks'])
             ->withTimestamps();
     }
 
     public function managers(): BelongsToMany
     {
         return $this->members()->wherePivot('role', ProjectRole::MANAGER->value);
+    }
+
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(ProjectAccessRequest::class);
+    }
+
+    /** A per-board grant from the share link or an approved access request. */
+    public function memberCanAddTasks(User $user): bool
+    {
+        return $this->members()->whereKey($user->getKey())->wherePivot('can_add_tasks', true)->exists();
     }
 
     public function hasMember(User $user): bool

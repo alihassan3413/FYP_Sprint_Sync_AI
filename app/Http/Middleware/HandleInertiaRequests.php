@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Modules\Admin\Support\Impersonation;
 use App\Modules\Workspace\Actions\ResolveWorkspaceCapabilities;
 use App\Modules\Workspace\Models\Workspace;
 use App\Modules\Workspace\Services\WorkspaceService;
@@ -50,6 +51,10 @@ class HandleInertiaRequests extends Middleware
             'workspace' => fn () => app(WorkspaceService::class)->inertiaFor($request->user()),
 
             'navigation' => fn () => $this->navigationFor($request),
+
+            'impersonation' => fn () => Impersonation::active($request) && $request->user() ? [
+                'user_name' => $request->user()->name,
+            ] : null,
 
             'notifications' => fn () => $request->user() ? [
                 'unread_count' => $request->user()->unreadNotifications()->count(),

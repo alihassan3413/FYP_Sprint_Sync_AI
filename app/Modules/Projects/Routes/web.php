@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Projects\Http\Controllers\BoardSharingController;
 use App\Modules\Projects\Http\Controllers\ProjectController;
 use App\Modules\Projects\Http\Controllers\ProjectMemberController;
+use App\Modules\Projects\Http\Controllers\SharedBoardController;
 use App\Modules\Projects\Http\Controllers\SprintController;
 use App\Support\Routing\TenantRoute;
 use Illuminate\Support\Facades\Route;
@@ -28,4 +30,20 @@ TenantRoute::prefixed('projects/{project}/sprints', 'workspace.projects.sprints.
     Route::post('{sprint}/start', [SprintController::class, 'start'])->name('start');
     Route::post('{sprint}/complete', [SprintController::class, 'complete'])->name('complete');
     Route::delete('{sprint}', [SprintController::class, 'destroy'])->name('destroy');
+});
+
+TenantRoute::prefixed('projects/{project}/sharing', 'workspace.projects.sharing.', function () {
+    Route::put('/', [BoardSharingController::class, 'update'])->name('update');
+    Route::post('requests/{accessRequest}', [BoardSharingController::class, 'decide'])->name('requests.decide');
+});
+
+/* Share links: viewing needs no account, adding tasks does. */
+Route::prefix('b/{token}')->name('shared-board.')->group(function () {
+    Route::get('/', [SharedBoardController::class, 'show'])->middleware('throttle:60,1')->name('show');
+
+    Route::middleware(['auth', 'throttle:10,1'])->group(function () {
+        Route::get('sign-in', [SharedBoardController::class, 'signIn'])->name('sign-in');
+        Route::post('join', [SharedBoardController::class, 'join'])->name('join');
+        Route::post('request', [SharedBoardController::class, 'requestAccess'])->name('request');
+    });
 });

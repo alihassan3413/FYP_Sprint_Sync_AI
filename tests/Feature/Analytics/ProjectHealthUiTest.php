@@ -87,6 +87,22 @@ final class ProjectHealthUiTest extends TestCase
             ->assertJsonPath('props.health.0.project_name', 'Website Revamp');
     }
 
+    public function test_project_health_covers_the_busiest_projects_first(): void
+    {
+        foreach (range(1, 8) as $number) {
+            Project::factory()->forWorkspace($this->workspace)->create(['name' => "Empty {$number}"]);
+        }
+
+        $this->overload();
+
+        $this->actingAs($this->owner)
+            ->withHeaders($this->partial('analytics/index', 'health'))
+            ->get(route('workspace.analytics.index', ['workspace' => $this->workspace->slug]))
+            ->assertOk()
+            ->assertJsonCount(8, 'props.health')
+            ->assertJsonPath('props.health.0.project_name', 'Website Revamp');
+    }
+
     public function test_the_project_page_delivers_its_own_health(): void
     {
         $this->overload();

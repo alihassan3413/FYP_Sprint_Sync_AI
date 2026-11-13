@@ -12,6 +12,7 @@ enum NotificationType: string
     case TASK_ASSIGNED = 'task_assigned';
     case TASK_MOVED = 'task_moved';
     case TASK_COMMENT = 'task_comment';
+    case BOARD_ACCESS_REQUESTED = 'board_access_requested';
 
     /**
      * @return array<int, self>
@@ -25,7 +26,7 @@ enum NotificationType: string
     {
         return match ($this) {
             self::MEETING_SCHEDULED, self::MEETING_UPDATED, self::MEETING_CANCELLED => 'Meetings',
-            self::TASK_ASSIGNED, self::TASK_MOVED, self::TASK_COMMENT => 'Tasks',
+            self::TASK_ASSIGNED, self::TASK_MOVED, self::TASK_COMMENT, self::BOARD_ACCESS_REQUESTED => 'Tasks',
         };
     }
 
@@ -38,6 +39,7 @@ enum NotificationType: string
             self::TASK_ASSIGNED => 'Task assigned',
             self::TASK_MOVED => 'Task moved',
             self::TASK_COMMENT => 'Task comment',
+            self::BOARD_ACCESS_REQUESTED => 'Board access requested',
         };
     }
 
@@ -51,7 +53,7 @@ enum NotificationType: string
                 NotificationChannel::IN_APP,
                 NotificationChannel::EMAIL,
             ],
-            self::TASK_ASSIGNED, self::TASK_MOVED, self::TASK_COMMENT => [
+            self::TASK_ASSIGNED, self::TASK_MOVED, self::TASK_COMMENT, self::BOARD_ACCESS_REQUESTED => [
                 NotificationChannel::IN_APP,
             ],
         };

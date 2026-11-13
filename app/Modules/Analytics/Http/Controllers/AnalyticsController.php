@@ -54,6 +54,8 @@ final class AnalyticsController
             'analytics' => $action->handle($scope, $filters),
             'health' => Inertia::defer(
                 fn () => $healthProjects
+                    ->loadCount('tasks')
+                    ->sortByDesc('tasks_count')
                     ->take(self::MAX_HEALTH_PROJECTS)
                     ->map(fn ($project) => $evaluateHealth->handle($project))
                     ->values(),

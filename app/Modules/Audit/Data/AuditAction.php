@@ -120,6 +120,8 @@ enum AuditAction: string
     case ACCOUNT_DELETED = 'account.deleted';
     case ACCOUNT_DESKTOP_SIGNED_IN = 'account.desktop_signed_in';
     case ACCOUNT_DESKTOP_SIGNED_OUT = 'account.desktop_signed_out';
+    case ACCOUNT_IMPERSONATION_STARTED = 'account.impersonation_started';
+    case ACCOUNT_IMPERSONATION_ENDED = 'account.impersonation_ended';
 
     /**
      * Billing entries name clients and amounts, so they are only shown to
@@ -282,6 +284,8 @@ enum AuditAction: string
             self::ACCOUNT_AVATAR_UPDATED => 'Profile picture updated',
             self::ACCOUNT_AVATAR_REMOVED => 'Profile picture removed',
             self::ACCOUNT_DELETED => 'Account deleted',
+            self::ACCOUNT_IMPERSONATION_STARTED => 'Started viewing as a user',
+            self::ACCOUNT_IMPERSONATION_ENDED => 'Stopped viewing as a user',
         };
     }
 }

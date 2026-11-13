@@ -2,7 +2,7 @@
 import type { BreadcrumbItem } from '@/types';
 import type { AssistantUsageData, PlatformMetricsData } from '@/types/generated';
 import { Head, router } from '@inertiajs/vue3';
-import { Bot, Building2, FolderKanban, ShieldCheck, Users } from 'lucide-vue-next';
+import { Bot, Building2, Eye, FolderKanban, ShieldCheck, Users } from 'lucide-vue-next';
 
 /**
  * Read-only platform overview for super admins. Every figure here is
@@ -80,6 +80,15 @@ function percentage(part: number, total: number): string {
 const peakSignups = computed(() => Math.max(1, ...props.metrics.signups.map((point) => point.count)));
 
 const taskCompletion = computed(() => percentage(props.metrics.tasks_completed, props.metrics.tasks_total));
+
+const impersonatingId = ref<number | null>(null);
+
+function impersonate(userId: number) {
+    if (impersonatingId.value !== null) return;
+
+    impersonatingId.value = userId;
+    router.post(route('admin.impersonate', { user: userId }), {}, { onFinish: () => (impersonatingId.value = null) });
+}
 
 function reload(overrides: Record<string, string | number | undefined>) {
     router.get(
@@ -270,6 +279,7 @@ watch([userSearch, workspaceSearch], () => search());
                                             <th class="px-4 py-2 text-left font-medium">Status</th>
                                             <th class="px-4 py-2 text-right font-medium">Workspaces</th>
                                             <th class="px-4 py-2 text-right font-medium">Joined</th>
+                                            <th class="px-4 py-2"><span class="sr-only">Actions</span></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -292,6 +302,20 @@ watch([userSearch, workspaceSearch], () => search());
                                             </td>
                                             <td class="px-4 py-2 text-right tabular-nums">{{ user.workspaces_count }}</td>
                                             <td class="text-muted-foreground px-4 py-2 text-right">{{ formatDate(user.created_at) }}</td>
+                                            <td class="px-4 py-2 text-right">
+                                                <Button
+                                                    v-if="!user.is_super_admin"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    class="h-8 gap-1.5"
+                                                    :disabled="impersonatingId !== null"
+                                                    :data-testid="`impersonate-${user.id}`"
+                                                    @click="impersonate(user.id)"
+                                                >
+                                                    <Eye class="size-3.5" />
+                                                    View as
+                                                </Button>
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>

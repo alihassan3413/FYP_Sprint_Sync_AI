@@ -73,6 +73,7 @@ export interface SharedData extends PageProps {
     notifications: NotificationsContext | null;
     navigation: NavigationContext | null;
     attachments: AttachmentLimits | null;
+    impersonation?: { user_name: string } | null;
 }
 
 /** Mirrors config/attachments.php so the browser can pre-validate uploads. */

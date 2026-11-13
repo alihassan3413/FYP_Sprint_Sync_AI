@@ -19,6 +19,10 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #65 added **super-admin impersonation** ("View as" any non-admin user,
+with a banner and "Return to admin") and fixed the sidebar for users without a
+workspace. **No FR status changes.**
+
 Entry #64 added **Delete from team**: the owner can remove a team profile so the
 person disappears from Team, Time and every person picker, without touching
 anyone's SprintSync login. **No FR status changes.**
@@ -6520,6 +6524,45 @@ which is People manage). The migration
 - the same email can be added again.
 
 The full suite passes (2019).
+
+### 65. Super-admin impersonation and the no-workspace sidebar
+
+**Impersonation (Admin module).**
+- **Start.** `POST admin/users/{user}/impersonate` (super admin only,
+  throttled) is handled by `ImpersonationController::start`.
+  - It logs in as the target, regenerates the session and stores
+    `impersonator_id` (`Admin\Support\Impersonation`).
+  - It then redirects to the target's own landing page.
+  - Yourself and other super admins are refused.
+- **Stop.** `POST impersonation/stop` restores the super admin. If the stored
+  impersonator is missing or no longer a super admin, the session is signed
+  out rather than left escalated.
+- **Audit.** Both are global audit entries: `account.impersonation_started`
+  and `account.impersonation_ended`, with the target's id.
+- **Banner.** A shared Inertia prop, `impersonation`, drives
+  `ImpersonationBanner` in both app layouts: "You're viewing SprintSync as …
+  Anything you change here is real." with **Return to admin**.
+- **Locked while impersonating.** `BlockDuringImpersonation` blocks account
+  settings: profile update, account deletion and password change.
+- **Admin users table.** Each non-super-admin row has a **View as** button.
+
+**Sidebar fixes.**
+- "Dashboard" only appears when there is a current workspace. Before, it linked
+  to `#` for super admins without one.
+- The empty workspace switcher used to link to the invite page (which needs a
+  workspace) and drew a white box that hid its plus icon. It now opens the
+  Create workspace modal, with a dashed sidebar-coloured tile.
+
+**Tests.** `ImpersonationTest` (6) covers:
+- start, with the banner prop and the audit entry;
+- stop restores the admin;
+- super admins and yourself are refused;
+- non-admins get 404;
+- account settings are locked;
+- a stale impersonation session signs out.
+
+The full suite passes, apart from the known flaky `AssistantClientTaskAccessTest`,
+which passes on rerun.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

@@ -494,6 +494,7 @@ export enum NotificationType {
     TASK_ASSIGNED = 'task_assigned',
     TASK_MOVED = 'task_moved',
     TASK_COMMENT = 'task_comment',
+    BOARD_ACCESS_REQUESTED = 'board_access_requested',
 }
 export enum OvertimeMode {
     TrackOnly = 'track_only',
