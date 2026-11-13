@@ -40,6 +40,8 @@ declare module 'vue' {
     AppRoleBadge: typeof import('./../components/ui/AppRoleBadge.vue')['default']
     AppSearchInput: typeof import('./../components/ui/AppSearchInput.vue')['default']
     AppSegmentedControl: typeof import('./../components/ui/AppSegmentedControl.vue')['default']
+    AppSelect: typeof import('./../components/ui/AppSelect.vue')['default']
+    AppSelectRow: typeof import('./../components/ui/AppSelectRow.vue')['default']
     AppShell: typeof import('./../components/AppShell.vue')['default']
     AppSidebar: typeof import('./../components/AppSidebar.vue')['default']
     AppSidebarHeader: typeof import('./../components/AppSidebarHeader.vue')['default']

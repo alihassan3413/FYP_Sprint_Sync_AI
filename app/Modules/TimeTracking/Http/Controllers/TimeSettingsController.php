@@ -36,7 +36,7 @@ final class TimeSettingsController
 {
     public function edit(Request $request, Workspace $workspace, TimePolicies $policies): Response
     {
-        abort_unless($request->user()->can('manageTeam', [TimeEntry::class, $workspace]), 403);
+        abort_unless($request->user()->can('configure', [TimeEntry::class, $workspace]), 403);
 
         $people = $workspace->people()->orderBy('name')->get();
         $policy = $policies->at($workspace->id);
@@ -138,7 +138,7 @@ final class TimeSettingsController
 
     public function destroyHoliday(Request $request, Workspace $workspace, string $holiday, ManageTimeOffAction $action): RedirectResponse
     {
-        abort_unless($request->user()->can('manageTeam', [TimeEntry::class, $workspace]), 403);
+        abort_unless($request->user()->can('configure', [TimeEntry::class, $workspace]), 403);
         $action->removeHoliday(TimeHoliday::query()->where('workspace_id', $workspace->id)->where('public_id', $holiday)->firstOrFail(), $request->user());
 
         return back()->with('success', 'Holiday removed.');
@@ -146,7 +146,7 @@ final class TimeSettingsController
 
     public function destroyLeave(Request $request, Workspace $workspace, string $leave, ManageTimeOffAction $action): RedirectResponse
     {
-        abort_unless($request->user()->can('manageTeam', [TimeEntry::class, $workspace]), 403);
+        abort_unless($request->user()->can('configure', [TimeEntry::class, $workspace]), 403);
         $action->removeLeave(TimeLeave::query()->where('workspace_id', $workspace->id)->where('public_id', $leave)->firstOrFail(), $request->user());
 
         return back()->with('success', 'Leave removed.');

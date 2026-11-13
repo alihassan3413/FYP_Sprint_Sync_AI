@@ -14,7 +14,7 @@ final class TimePolicyRequest extends TimeRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('manageTeam', [TimeEntry::class, $this->workspace()]);
+        return $this->user()->can('configure', [TimeEntry::class, $this->workspace()]);
     }
 
     /**

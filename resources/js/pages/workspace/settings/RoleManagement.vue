@@ -5,6 +5,7 @@ import {
     Brush,
     ChevronDown,
     ChevronUp,
+    Clock,
     Code,
     Crown,
     Handshake,
@@ -99,6 +100,16 @@ const allPermissionGroups: PermissionGroup[] = [
             { key: 'integrations.view', label: 'View integrations', hint: 'See connected apps' },
             { key: 'integrations.manage', label: 'Manage integrations', hint: 'Connect or disconnect services' },
             { key: 'integrations.deploy', label: 'Deploy & webhooks', hint: 'Trigger deployments and webhooks' },
+        ],
+    },
+    {
+        key: 'time',
+        label: 'Team time',
+        icon: Clock,
+        permissions: [
+            { key: 'time.view', label: "See everyone's time", hint: "Open the team's week and any person's hours" },
+            { key: 'time.edit', label: 'Add and correct team time', hint: 'Add time for others, correct or void entries, add previous hours' },
+            { key: 'time.approve', label: 'Approve or reject flagged time', hint: 'Decide idle time, extra lunch and other reviews' },
         ],
     },
 ];
@@ -382,8 +393,8 @@ function saveRole() {
                         <div class="text-muted-foreground flex items-start gap-2 border-b px-4 py-2.5 text-[11px] leading-relaxed">
                             <Info class="mt-px size-3.5 shrink-0" />
                             <span>
-                                Permissions are recorded against the role for team structure. Access is currently enforced by the system role (Owner /
-                                Admin / Member) and by project membership.
+                                Admins already have every project, member and integration permission. Team time is different: only the owner has it
+                                until you switch it on here, for admins and members alike. Time settings stay with the owner.
                             </span>
                         </div>
 

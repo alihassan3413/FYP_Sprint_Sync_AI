@@ -89,6 +89,20 @@ final class TimeAccessTest extends TestCase
                 ->has('people', 6));
     }
 
+    public function test_the_pickers_get_each_persons_title_and_each_tasks_column(): void
+    {
+        $column = $this->task->boardColumn()->value('name');
+
+        $this->actingAs($this->owner)
+            ->get(route('workspace.time.index', $this->workspace))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('people.0.title', 'CSR')
+                ->where('projects.0.tasks.0.title', 'Flood Quote Workflow')
+                ->where('projects.0.tasks.0.column', $column));
+
+        $this->assertNotNull($column);
+    }
+
     public function test_an_admin_tracks_their_own_time_but_sees_no_one_elses(): void
     {
         $admin = $this->joined(UserRole::ADMIN);

@@ -353,6 +353,21 @@ final class LunchAndIdleTest extends TestCase
         $this->assertSame(ReviewKind::IdleKept, $review->kind);
     }
 
+    public function test_a_review_note_over_500_characters_is_refused_with_a_plain_message(): void
+    {
+        $this->policy(['idle_enabled' => true, 'idle_seconds' => 300]);
+        $this->begin();
+        $this->at('10:05:00');
+        $this->idle('10:00:00', '10:05:00');
+        $this->at('10:13:00');
+        $this->actingAs($this->member)->postJson(route('workspace.time.idle.keep', [$this->workspace, TimeIdlePeriod::query()->sole()->public_id]), ['reason' => 'Reading printed contract'])->assertOk();
+
+        $review = TimeReview::query()->sole();
+        $this->actingAs($this->owner)->post(route('workspace.time.reviews.resolve', [$this->workspace, $review->public_id]), ['decision' => 'accepted', 'note' => str_repeat('x', 501)])
+            ->assertSessionHasErrors(['note' => 'Notes can be up to 500 characters. Shorten the note and confirm again.']);
+        $this->assertSame('open', $review->refresh()->status);
+    }
+
     public function test_the_owner_can_reject_kept_idle_time(): void
     {
         $this->policy(['idle_enabled' => true, 'idle_seconds' => 300]);

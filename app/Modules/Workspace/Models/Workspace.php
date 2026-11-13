@@ -18,6 +18,7 @@ use App\Modules\Projects\Models\Project;
 use App\Modules\TimeTracking\Models\TimeEntry;
 use App\Modules\Workspace\Data\ClientPermission;
 use App\Modules\Workspace\Data\FinancePermission;
+use App\Modules\Workspace\Data\TimePermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Database\Factories\WorkspaceFactory;
 use App\UserRole;
@@ -222,6 +223,26 @@ final class Workspace extends Model
     public function allowsFinance(User $user, FinancePermission $permission): bool
     {
         return $this->roleFor($user) === UserRole::OWNER;
+    }
+
+    /**
+     * The single place delegated time access is decided: always the owner,
+     * otherwise only what the person's custom role grants. Admin rank alone
+     * grants nothing, and client guests never get it.
+     */
+    public function allowsTime(User $user, TimePermission $permission): bool
+    {
+        $role = $this->roleFor($user);
+
+        if ($role === UserRole::OWNER) {
+            return true;
+        }
+
+        if ($role === null || $role->isClient()) {
+            return false;
+        }
+
+        return $this->customRoleFor($user)?->grants($permission->value) ?? false;
     }
 
     public function isClient(User $user): bool

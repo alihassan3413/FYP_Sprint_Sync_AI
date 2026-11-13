@@ -19,6 +19,10 @@ Strict completion: **18 / 35 (51.4%)**. Counting the two Design Mismatches as
 satisfied-by-design (the recommended resolution): **20 / 35 (57.1%)**.
 Weighted (Complete=1, Design Mismatch=1, Partial=0.5): **74.3%**.
 
+Entry #63 added **AppSelect v2**: one shared select component with automatic
+search above 8 options. The Time page is the reference use; no other dropdown is
+migrated yet. **No FR status changes.**
+
 Entry #61 made SprintSync Desktop required for starting timers while idle
 detection is on (the web can't see whether the computer is in use) and added an
 optional server-side safeguard that stops timers left running past the shift
@@ -6148,6 +6152,81 @@ changed later". "Count as paid + billable" now says the client is charged.
 **Tests.** The person-view test checks `paid_seconds` (3600 on the lunch
 entry, null on tracked entries).
 
+**Confirm step and hierarchy** (after the sixth re-critique, 27/40).
+Frontend only; review logic is unchanged.
+- **Inline two-step confirm.** Applies to long-lunch and idle-kept decisions
+  only, since they change pay and can't be undone.
+  - The clicked choice becomes "Confirm: <decision>" (primary) with Cancel
+    beside it. Focus moves to Confirm.
+  - Esc or Cancel returns focus to the original button.
+  - Activity and auto-stopped decisions stay one click.
+- **Effect lines** now sit above the decision buttons at `text-sm`. "Pay
+  decisions are final" has a lock icon and foreground weight.
+- **"Correct hours"** is a full outline button next to the decisions on
+  auto-stopped cards. View entry and Add a note stay quiet.
+- **Small fixes.**
+  - The date in card titles no longer wraps away from its "·".
+  - The note toggle no longer points `aria-controls` at an element that
+    doesn't exist while the note is closed.
+
+**"Correct hours" demoted** (after the seventh re-critique, 31/40).
+Frontend only. Review logic is unchanged, and a correction never resolves
+the review.
+- **Quiet action.** On auto-stopped cards, "Correct hours…" is back with View
+  entry and Add a note as a quiet text action with a pencil icon. The
+  correction modal is unchanged.
+- **Explanation.** One line explains it, also used as the action's
+  `aria-describedby`: "Correct hours…: changes the recorded time only. It
+  doesn't close this review."
+- **Confirm step.**
+  - The chosen decision's effect line is highlighted with an amber tint.
+  - The other line fades to 40% opacity.
+- **Mobile.** Below `sm`, activity cards show "No pay change · automatic
+  invoices held" as a small chip under the evidence, instead of a right-hand
+  column that squeezed the text.
+- **Lock icon.** It is `aria-hidden`.
+
+**Regression fixes** (after the eighth re-critique, 27/40). Frontend only.
+- **"Correct hours…" explanation.** It is no longer in the decision-effects
+  list, where it read as a third decision. The link's
+  `aria-describedby` now points at screen-reader-only text: "Changes the
+  recorded time only. It doesn't close this review". The same text shows as
+  a hover title. The correction flow is unchanged, and it never resolves the
+  review.
+- **Failed decisions keep the confirm open.**
+  - `confirming` is now cleared only in `onSuccess`, not `onFinish`.
+  - After an error, focus goes back to "Confirm: …" once the request
+    finishes and the button is enabled again. Without a confirm step, it
+    goes back to the decision button.
+  - The inline error (`review-error-{id}`) is added to Confirm's
+    `aria-describedby`.
+- **Verified in headless Chrome, keyboard only.** A 600-character note,
+  which fails the server's 500-character validation, gives:
+  - Enter on "Don't count" opens Confirm and focuses it;
+  - Enter on Confirm leaves Confirm open and focused, with the inline error
+    shown;
+  - Esc returns focus to "Don't count";
+  - the review stays open.
+
+**Auto-stopped amount and note errors** (after the ninth re-critique,
+29/40). Review, pay and timer logic are unchanged.
+- **Auto-stopped amount.** The card now shows its amount as context only:
+  "5h 00m" in small muted text with the caption "total recorded". Before, it
+  had the large bold style used for pay-impact amounts, and the caption was
+  "recorded". The stop reason and recorded range in the evidence line still
+  explain what happened. Long-lunch and idle amounts keep the larger style.
+- **Note validation.**
+  - A note over 500 characters is now refused with "Notes can be up to 500
+    characters. Shorten the note and confirm again." instead of Laravel's
+    default wording (`TimeReviewController::resolve` validation message).
+  - The note input gets `aria-invalid`, a red border and `aria-describedby`
+    pointing at the error.
+  - Focus still stays on Confirm. This was re-verified keyboard-only in
+    headless Chrome.
+- **Tests.** New
+  `LunchAndIdleTest::test_a_review_note_over_500_characters_is_refused_with_a_plain_message`
+  checks the message, and that the review stays open.
+
 **Not done yet (pass 2):** undo/reopen of decisions, live presence for
 everyone, bulk actions, week navigation.
 
@@ -6165,6 +6244,229 @@ everyone, bulk actions, week navigation.
 - New `test_the_team_lists_people_with_the_most_open_reviews_first`.
 
 All 201 TimeTracking tests pass.
+
+### 63. AppSelect v2 (shared select / combobox), Time page reference
+
+**One public component, two engines.** `components/ui/AppSelect.vue` picks the
+engine itself:
+- **Menu mode** (Reka `Select`) for lists of 8 or fewer, or `searchable=false`.
+- **Search mode** (Reka `Combobox`, with the search field inside the menu) for
+  more than 8 options, or `searchable` / `searchable=true`.
+- `AppSelectRow.vue` renders one option for both engines.
+- No new dependencies. Virtualization uses Reka's `ComboboxVirtualizer`, whose
+  `@tanstack/vue-virtual` was already installed through Reka.
+
+**API.**
+- Props: `v-model`, `options: AppSelectOption<T>[]`, `searchable`,
+  `placeholder`, `searchPlaceholder`, `emptyText`, `loading`, `disabled`,
+  `invalid`, `size` (`md` 40px / `sm` 32px), `variant` (`default` / `inline`),
+  `id`, `class`, `contentClass`.
+- Each option: `value`, `label`, `description`, `meta`, `icon`, `avatar`,
+  `group`, `keywords`, `disabled`.
+- The component is generic over the value type. Options are matched by
+  position with strict equality, so `''`, `null`, numbers and string
+  placeholders such as `all` / `none` / `unassigned` / `backlog` round-trip
+  exactly. `v-model.number` is no longer needed.
+
+**Behaviour.**
+- **Placement:** the menu is anchored under the trigger, starting at its left
+  edge, 6px below. It flips above when space runs out and keeps 8px from the
+  screen edges.
+- **Width:** at least the trigger's width, growing with content to
+  `max(trigger, 22.5rem)`, always clamped to the visible width.
+- **Selected state:** a right-side check in `primary-text` plus a
+  medium-weight label. Rows are otherwise neutral, with a 5% / 7% hover and
+  keyboard highlight. No lime fills.
+- **Search:**
+  - Ignores case and accents.
+  - Ranking: label prefix, then word prefix, then contains, then description,
+    meta and keywords.
+  - Escape clears the search first, then closes.
+  - Typing on a focused closed trigger opens the menu with the search
+    pre-filled.
+  - Result counts are announced to screen readers.
+- **Menu-mode typeahead on the closed trigger:** native-select style
+  (repeating a letter cycles). Reka's own closed typeahead never changes the
+  value.
+- **Focus:** returns to the trigger after selecting or pressing Escape, but
+  not after a click outside.
+- **Search-mode trigger:** a plain button with `aria-haspopup` and
+  `aria-expanded`. Reka's `ComboboxTrigger` sets `tabindex=-1` and
+  `aria-label="Show popup"`, which hid the trigger from Tab and overrode the
+  field's visible label.
+- **States:**
+  - loading: skeleton rows plus a spinner in the trigger
+  - empty and no-match messages
+  - disabled and invalid
+- **Rows:** 40px on touch screens; the search field uses 16px text on mobile to
+  avoid iOS zoom.
+- **Motion:** 120ms ease-out open and 80ms fade close. With reduced motion,
+  fade only.
+- **Scrollbar:** a thin themed scrollbar, overriding Reka's hidden one.
+- **Virtualization:** used above 80 results.
+
+**Time page.**
+- **Project:** auto; a short menu with 2 projects, search beyond 8. Disabled
+  with "No projects yet".
+- **Task:** auto, with the board column as secondary text. Disabled until a
+  project is chosen.
+- **Switch to / Add-time person:** always searchable, with avatars and job
+  titles.
+- `TimeIndexController` now sends `people.title` and `tasks.column`; both are
+  additive keys. Test: `test_the_pickers_get_each_persons_title_and_each_tasks_column`.
+
+**Verification.**
+- Before/after screenshots (desktop light and dark, mobile 390px).
+- Keyboard suite: open, Escape twice, focus return, Enter, Home/End, typeahead,
+  outside click.
+- 14 projects and 125 people (virtualized, 20 rows in the page).
+- Collision flip, disabled member with no projects, reduced motion.
+- ESLint, vue-tsc, build, Pint and the time-tracking tests are clean.
+
+**Impeccable critique** (design review only; the detector pass was
+interrupted): 27/40. Fixes applied afterwards:
+- **Keyboard highlight.** Mouse hover stays a faint 5%. Keyboard navigation
+  (`data-input="keyboard"` on the menu) gets an 8% fill plus an inset
+  `ring/60`, in light and dark.
+- **Empty Task menu.** When a project has no open tasks, Task is disabled with
+  "No open tasks in this project", or "Choose a project first" when no project
+  is chosen.
+- **"You" first** in every person picker.
+- **Next steps.** No-match search shows "Check the spelling or try fewer
+  letters." The no-projects line now says to create a project (owner/admin) or
+  to ask the owner (member).
+- **Task rows.** The board column is now right-side `meta`, so rows stay one
+  line.
+- **Search highlighting.** Matched text is bolded in search results.
+- **Virtualizer** row-size estimate follows two-line rows.
+
+**Verification pass** (separate session, against the original spec):
+- **Keyboard highlight.** It is now neutral: an inset `ring-foreground/15`
+  (`white/20` in dark) on the 8% fill. The spec asked for no lime anywhere
+  in the menu; the old ring used the `ring` colour, which is lime in light
+  and blue in dark.
+- **Search highlighting.** Bolding now ignores accents, so "zoe" bolds
+  "Zoë" (matching the search itself).
+- **Touch-opened search menus.** When opened by touch on a coarse pointer,
+  they no longer raise the on-screen keyboard. Reka focuses the input on
+  mount, so `AppSelect` blurs it in that case. Opening by keyboard still
+  focuses the search field.
+- **Checks run.** Paired BEFORE/AFTER screenshots and side-by-side
+  comparisons, using a short and a long scratch dataset:
+  - 6 people / 1 project / 5 tasks;
+  - 126 people / 11 projects / 15 tasks.
+  - Viewports: desktop, 390px mobile, dark.
+  - States: short menu, search, virtualized (126 people, 18 rows rendered),
+    accent search, no match, empty/disabled Task, invalid Project/Task.
+- **Keyboard log.** Each of these behaves as expected:
+  - Enter / ArrowDown open the menu;
+  - Enter selects and returns focus to the trigger;
+  - the first Escape clears the search, the second closes;
+  - typing on a closed trigger opens search pre-filled;
+  - a touch tap opens without focusing the search field.
+- **Test-harness note.** Headless Chrome reports the page as `hidden`
+  unless it is brought to front with focus emulation. While hidden,
+  `requestAnimationFrame` and exit animations stall, which falsely looks
+  like stuck menus and lost focus.
+
+**Fixes after the AppSelect critique (28/40):**
+- **Search menus open on the current choice.** AppSelect toggles `open`
+  itself, so Reka's own open handler, which calls `highlightSelected()`,
+  never ran. `AppSelect` now calls it through the `ComboboxRoot` ref after
+  the menu mounts. Virtualized lists retry once at 120ms, because the
+  virtualizer can't scroll before the new menu has a height. The
+  126-person list now opens scrolled to the current person.
+- **Tab / Shift+Tab out of the search field.** The menu closes and focus
+  moves to the next or previous focusable element after or before the
+  trigger, as with a native field. Before, the close handler pulled focus
+  back to the trigger.
+- **Errors are linked.** On the Time page, every AppSelect with an error
+  passes `aria-describedby`, which `$attrs` carries to the trigger in both
+  engines. Each `InputError` has a matching id. Add-time Task now also
+  shows its own error and invalid state.
+- **Switch-to keeps focus.** After switching person, the new page
+  refocuses the switcher instead of leaving focus on `<body>`.
+- **Verified in headless Chrome:**
+  - the current person is highlighted and in view, in short and
+    virtualized lists;
+  - Tab moves to "Hours look right" and Shift+Tab to the Team back link;
+  - focus is on the switcher after navigation;
+  - `aria-describedby` points to the error ids;
+  - the earlier keyboard and touch runs are unchanged.
+
+Kept by decision: typing on a closed trigger selects in place in menu mode
+but opens search in search mode, following the native convention.
+
+### 64. Time settings page: UX and UI redesign
+
+**Why.** The settings page had several problems:
+- All five rules sat in one long card with a single "Save policy" button at
+  the bottom, and nothing said there were unsaved changes.
+- Each rule carried a paragraph of fine print.
+- The holiday and leave add-forms were always open above their lists.
+- Removing a holiday or leave happened on one click, with no confirmation.
+- The schedule never said in words what had been set.
+
+**Frontend only.** `resources/js/pages/time/settings.vue` was rewritten.
+Request payloads, routes, validation and policy, schedule and time-off logic
+are unchanged.
+
+**Layout**
+- On desktop, a sticky side menu links to Tracking rules (with "n/5 on"),
+  Work schedule, Holidays (count) and Leave (count).
+- The eyebrow is gone. The workspace time zone is now one line in the
+  header, with a Change link.
+
+**Tracking rules**
+- Each rule is a row: icon, title, one-line purpose and a switch on the
+  right. Its setting appears only when the rule is on.
+- The long explanations moved into "How it works" / "What is checked"
+  disclosures.
+- One consequence stays visible: while idle detection is on, timers can only
+  be started from SprintSync Desktop.
+- The idle-minutes and forgotten-timer hour pickers use AppSelect.
+- "Time above the target" is a labelled radio group: "Just track it" /
+  "Highlight it for me".
+
+**Saving rules**
+- A save bar shows "You have unsaved changes" with Discard and Save rules.
+  It sticks to the bottom of the screen while there are changes, raised
+  above the floating assistant button.
+- With no changes, Save is a quiet, disabled outline button, and the bar
+  shows the current-rules date or "Saved".
+- After a save, `policyForm.defaults()` makes the saved values the new
+  baseline. Rule history is a disclosure under the bar.
+
+**Work schedule**
+- "Applies to" is an AppSelect: Everyone, or each person with an avatar,
+  marked "Own schedule" when they have one.
+- Days are toggle chips. Start and end times have labels.
+- A live summary reads, for example, "Mon–Fri · 9:00 AM–5:00 PM · 8h 00m a
+  day", plus "ends the next day" for overnight shifts.
+- Switching person resets the form's baseline. Save is enabled only when
+  something changed.
+
+**Holidays and leave**
+- The list comes first, with an empty state.
+- "Add holiday" / "Add leave" opens the form inline and focuses its first
+  field. Cancel closes it.
+- Holidays:
+  - "Applies to" is Everyone or Selected people. People are chips with
+    avatars.
+  - Rows show a date tile. Upcoming holidays come first; past ones are
+    muted and marked "Past".
+- Leave:
+  - The person is picked with AppSelect, and the type with a Paid/Unpaid
+    radio group.
+  - Rows show an avatar and a Paid/Unpaid badge.
+- Removing a row asks first: "Remove" (destructive, focused) or "Keep".
+- The page has bottom padding so the floating button never covers the last
+  row.
+
+**Checked.** Screenshots at desktop, 390px mobile and dark, with and without
+holidays and leave, plus the unsaved-changes bar, the add-holiday form, the
+remove confirmation, a filled schedule and the mobile add-leave form.
+ESLint, vue-tsc, the build and the TimeTracking tests are clean.
 
 ## Next recommended task (updated 2026-08-20, after entry #55)
 

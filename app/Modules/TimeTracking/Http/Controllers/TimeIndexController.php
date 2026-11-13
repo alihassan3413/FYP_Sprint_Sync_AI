@@ -29,8 +29,9 @@ use Inertia\Response;
 
 /**
  * The Time page: your timer, today / this week / this month and your recent
- * entries. The owner can switch to anyone on the team (?person=), add time
- * for them, correct entries and add previous hours. Days, weeks and months
+ * entries. The owner, and anyone whose role delegates it, can switch to
+ * anyone on the team (?person=); editing (add time for them, correct entries,
+ * previous hours) and approving reviews are separate grants. Days, weeks and months
  * follow the workspace's calendar. While a timer runs past midnight, "today"
  * is that timer's workday (an 18:00–03:00 shift stays on the day it began).
  */
@@ -47,12 +48,14 @@ final class TimeIndexController
         $user = $request->user();
         abort_unless($user->can('track', [TimeEntry::class, $workspace]), 403);
 
+        $canView = $user->can('viewTeam', [TimeEntry::class, $workspace]);
         $canManage = $user->can('manageTeam', [TimeEntry::class, $workspace]);
+        $canApprove = $user->can('approveTeam', [TimeEntry::class, $workspace]);
         $me = $access->personFor($user, $workspace);
         $viewing = $me;
 
         if ($request->filled('person')) {
-            abort_unless($canManage, 403);
+            abort_unless($canView, 403);
             $viewing = $access->person($workspace, $request->string('person')->toString()) ?? abort(404);
         }
 
@@ -63,15 +66,18 @@ final class TimeIndexController
         $workday = $session === null ? $today : CarbonImmutable::parse($schedules->workdayOf($session), $workspace->timezone);
         $schedule = $viewing === null ? null : $schedules->for($viewing);
         $overnightShift = $schedule !== null && $schedule->end_time <= $schedule->start_time ? ['start' => $schedule->start_time, 'end' => $schedule->end_time] : null;
-        $teamScope = $canManage && ! $request->filled('person');
+        $teamScope = $canView && ! $request->filled('person');
 
         return Inertia::render('time/index', [
+            'canViewTeam' => $canView,
             'canManageTeam' => $canManage,
+            'canApproveTime' => $canApprove,
+            'canConfigureTime' => $user->can('configure', [TimeEntry::class, $workspace]),
             'scope' => $teamScope ? 'team' : 'person',
             'me' => $me?->only(['public_id', 'name']),
             'viewing' => $viewing?->only(['public_id', 'name']),
             'isSelf' => $viewing !== null && $viewing->is($me),
-            'people' => $canManage ? $workspace->people()->orderBy('name')->get(['public_id', 'name']) : [],
+            'people' => $canView ? $workspace->people()->orderBy('name')->get(['public_id', 'name', 'title']) : [],
             'timer' => $session === null ? null : TimerData::fromSession($session, now()),
             'projects' => self::projectOptions($access->projects($user, $workspace)),
             'totals' => [
@@ -103,9 +109,9 @@ final class TimeIndexController
                 'week' => $totals->week($viewing, $today)->toArray(),
             ],
             'idlePeriods' => $viewing === null ? [] : self::idlePeriods($viewing->id),
-            'reviews' => $canManage && ! $teamScope && $viewing !== null ? self::openReviews($workspace, $viewing) : [],
+            'reviews' => $canApprove && ! $teamScope && $viewing !== null ? self::openReviews($workspace, $viewing) : [],
             'team' => $teamScope ? self::team($workspace, $totals, $today) : [],
-            'nextNeedingReview' => $canManage && ! $teamScope && $viewing !== null ? self::nextNeedingReview($workspace, $viewing) : null,
+            'nextNeedingReview' => $canApprove && ! $teamScope && $viewing !== null ? self::nextNeedingReview($workspace, $viewing) : null,
         ]);
     }
 
@@ -186,12 +192,15 @@ final class TimeIndexController
      */
     public static function projectOptions(Collection $projects): array
     {
-        $projects->load(['tasks' => fn ($query) => $query->whereNull('completed_at')->orderBy('title')->select(['id', 'public_id', 'title', 'project_id'])]);
+        $projects->load([
+            'tasks' => fn ($query) => $query->whereNull('completed_at')->orderBy('title')->select(['id', 'public_id', 'title', 'project_id', 'board_column_id']),
+            'tasks.boardColumn:id,name',
+        ]);
 
         return $projects->map(fn (Project $project) => [
             'public_id' => $project->public_id,
             'name' => $project->name,
-            'tasks' => $project->tasks->map(fn ($task) => ['public_id' => $task->public_id, 'title' => $task->title])->values()->all(),
+            'tasks' => $project->tasks->map(fn ($task) => ['public_id' => $task->public_id, 'title' => $task->title, 'column' => $task->boardColumn?->name])->values()->all(),
         ])->values()->all();
     }
 }

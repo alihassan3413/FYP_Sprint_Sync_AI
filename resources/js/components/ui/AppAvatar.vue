@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+type AvatarSize = '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 type StatusKind = 'active' | 'away' | 'offline' | 'busy' | null;
 
 interface Props {
@@ -61,6 +61,7 @@ const colorPair = computed(() => {
 });
 
 const sizeClasses = computed(() => ({
+  '2xs': 'size-5 text-[8.5px]',
   xs: 'size-6 text-[10px]',
   sm: 'size-7 text-[11px]',
   md: 'size-8 text-xs',
@@ -70,6 +71,7 @@ const sizeClasses = computed(() => ({
 }[props.size]));
 
 const dotClasses = computed(() => ({
+  '2xs': 'size-1.5 ring-1',
   xs: 'size-1.5 ring-[1.5px]',
   sm: 'size-2 ring-2',
   md: 'size-2.5 ring-2',

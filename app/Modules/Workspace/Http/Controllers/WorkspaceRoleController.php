@@ -8,6 +8,7 @@ use App\Modules\Workspace\Actions\CreateWorkspaceRoleAction;
 use App\Modules\Workspace\Actions\DeleteWorkspaceRoleAction;
 use App\Modules\Workspace\Actions\UpdateWorkspaceRoleAction;
 use App\Modules\Workspace\Data\ClientPermission;
+use App\Modules\Workspace\Data\TimePermission;
 use App\Modules\Workspace\Data\WorkspacePermission;
 use App\Modules\Workspace\Data\WorkspaceRoleData;
 use App\Modules\Workspace\Http\Requests\StoreWorkspaceRoleRequest;
@@ -33,7 +34,7 @@ final class WorkspaceRoleController
 
         return Inertia::render('workspace/settings/RoleManagement', [
             'workspaceId' => $workspace->id,
-            'availablePermissions' => WorkspacePermission::values(),
+            'availablePermissions' => [...WorkspacePermission::values(), ...TimePermission::values()],
             'availableClientPermissions' => array_map(
                 fn (ClientPermission $permission) => [
                     'value' => $permission->value,

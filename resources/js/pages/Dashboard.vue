@@ -314,11 +314,13 @@ const insightIsCritical = computed(() => props.insight?.severity === 'critical')
 .dash-mark {
     position: relative;
     display: inline-block;
+    isolation: isolate;
 }
 
 .dash-mark::after {
     content: '';
     position: absolute;
+    z-index: -1;
     inset: auto -0.06em 0.1em;
     height: 0.2em;
     border-radius: 2px;

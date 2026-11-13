@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Owner-only: totals for a period before tracking started, for the whole team at once. */
+/** Owner, or a role that can edit team time: totals for a period before tracking started, for the whole team at once. */
 final class PreviousHoursController
 {
     public function create(Request $request, Workspace $workspace, TimeAccess $access): Response

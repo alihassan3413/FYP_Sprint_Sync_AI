@@ -22,7 +22,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Idle decisions (the person, about their own idle time), owner reviews and
+ * Idle decisions (the person, about their own idle time), reviews (the owner
+ * or anyone whose role can approve team time) and
  * activity signals from SprintSync Desktop.
  */
 final class TimeReviewController
@@ -46,12 +47,12 @@ final class TimeReviewController
 
     public function resolve(Request $request, Workspace $workspace, string $review, ResolveTimeReviewAction $action): RedirectResponse
     {
-        abort_unless($request->user()->can('manageTeam', [TimeEntry::class, $workspace]), 403);
+        abort_unless($request->user()->can('approveTeam', [TimeEntry::class, $workspace]), 403);
         $model = TimeReview::query()->where('workspace_id', $workspace->id)->where('public_id', $review)->firstOrFail();
         $validated = $request->validate([
             'decision' => ['required', Rule::in($model->kind->decisions())],
             'note' => ['nullable', 'string', 'max:500'],
-        ]);
+        ], ['note.max' => 'Notes can be up to 500 characters. Shorten the note and confirm again.']);
 
         $action->handle($model, $validated['decision'], $validated['note'] ?? null, $request->user());
 

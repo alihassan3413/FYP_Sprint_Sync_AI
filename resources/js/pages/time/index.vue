@@ -11,9 +11,11 @@ import {
     History,
     Hourglass,
     Loader2,
+    Lock,
     MessageSquarePlus,
     Monitor,
     Pause,
+    PencilLine,
     Play,
     Plus,
     Settings2,
@@ -24,17 +26,25 @@ import {
 import type { Component } from 'vue';
 
 import type { DropdownEntry } from '@/components/ui/AppDropDown.vue';
+import type { AppSelectOption } from '@/components/ui/AppSelect.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatBusinessDate, formatClock, formatClockTime, formatDuration, formatPeriod, formatTimeOfDay, requestKey } from '@/lib/time';
 import { zoneLabel } from '@/lib/timezones';
 import { type BreadcrumbItem } from '@/types';
 import type { TimeEntryData, TimerData } from '@/types/generated';
 
-type ProjectOption = { public_id: string; name: string; tasks: { public_id: string; title: string }[] };
-type PersonRef = { public_id: string; name: string };
+type ProjectOption = { public_id: string; name: string; tasks: { public_id: string; title: string; column?: string | null }[] };
+type PersonRef = { public_id: string; name: string; title?: string | null };
 
 const props = defineProps<{
+    /** See anyone's time (owner, or a role with any team-time permission). */
+    canViewTeam: boolean;
+    /** Add time for others, correct or void entries, add previous hours. */
     canManageTeam: boolean;
+    /** Decide reviews: idle time kept, extra lunch, activity, auto-stops. */
+    canApproveTime: boolean;
+    /** Time settings are the owner's alone. */
+    canConfigureTime: boolean;
     scope: 'team' | 'person';
     /** Your own Team profile; null when your account isn't linked to one. */
     me: PersonRef | null;
@@ -129,6 +139,39 @@ const elapsed = computed(() => {
 
 const startForm = useForm({ project: props.projects[0]?.public_id ?? '', task: '', note: '', billable: true, operation_key: '' });
 const tasksFor = (project: string) => props.projects.find((option) => option.public_id === project)?.tasks ?? [];
+const projectOptions = computed<AppSelectOption<string>[]>(() =>
+    props.projects.map((project) => ({ value: project.public_id, label: project.name })),
+);
+const taskOptions = (project: string): AppSelectOption<string>[] => {
+    const tasks = tasksFor(project);
+
+    return tasks.length
+        ? [{ value: '', label: 'No task' }, ...tasks.map((task) => ({ value: task.public_id, label: task.title, meta: task.column ?? undefined }))]
+        : [];
+};
+const taskPlaceholder = (project: string) => (!project ? 'Choose a project first' : 'No open tasks in this project');
+const personOption = (person: PersonRef, label: string, value: string = person.public_id): AppSelectOption<string> => ({
+    value,
+    label,
+    description: person.title ?? undefined,
+    avatar: { name: person.name },
+});
+const personOptions = computed<AppSelectOption<string>[]>(() => {
+    const me = props.people.find((person) => person.public_id === props.me?.public_id);
+
+    return [
+        ...(me ? [personOption(me, `You (${me.name})`)] : []),
+        ...props.people.filter((person) => person.public_id !== props.me?.public_id).map((person) => personOption(person, person.name)),
+    ];
+});
+const addPersonOptions = computed<AppSelectOption<string>[]>(() => {
+    const me = props.people.find((person) => person.public_id === props.me?.public_id) ?? props.me;
+
+    return [
+        ...(me ? [personOption(me, `You (${me.name})`, '')] : []),
+        ...props.people.filter((person) => person.public_id !== props.me?.public_id).map((person) => personOption(person, person.name)),
+    ];
+});
 watch(
     () => startForm.project,
     () => (startForm.task = ''),
@@ -178,7 +221,15 @@ const formatShort = (seconds: number) =>
 
 const REVIEW_KINDS: Record<
     ReviewKind,
-    { label: string; icon: Component; impact: string; decisions: Record<string, Decision>; notes?: string[]; noPayChange?: boolean }
+    {
+        label: string;
+        icon: Component;
+        impact: string;
+        decisions: Record<string, Decision>;
+        notes?: string[];
+        noPayChange?: boolean;
+        contextOnly?: boolean;
+    }
 > = {
     lunch_excess: {
         label: 'Long lunch',
@@ -223,12 +274,19 @@ const REVIEW_KINDS: Record<
     auto_stopped: {
         label: 'Timer stopped automatically',
         icon: TimerOff,
-        impact: 'recorded',
+        impact: 'total recorded',
+        contextOnly: true,
         decisions: {
             no_concern: { label: 'Hours look right', done: 'hours kept as recorded', effect: () => 'the hours stay as recorded.' },
             follow_up: { label: 'Follow up', done: 'marked to follow up', effect: () => RECORD_ONLY },
         },
     },
+};
+
+const canCorrect = (review: Review) => {
+    const entry = review.kind === 'auto_stopped' ? entryFor(review.entry) : undefined;
+
+    return !!entry && entryActions(entry).length > 0;
 };
 
 const notesFor = (review: Review) => [
@@ -268,8 +326,25 @@ function evidenceFor(review: Review): string | null {
 const noting = ref<string | null>(null);
 const reviewNote = ref('');
 const resolving = ref<{ review: string; decision: string } | null>(null);
-const reviewError = ref<{ review: string; message: string } | null>(null);
+const reviewError = ref<{ review: string; field: string | null; message: string } | null>(null);
 const reviewAnnouncement = ref('');
+const confirming = ref<{ review: string; decision: string } | null>(null);
+
+function chooseDecision(review: Review, decision: string) {
+    if (!['lunch_excess', 'idle_kept'].includes(review.kind)) {
+        resolveReview(review, decision);
+
+        return;
+    }
+
+    confirming.value = { review: review.public_id, decision };
+    nextTick(() => document.getElementById(`review-confirm-${review.public_id}`)?.focus());
+}
+
+function cancelConfirm(review: Review, decision: string) {
+    confirming.value = null;
+    nextTick(() => document.getElementById(`review-${review.public_id}-${decision}`)?.focus());
+}
 const lastDecision = ref<string | null>(null);
 
 function resolveReview(review: Review, decision: string) {
@@ -285,6 +360,7 @@ function resolveReview(review: Review, decision: string) {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
+                confirming.value = null;
                 noting.value = null;
                 reviewNote.value = '';
                 const left = props.reviews.length;
@@ -293,9 +369,23 @@ function resolveReview(review: Review, decision: string) {
                 nextTick(() => document.querySelector<HTMLElement>('[data-review-focus]')?.focus());
             },
             onError: (errors) => {
-                reviewError.value = { review: publicId, message: Object.values(errors)[0] ?? "That decision wasn't saved. Try again." };
+                reviewError.value = {
+                    review: publicId,
+                    field: Object.keys(errors)[0] ?? null,
+                    message: Object.values(errors)[0] ?? "That decision wasn't saved. Try again.",
+                };
             },
-            onFinish: () => (resolving.value = null),
+            onFinish: () => {
+                resolving.value = null;
+
+                if (reviewError.value?.review === publicId) {
+                    nextTick(() =>
+                        document
+                            .getElementById(confirming.value?.review === publicId ? `review-confirm-${publicId}` : `review-${publicId}-${decision}`)
+                            ?.focus(),
+                    );
+                }
+            },
         },
     );
 }
@@ -360,8 +450,14 @@ function timerAction(action: 'pause' | 'resume' | 'stop' | 'lunch-start' | 'lunc
 
 /* ---- Owner: switch person ---- */
 
-function viewPerson(event: Event) {
-    router.get(personRoute((event.target as HTMLSelectElement).value));
+function viewPerson(publicId: string | undefined) {
+    if (typeof publicId === 'string' && publicId !== props.viewing?.public_id) {
+        router.get(
+            personRoute(publicId),
+            {},
+            { onSuccess: () => nextTick(() => document.querySelector<HTMLElement>('[data-testid="person-select"]')?.focus()) },
+        );
+    }
 }
 
 /* ---- Add time for a day ---- */
@@ -496,13 +592,13 @@ const workdayContext = computed(() => {
                         <WorkingClock :timezone="timezone" caption="Workspace time" />
                     </template>
                     <template #actions>
-                        <Button variant="outline" size="sm" class="gap-1.5" as-child>
+                        <Button v-if="canConfigureTime" variant="outline" size="sm" class="gap-1.5" as-child>
                             <Link :href="workspaceRoute('workspace.time.settings.edit')" data-testid="time-settings-link">
                                 <Settings2 class="size-4" />
                                 Time settings
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" class="gap-1.5" as-child>
+                        <Button v-if="canManageTeam" variant="outline" size="sm" class="gap-1.5" as-child>
                             <Link :href="workspaceRoute('workspace.time.previous-hours.create')" data-testid="previous-hours-link">
                                 <CalendarPlus class="size-4" />
                                 Add previous hours
@@ -659,7 +755,7 @@ const workdayContext = computed(() => {
             </template>
 
             <template v-else>
-                <div v-if="canManageTeam" class="flex flex-col gap-4">
+                <div v-if="canViewTeam" class="flex flex-col gap-4">
                     <Link
                         :href="workspaceRoute('workspace.time.index')"
                         class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 self-start text-sm"
@@ -692,16 +788,17 @@ const workdayContext = computed(() => {
                         </div>
                         <label class="inline-flex items-center gap-2 text-sm">
                             <span class="text-muted-foreground">Switch to</span>
-                            <select
-                                class="bg-background h-9 rounded-md border px-2 text-sm"
-                                :value="viewing?.public_id ?? ''"
+                            <AppSelect
+                                :model-value="viewing?.public_id"
+                                :options="personOptions"
+                                searchable
+                                placeholder="Choose someone"
+                                search-placeholder="Search people…"
+                                size="sm"
+                                class="w-60"
                                 data-testid="person-select"
-                                @change="viewPerson"
-                            >
-                                <option v-for="person in people" :key="person.public_id" :value="person.public_id">
-                                    {{ person.public_id === me?.public_id ? `You (${person.name})` : person.name }}
-                                </option>
-                            </select>
+                                @update:model-value="viewPerson"
+                            />
                         </label>
                     </div>
                 </div>
@@ -842,32 +939,33 @@ const workdayContext = computed(() => {
                         <form v-else class="grid gap-4 sm:grid-cols-2" @submit.prevent="start">
                             <div class="grid gap-1.5">
                                 <Label for="timer-project">Project</Label>
-                                <select
+                                <AppSelect
                                     id="timer-project"
                                     v-model="startForm.project"
-                                    class="bg-background h-10 rounded-md border px-3 text-sm"
+                                    :options="projectOptions"
+                                    :placeholder="projects.length ? 'Choose a project' : 'No projects yet'"
+                                    search-placeholder="Search projects…"
+                                    :disabled="!projects.length"
+                                    :invalid="!!startForm.errors.project"
+                                    :aria-describedby="startForm.errors.project ? 'timer-project-error' : undefined"
                                     data-testid="timer-project"
-                                >
-                                    <option v-for="project in projects" :key="project.public_id" :value="project.public_id">
-                                        {{ project.name }}
-                                    </option>
-                                </select>
-                                <InputError :message="startForm.errors.project" />
+                                />
+                                <InputError id="timer-project-error" :message="startForm.errors.project" />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label for="timer-task">Task <span class="text-muted-foreground font-normal">(optional)</span></Label>
-                                <select
+                                <AppSelect
                                     id="timer-task"
                                     v-model="startForm.task"
-                                    class="bg-background h-10 rounded-md border px-3 text-sm"
+                                    :options="taskOptions(startForm.project)"
+                                    search-placeholder="Search tasks…"
+                                    :placeholder="taskPlaceholder(startForm.project)"
+                                    :disabled="!tasksFor(startForm.project).length"
+                                    :invalid="!!startForm.errors.task"
+                                    :aria-describedby="startForm.errors.task ? 'timer-task-error' : undefined"
                                     data-testid="timer-task"
-                                >
-                                    <option value="">No task</option>
-                                    <option v-for="task in tasksFor(startForm.project)" :key="task.public_id" :value="task.public_id">
-                                        {{ task.title }}
-                                    </option>
-                                </select>
-                                <InputError :message="startForm.errors.task" />
+                                />
+                                <InputError id="timer-task-error" :message="startForm.errors.task" />
                             </div>
                             <AppFormInput
                                 id="timer-note"
@@ -887,20 +985,26 @@ const workdayContext = computed(() => {
                                     Start timer
                                 </Button>
                             </div>
-                            <p v-if="!projects.length" class="text-muted-foreground text-sm sm:col-span-2">You aren't on any projects yet.</p>
+                            <p v-if="!projects.length" class="text-muted-foreground text-sm sm:col-span-2" data-testid="no-projects-hint">
+                                {{
+                                    canManageTeam
+                                        ? 'You aren’t on any projects yet. Create one in Projects to start tracking time.'
+                                        : 'You aren’t on any projects yet. Ask your workspace owner to add you to one.'
+                                }}
+                            </p>
                         </form>
                     </section>
 
                     <p class="sr-only" aria-live="polite">{{ reviewAnnouncement }}</p>
                     <p
-                        v-if="canManageTeam && lastDecision"
+                        v-if="canApproveTime && lastDecision"
                         class="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400"
                         data-testid="decision-confirmation"
                     >
                         <CircleCheck class="size-4 shrink-0" />
                         {{ lastDecision }}
                     </p>
-                    <section v-if="canManageTeam && reviews.length" class="bg-card rounded-2xl border border-amber-500/30" data-testid="reviews">
+                    <section v-if="canApproveTime && reviews.length" class="bg-card rounded-2xl border border-amber-500/30" data-testid="reviews">
                         <div class="flex items-center gap-2 border-b px-4 py-3">
                             <h2 class="text-sm font-semibold outline-none" tabindex="-1" data-review-focus>Waiting on your decision</h2>
                             <AppBadge variant="warning">{{ reviews.length }}</AppBadge>
@@ -916,7 +1020,7 @@ const workdayContext = computed(() => {
                                     <div class="min-w-0 flex-1">
                                         <h3 class="text-sm font-semibold">
                                             {{ REVIEW_KINDS[review.kind].label }}
-                                            <span class="text-muted-foreground font-normal"
+                                            <span class="text-muted-foreground font-normal whitespace-nowrap"
                                                 >· {{ formatPeriod(review.work_date, review.work_date) }}</span
                                             >
                                         </h3>
@@ -926,18 +1030,72 @@ const workdayContext = computed(() => {
                                         <p v-if="!evidenceFor(review) || review.kind === 'idle_kept'" class="text-muted-foreground mt-0.5 text-sm">
                                             {{ review.summary }}
                                         </p>
+                                        <p
+                                            v-if="REVIEW_KINDS[review.kind].noPayChange"
+                                            class="bg-muted mt-1.5 inline-flex rounded-md px-2 py-0.5 text-xs sm:hidden"
+                                            data-testid="review-impact-inline"
+                                        >
+                                            <span class="font-semibold">No pay change</span>
+                                            <span class="text-muted-foreground">&nbsp;· {{ REVIEW_KINDS[review.kind].impact }}</span>
+                                        </p>
                                     </div>
                                     <div
                                         v-if="review.seconds || REVIEW_KINDS[review.kind].noPayChange"
-                                        class="max-w-28 shrink-0 text-right sm:max-w-none"
+                                        class="shrink-0 text-right"
+                                        :class="REVIEW_KINDS[review.kind].noPayChange && 'hidden sm:block'"
                                         data-testid="review-impact"
                                     >
                                         <p v-if="REVIEW_KINDS[review.kind].noPayChange" class="text-sm leading-tight font-semibold">No pay change</p>
-                                        <p v-else class="text-lg leading-tight font-semibold tabular-nums">{{ formatShort(review.seconds ?? 0) }}</p>
+                                        <p
+                                            v-else
+                                            class="leading-tight tabular-nums"
+                                            :class="
+                                                REVIEW_KINDS[review.kind].contextOnly
+                                                    ? 'text-muted-foreground text-sm font-medium'
+                                                    : 'text-lg font-semibold'
+                                            "
+                                        >
+                                            {{ formatShort(review.seconds ?? 0) }}
+                                        </p>
                                         <p class="text-muted-foreground text-xs">{{ REVIEW_KINDS[review.kind].impact }}</p>
                                     </div>
                                 </div>
                                 <div class="grid gap-3 sm:pl-12">
+                                    <ul class="grid gap-1 text-sm" data-testid="review-effects">
+                                        <li
+                                            v-for="decision in review.decisions"
+                                            :id="`review-effect-${review.public_id}-${decision}`"
+                                            :key="decision"
+                                            class="text-muted-foreground transition-opacity"
+                                            :class="
+                                                confirming?.review === review.public_id &&
+                                                (confirming.decision === decision
+                                                    ? '-mx-2 rounded-md bg-amber-500/10 px-2 py-1 text-amber-950 dark:text-amber-100'
+                                                    : 'opacity-40')
+                                            "
+                                            :data-selected="
+                                                confirming?.review === review.public_id && confirming.decision === decision ? 'true' : undefined
+                                            "
+                                        >
+                                            <span class="text-foreground font-medium">{{ decisionFor(review, decision).label }}</span
+                                            >:
+                                            {{ decisionFor(review, decision).effect(review) }}
+                                        </li>
+                                        <li
+                                            v-for="(hint, index) in notesFor(review)"
+                                            :id="`review-hint-${review.public_id}-${index}`"
+                                            :key="hint"
+                                            class="flex items-start gap-1.5"
+                                            :class="hint === FINAL ? 'text-foreground font-medium' : 'text-muted-foreground'"
+                                        >
+                                            <Lock
+                                                v-if="hint === FINAL"
+                                                class="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400"
+                                                aria-hidden="true"
+                                            />
+                                            {{ hint }}
+                                        </li>
+                                    </ul>
                                     <div v-if="noting === review.public_id" class="grid gap-1.5">
                                         <Label :for="`review-note-${review.public_id}`">
                                             Note <span class="text-muted-foreground font-normal">(optional, saved with your decision)</span>
@@ -947,49 +1105,102 @@ const workdayContext = computed(() => {
                                             v-model="reviewNote"
                                             maxlength="500"
                                             class="bg-background h-9 rounded-md border px-3 text-sm"
+                                            :class="reviewError?.review === review.public_id && reviewError.field === 'note' && 'border-destructive'"
+                                            :aria-invalid="
+                                                reviewError?.review === review.public_id && reviewError.field === 'note' ? 'true' : undefined
+                                            "
+                                            :aria-describedby="
+                                                reviewError?.review === review.public_id && reviewError.field === 'note'
+                                                    ? `review-error-${review.public_id}`
+                                                    : undefined
+                                            "
                                             placeholder="e.g. Agreed with the team lead"
                                             data-testid="review-note"
                                         />
                                     </div>
                                     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                                        <div class="flex flex-wrap gap-2" role="group" :aria-label="`Decide: ${REVIEW_KINDS[review.kind].label}`">
-                                            <Button
-                                                v-for="decision in review.decisions"
-                                                :key="decision"
-                                                variant="outline"
-                                                class="gap-1.5"
-                                                :disabled="resolving !== null"
-                                                :aria-label="`${decisionFor(review, decision).label}: ${viewing.name}, ${formatPeriod(review.work_date, review.work_date)}`"
-                                                :aria-describedby="
-                                                    [
-                                                        `review-effect-${review.public_id}-${decision}`,
-                                                        ...notesFor(review).map((_, index) => `review-hint-${review.public_id}-${index}`),
-                                                    ].join(' ')
-                                                "
-                                                :data-testid="`review-${decision}`"
-                                                @click="resolveReview(review, decision)"
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <div
+                                                v-if="confirming?.review === review.public_id"
+                                                class="flex flex-wrap gap-2"
+                                                role="group"
+                                                :aria-label="`Confirm: ${REVIEW_KINDS[review.kind].label}`"
+                                                @keydown.esc="cancelConfirm(review, confirming.decision)"
                                             >
-                                                <Loader2
-                                                    v-if="resolving?.review === review.public_id && resolving.decision === decision"
-                                                    class="size-4 animate-spin"
-                                                />
-                                                {{ decisionFor(review, decision).label }}
-                                            </Button>
+                                                <Button
+                                                    :id="`review-confirm-${review.public_id}`"
+                                                    class="gap-1.5"
+                                                    :disabled="resolving !== null"
+                                                    :aria-label="`Confirm ${decisionFor(review, confirming.decision).label}: ${viewing.name}, ${formatPeriod(review.work_date, review.work_date)}. This can't be changed later.`"
+                                                    :aria-describedby="
+                                                        [
+                                                            `review-effect-${review.public_id}-${confirming.decision}`,
+                                                            reviewError?.review === review.public_id ? `review-error-${review.public_id}` : '',
+                                                        ]
+                                                            .join(' ')
+                                                            .trim()
+                                                    "
+                                                    data-testid="review-confirm"
+                                                    @click="resolveReview(review, confirming.decision)"
+                                                >
+                                                    <Loader2 v-if="resolving?.review === review.public_id" class="size-4 animate-spin" />
+                                                    Confirm: {{ decisionFor(review, confirming.decision).label }}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    :disabled="resolving !== null"
+                                                    data-testid="review-confirm-cancel"
+                                                    @click="cancelConfirm(review, confirming.decision)"
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                            <div
+                                                v-else
+                                                class="flex flex-wrap gap-2"
+                                                role="group"
+                                                :aria-label="`Decide: ${REVIEW_KINDS[review.kind].label}`"
+                                            >
+                                                <Button
+                                                    v-for="decision in review.decisions"
+                                                    :id="`review-${review.public_id}-${decision}`"
+                                                    :key="decision"
+                                                    variant="outline"
+                                                    class="gap-1.5"
+                                                    :disabled="resolving !== null"
+                                                    :aria-label="`${decisionFor(review, decision).label}: ${viewing.name}, ${formatPeriod(review.work_date, review.work_date)}`"
+                                                    :aria-describedby="
+                                                        [
+                                                            `review-effect-${review.public_id}-${decision}`,
+                                                            ...notesFor(review).map((_, index) => `review-hint-${review.public_id}-${index}`),
+                                                        ].join(' ')
+                                                    "
+                                                    :data-testid="`review-${decision}`"
+                                                    @click="chooseDecision(review, decision)"
+                                                >
+                                                    <Loader2
+                                                        v-if="resolving?.review === review.public_id && resolving.decision === decision"
+                                                        class="size-4 animate-spin"
+                                                    />
+                                                    {{ decisionFor(review, decision).label }}
+                                                </Button>
+                                            </div>
                                         </div>
                                         <div class="flex w-full flex-wrap items-center gap-x-4 gap-y-1 sm:w-auto">
                                             <button
-                                                v-if="
-                                                    review.kind === 'auto_stopped' &&
-                                                    entryFor(review.entry) &&
-                                                    entryActions(entryFor(review.entry)!).length
-                                                "
+                                                v-if="canCorrect(review)"
                                                 type="button"
                                                 class="text-muted-foreground hover:text-foreground inline-flex min-h-7 items-center gap-1.5 text-sm underline-offset-4 hover:underline"
+                                                :aria-describedby="`review-correct-hint-${review.public_id}`"
+                                                title="Changes the recorded time only. It doesn't close this review."
                                                 data-testid="review-correct"
                                                 @click="openCorrect(entryFor(review.entry)!)"
                                             >
-                                                <Clock class="size-3.5" />
+                                                <PencilLine class="size-3.5" aria-hidden="true" />
                                                 Correct hours…
+                                                <span :id="`review-correct-hint-${review.public_id}`" class="sr-only">
+                                                    Changes the recorded time only. It doesn't close this review.
+                                                </span>
                                             </button>
                                             <button
                                                 v-if="entryFor(review.entry)"
@@ -1005,7 +1216,6 @@ const workdayContext = computed(() => {
                                                 type="button"
                                                 class="text-muted-foreground hover:text-foreground inline-flex min-h-7 items-center gap-1.5 text-sm underline-offset-4 hover:underline"
                                                 :aria-expanded="noting === review.public_id"
-                                                :aria-controls="`review-note-${review.public_id}`"
                                                 data-testid="review-note-toggle"
                                                 @click="toggleNote(review.public_id)"
                                             >
@@ -1014,27 +1224,18 @@ const workdayContext = computed(() => {
                                             </button>
                                         </div>
                                     </div>
-                                    <InputError v-if="reviewError?.review === review.public_id" role="alert" :message="reviewError.message" />
-                                    <ul class="text-muted-foreground grid gap-0.5 text-xs" data-testid="review-effects">
-                                        <li
-                                            v-for="decision in review.decisions"
-                                            :id="`review-effect-${review.public_id}-${decision}`"
-                                            :key="decision"
-                                        >
-                                            <span class="text-foreground font-medium">{{ decisionFor(review, decision).label }}</span
-                                            >:
-                                            {{ decisionFor(review, decision).effect(review) }}
-                                        </li>
-                                        <li v-for="(hint, index) in notesFor(review)" :id="`review-hint-${review.public_id}-${index}`" :key="hint">
-                                            {{ hint }}
-                                        </li>
-                                    </ul>
+                                    <InputError
+                                        v-if="reviewError?.review === review.public_id"
+                                        :id="`review-error-${review.public_id}`"
+                                        role="alert"
+                                        :message="reviewError.message"
+                                    />
                                 </div>
                             </li>
                         </ul>
                     </section>
                     <div
-                        v-else-if="canManageTeam"
+                        v-else-if="canApproveTime"
                         class="flex flex-col gap-3 rounded-2xl border px-4 py-3 outline-none sm:flex-row sm:items-center"
                         tabindex="-1"
                         data-review-focus
@@ -1191,7 +1392,14 @@ const workdayContext = computed(() => {
                     <section>
                         <div class="mb-3 flex items-center justify-between gap-3">
                             <h2 class="text-sm font-semibold">Time entries</h2>
-                            <Button variant="outline" size="sm" class="gap-1.5" data-testid="add-time" @click="openAdd">
+                            <Button
+                                v-if="isSelf || canManageTeam"
+                                variant="outline"
+                                size="sm"
+                                class="gap-1.5"
+                                data-testid="add-time"
+                                @click="openAdd"
+                            >
                                 <Plus class="size-4" />
                                 Add time
                             </Button>
@@ -1267,31 +1475,44 @@ const workdayContext = computed(() => {
             <form id="add-time-form" class="grid gap-4" @submit.prevent="saveAdd">
                 <div v-if="canManageTeam" class="grid gap-1.5">
                     <Label for="add-person">Person</Label>
-                    <select id="add-person" v-model="addForm.person" class="bg-background h-10 rounded-md border px-3 text-sm">
-                        <option v-if="me" value="">You ({{ me.name }})</option>
-                        <option
-                            v-for="person in people.filter((p) => p.public_id !== me?.public_id)"
-                            :key="person.public_id"
-                            :value="person.public_id"
-                        >
-                            {{ person.name }}
-                        </option>
-                    </select>
-                    <InputError :message="addForm.errors.person" />
+                    <AppSelect
+                        id="add-person"
+                        v-model="addForm.person"
+                        :options="addPersonOptions"
+                        searchable
+                        search-placeholder="Search people…"
+                        :invalid="!!addForm.errors.person"
+                        :aria-describedby="addForm.errors.person ? 'add-person-error' : undefined"
+                    />
+                    <InputError id="add-person-error" :message="addForm.errors.person" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label for="add-project">Project</Label>
-                    <select id="add-project" v-model="addForm.project" class="bg-background h-10 rounded-md border px-3 text-sm">
-                        <option v-for="project in projects" :key="project.public_id" :value="project.public_id">{{ project.name }}</option>
-                    </select>
-                    <InputError :message="addForm.errors.project" />
+                    <AppSelect
+                        id="add-project"
+                        v-model="addForm.project"
+                        :options="projectOptions"
+                        :placeholder="projects.length ? 'Choose a project' : 'No projects yet'"
+                        search-placeholder="Search projects…"
+                        :disabled="!projects.length"
+                        :invalid="!!addForm.errors.project"
+                        :aria-describedby="addForm.errors.project ? 'add-project-error' : undefined"
+                    />
+                    <InputError id="add-project-error" :message="addForm.errors.project" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label for="add-task">Task <span class="text-muted-foreground font-normal">(optional)</span></Label>
-                    <select id="add-task" v-model="addForm.task" class="bg-background h-10 rounded-md border px-3 text-sm">
-                        <option value="">No task</option>
-                        <option v-for="task in tasksFor(addForm.project)" :key="task.public_id" :value="task.public_id">{{ task.title }}</option>
-                    </select>
+                    <AppSelect
+                        id="add-task"
+                        v-model="addForm.task"
+                        :options="taskOptions(addForm.project)"
+                        search-placeholder="Search tasks…"
+                        :placeholder="taskPlaceholder(addForm.project)"
+                        :disabled="!tasksFor(addForm.project).length"
+                        :invalid="!!addForm.errors.task"
+                        :aria-describedby="addForm.errors.task ? 'add-task-error' : undefined"
+                    />
+                    <InputError id="add-task-error" :message="addForm.errors.task" />
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <AppFormInput id="add-date" v-model="addForm.date" type="date" label="Day" :error="addForm.errors.date" required />
