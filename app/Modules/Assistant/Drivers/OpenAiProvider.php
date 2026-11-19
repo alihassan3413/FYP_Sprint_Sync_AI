@@ -77,7 +77,7 @@ class OpenAiProvider implements AiProvider
                 // Retry only transient errors. Don't retry on 4xx (our bug)
                 // or 401 (bad key) — those won't fix themselves.
                 return $exception instanceof ConnectionException;
-            })
+            }, throw: false)
             // withOptions stream:true tells Guzzle to give us a stream
             // resource instead of buffering the whole response.
             ->withOptions(['stream' => true])

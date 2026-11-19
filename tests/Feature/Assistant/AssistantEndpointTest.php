@@ -91,4 +91,21 @@ final class AssistantEndpointTest extends TestCase
             ->postJson(route('assistant.chat'), ['message' => 'hello'])
             ->assertStatus(429);
     }
+
+    public function test_the_minute_and_day_limits_count_each_message_once(): void
+    {
+        config(['assistant.rate_limits.per_minute' => 4]);
+
+        $user = User::factory()->create();
+
+        foreach (range(1, 4) as $ignored) {
+            $this->actingAs($user)
+                ->postJson(route('assistant.chat'), ['message' => ''])
+                ->assertStatus(422);
+        }
+
+        $this->actingAs($user)
+            ->postJson(route('assistant.chat'), ['message' => ''])
+            ->assertStatus(429);
+    }
 }
