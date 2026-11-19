@@ -76,7 +76,7 @@ final class ChatController
             ->where('user_id', $user->id)
             ->findOrFail($conversationId);
 
-        if ($conversation->workspace_id === null && $workspaceId !== null) {
+        if ($workspaceId !== null && (int) $workspaceId !== $conversation->workspace_id) {
             $conversation->update(['workspace_id' => $workspaceId]);
         }
 

@@ -77,6 +77,23 @@ final class AssistantEndpointTest extends TestCase
         $this->assertSame(Message::STATUS_PENDING, $pending->refresh()->tool_status);
     }
 
+    public function test_an_existing_conversation_follows_a_workspace_switch(): void
+    {
+        $user = User::factory()->create();
+        $alpha = Workspace::factory()->ownedBy($user)->create();
+        $beta = Workspace::factory()->ownedBy($user)->create();
+        $conversation = Conversation::factory()->create(['user_id' => $user->id, 'workspace_id' => $alpha->id]);
+
+        $user->forceFill(['current_workspace_id' => $beta->id])->save();
+
+        $this->actingAs($user)->postJson(route('assistant.chat'), [
+            'message' => 'hello',
+            'conversation_id' => $conversation->id,
+        ]);
+
+        $this->assertSame($beta->id, $conversation->fresh()->workspace_id);
+    }
+
     public function test_chat_is_rate_limited(): void
     {
         config(['assistant.rate_limits.per_minute' => 2]);
